@@ -44,18 +44,18 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
         const firebaseConfig = {
-            apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
-            authDomain: "actiongame-7c8c9.firebaseapp.com",
-            projectId: "actiongame-7c8c9",
-            storageBucket: "actiongame-7c8c9.firebasestorage.app",
-            messagingSenderId: "386021872588",
-            appId: "1:386021872588:web:eb6019fa0a182d3aec4369",
-            measurementId: "G-W6CNY1D4RL"
+            apiKey: "AIzaSyAdCP5BvvIhcjYt2_Re80JKKDKqfbgjtvk",
+            authDomain: "drum-8d969.firebaseapp.com",
+            projectId: "drum-8d969",
+            storageBucket: "drum-8d969.firebasestorage.app",
+            messagingSenderId: "28100257204",
+            appId: "1:28100257204:web:2d787ad57171b2d820fee1",
+            measurementId: "G-NLXPNWL0RS"
         };
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
-        const appId = "discipline-app-v14";
+        const appId = "discipline-app-v15";
 
         const formatDateKey = (date) => {
             const y = date.getFullYear();
