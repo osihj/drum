@@ -542,9 +542,8 @@
                             </>
                         )}
                         {activeTab === 'calendar' && <CalendarView dailyLogs={dailyLogs} />}
-                        {activeTab === 'profile' && <ProfileView dailyLogs={dailyLogs} />}
+                        {activeTab === 'profile' && <ProfileView dailyLogs={dailyLogs} isAdmin={isAdmin} />}
                         {activeTab === 'leaderboard' && <LeaderboardView currentUser={user} userTeamId={userProfile?.teamId} />}
-                        {activeTab === 'admin' && <AdminView />}
                     </main>
 
                     {isModalOpen && (
@@ -569,12 +568,11 @@
                     )}
 
                     <nav className="fixed bottom-8 left-0 right-0 px-8 z-40">
-                        <div className={`mx-auto flex justify-between items-center bg-white/95 neo-border rounded-[2rem] p-2.5 neo-shadow-sm ${isAdmin ? 'max-w-sm' : 'max-w-xs'}`}>
+                        <div className="max-w-xs mx-auto flex justify-between items-center bg-white/95 neo-border rounded-[2rem] p-2.5 neo-shadow-sm">
                             <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon="Mountain" label="修煉" />
                             <NavBtn active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} icon="Scroll" label="卷軸" />
                             <NavBtn active={activeTab === 'leaderboard'} onClick={() => setActiveTab('leaderboard')} icon="Trophy" label="排行" />
                             <NavBtn active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon="UserRound" label="洞府" />
-                            {isAdmin && <NavBtn active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} icon="Shield" label="後台" />}
                         </div>
                     </nav>
                 </div>
@@ -668,7 +666,7 @@
             );
         };
 
-        const ProfileView = ({ dailyLogs }) => {
+        const ProfileView = ({ dailyLogs, isAdmin }) => {
             const mStats = useMemo(() => {
                 const now = new Date();
                 const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -712,6 +710,15 @@
                         <StatBlock label="運動" value={mStats.mExMins} unit="mins" color="pk-orange" />
                         <StatBlock label="拉筋" value={mStats.mStretchMins} unit="mins" color="pk-pink" />
                     </div>
+                    {isAdmin && (
+                        <div className="mt-4">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Icon name="Shield" size={16} className="text-[#4b5563]" />
+                                <span className="sans-font text-xs text-[#4b5563] tracking-widest">管理員後台</span>
+                            </div>
+                            <AdminView />
+                        </div>
+                    )}
                 </div>
             );
         };
