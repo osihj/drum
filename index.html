@@ -56,6 +56,7 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
         const appId = "discipline-app-v15";
+        const ADMIN_EMAIL = "happypiecejoy@gmail.com";
 
         const formatDateKey = (date) => {
             const y = date.getFullYear();
@@ -521,6 +522,7 @@
                         {activeTab === 'calendar' && <CalendarView dailyLogs={dailyLogs} />}
                         {activeTab === 'profile' && <ProfileView dailyLogs={dailyLogs} />}
                         {activeTab === 'leaderboard' && <LeaderboardView currentUser={user} userTeamId={userProfile?.teamId} />}
+                        {activeTab === 'admin' && <AdminView />}
                     </main>
 
                     {isModalOpen && (
@@ -550,6 +552,7 @@
                             <NavBtn active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} icon="Scroll" label="卷軸" />
                             <NavBtn active={activeTab === 'leaderboard'} onClick={() => setActiveTab('leaderboard')} icon="Trophy" label="排行" />
                             <NavBtn active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon="UserRound" label="洞府" />
+                            {user?.email === ADMIN_EMAIL && <NavBtn active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} icon="Shield" label="後台" />}
                         </div>
                     </nav>
                 </div>
@@ -719,6 +722,209 @@
                 <span className="text-[10px] sans-font opacity-40">{total} 分鐘</span>
             </div>
         );
+
+        // ─── Admin View ─────────────────────────────────────────────────
+        const AdminView = () => {
+            const [teams, setTeams] = useState([]);
+            const [users, setUsers] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [movingUser, setMovingUser] = useState(null); // { uid, name }
+            const [newTeamName, setNewTeamName] = useState('');
+            const [creating, setCreating] = useState(false);
+            const [tab, setTab] = useState('teams'); // 'teams' | 'users'
+
+            useEffect(() => {
+                const unsubTeams = db.collection('artifacts').doc(appId).collection('teams')
+                    .onSnapshot(snap => {
+                        const list = [];
+                        snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+                        setTeams(list);
+                    });
+                const unsubUsers = db.collection('artifacts').doc(appId).collection('users')
+                    .onSnapshot(snap => {
+                        const list = [];
+                        snap.forEach(doc => list.push({ uid: doc.id, ...doc.data() }));
+                        setUsers(list);
+                        setLoading(false);
+                    });
+                return () => { unsubTeams(); unsubUsers(); };
+            }, []);
+
+            const deleteTeam = async (team) => {
+                const membersInTeam = users.filter(u => u.teamId === team.id);
+                if (!window.confirm(`確定刪除「${team.name}」門派？\n${membersInTeam.length > 0 ? `⚠️ 裡面還有 ${membersInTeam.length} 位成員，他們將變成無門派狀態。` : '此門派目前沒有成員。'}`)) return;
+                // Clear teamId for all members
+                const batch = db.batch();
+                membersInTeam.forEach(u => {
+                    const ref = db.collection('artifacts').doc(appId).collection('users').doc(u.uid);
+                    batch.update(ref, { teamId: firebase.firestore.FieldValue.delete(), teamName: firebase.firestore.FieldValue.delete() });
+                });
+                batch.delete(db.collection('artifacts').doc(appId).collection('teams').doc(team.id));
+                await batch.commit();
+            };
+
+            const createTeam = async () => {
+                const name = newTeamName.trim();
+                if (!name) return;
+                setCreating(true);
+                await db.collection('artifacts').doc(appId).collection('teams').add({
+                    name, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                setNewTeamName('');
+                setCreating(false);
+            };
+
+            const moveUserToTeam = async (uid, teamId, teamName) => {
+                await db.collection('artifacts').doc(appId).collection('users').doc(uid)
+                    .update({ teamId, teamName });
+                setMovingUser(null);
+            };
+
+            const removeUserFromTeam = async (uid) => {
+                if (!window.confirm('確定將此成員移出門派？')) return;
+                await db.collection('artifacts').doc(appId).collection('users').doc(uid)
+                    .update({ teamId: firebase.firestore.FieldValue.delete(), teamName: firebase.firestore.FieldValue.delete() });
+            };
+
+            const teamColors = ['pk-yellow','pk-blue','pk-pink','pk-green','pk-purple','pk-orange'];
+
+            return (
+                <div className="space-y-5 animate-in fade-in duration-300">
+                    {/* Header */}
+                    <div className="bg-[#4b5563] p-6 rounded-[2.5rem] relative overflow-hidden">
+                        <div className="relative z-10">
+                            <h2 className="sans-font text-2xl text-white mb-1">管理員後台</h2>
+                            <p className="text-xs text-white/50 sans-font">門派與成員管理</p>
+                        </div>
+                        <Icon name="Shield" size={90} className="absolute -bottom-4 -right-3 text-white/10 rotate-12" />
+                    </div>
+
+                    {/* Sub tabs */}
+                    <div className="flex bg-white rounded-2xl neo-border-thin p-1">
+                        <button onClick={() => setTab('teams')} className={`flex-1 py-2 sans-font text-xs rounded-xl transition-all ${tab === 'teams' ? 'pk-blue' : 'opacity-40'}`}>門派管理</button>
+                        <button onClick={() => setTab('users')} className={`flex-1 py-2 sans-font text-xs rounded-xl transition-all ${tab === 'users' ? 'pk-blue' : 'opacity-40'}`}>成員管理</button>
+                    </div>
+
+                    {/* ── Teams tab ── */}
+                    {tab === 'teams' && (
+                        <div className="space-y-4">
+                            {/* Create team */}
+                            <div className="bg-white p-5 rounded-[2rem] neo-border-thin space-y-3">
+                                <p className="sans-font text-xs opacity-50 tracking-widest">新增門派</p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text" value={newTeamName}
+                                        onChange={e => setNewTeamName(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && createTeam()}
+                                        placeholder="門派名稱..."
+                                        className="flex-1 border-[2px] border-[#4b5563] rounded-2xl px-4 py-2 text-sm sans-font focus:outline-none bg-slate-50"
+                                    />
+                                    <button onClick={createTeam} disabled={creating || !newTeamName.trim()}
+                                        className="pk-green px-5 py-2 rounded-2xl neo-border-thin sans-font text-sm active-press disabled:opacity-30">
+                                        {creating ? '...' : '新增'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Team list */}
+                            {teams.length === 0 && <p className="text-center text-xs opacity-30 sans-font py-4">尚無門派</p>}
+                            {teams.map((team, i) => {
+                                const memberCount = users.filter(u => u.teamId === team.id).length;
+                                const color = teamColors[i % teamColors.length];
+                                return (
+                                    <div key={team.id} className="bg-white p-5 rounded-[2rem] neo-border-thin">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-10 h-10 ${color} neo-border-thin rounded-xl flex items-center justify-center`}>
+                                                    <Icon name="Sword" size={18} className="text-[#374151]" />
+                                                </div>
+                                                <div>
+                                                    <p className="sans-font text-base">{team.name}</p>
+                                                    <p className="text-[10px] opacity-40 sans-font">{memberCount} 位成員</p>
+                                                </div>
+                                            </div>
+                                            <button onClick={() => deleteTeam(team)}
+                                                className="w-9 h-9 bg-red-50 border-[1.5px] border-red-200 rounded-xl flex items-center justify-center active-press hover:bg-red-100">
+                                                <Icon name="Trash2" size={16} className="text-red-400" />
+                                            </button>
+                                        </div>
+                                        {/* Members preview */}
+                                        {memberCount > 0 && (
+                                            <div className="mt-3 pl-13 flex flex-wrap gap-1 pl-12">
+                                                {users.filter(u => u.teamId === team.id).map(u => (
+                                                    <span key={u.uid} className="text-[10px] bg-slate-100 px-2 py-1 rounded-full sans-font opacity-60 truncate max-w-[120px]">
+                                                        {u.displayName || u.email}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* ── Users tab ── */}
+                    {tab === 'users' && (
+                        <div className="space-y-3">
+                            {loading && <p className="text-center text-xs opacity-30 sans-font py-4">載入中...</p>}
+                            {users.map(u => {
+                                const teamName = teams.find(t => t.id === u.teamId)?.name;
+                                return (
+                                    <div key={u.uid} className="bg-white p-4 rounded-[2rem] neo-border-thin">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="sans-font text-sm truncate">{u.displayName || u.email}</p>
+                                                <p className="text-[10px] opacity-30 sans-font truncate">{u.email}</p>
+                                                {teamName
+                                                    ? <span className="text-[10px] pk-blue px-2 py-0.5 rounded-full sans-font mt-1 inline-block">{teamName}</span>
+                                                    : <span className="text-[10px] bg-red-50 text-red-400 px-2 py-0.5 rounded-full sans-font mt-1 inline-block">無門派</span>
+                                                }
+                                            </div>
+                                            <div className="flex gap-2 ml-2">
+                                                <button onClick={() => setMovingUser({ uid: u.uid, name: u.displayName || u.email })}
+                                                    className="px-3 py-2 bg-slate-100 neo-border-thin rounded-xl text-[10px] sans-font active-press">
+                                                    換組
+                                                </button>
+                                                {u.teamId && (
+                                                    <button onClick={() => removeUserFromTeam(u.uid)}
+                                                        className="w-9 h-9 bg-red-50 border-[1.5px] border-red-200 rounded-xl flex items-center justify-center active-press">
+                                                        <Icon name="UserMinus" size={14} className="text-red-400" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* Move user modal */}
+                    {movingUser && (
+                        <div className="fixed inset-0 z-50 flex items-end justify-center overlay-blur p-6">
+                            <div className="w-full max-w-sm bg-white rounded-[2.5rem] neo-border neo-shadow p-7 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <p className="sans-font text-base">將 <span className="text-[#74c0fc]">{movingUser.name}</span> 移至...</p>
+                                    <button onClick={() => setMovingUser(null)}><Icon name="X" size={20} className="opacity-40" /></button>
+                                </div>
+                                <div className="space-y-2 max-h-64 overflow-y-auto">
+                                    {teams.map((team, i) => (
+                                        <button key={team.id} onClick={() => moveUserToTeam(movingUser.uid, team.id, team.name)}
+                                            className={`w-full flex items-center gap-3 p-4 rounded-2xl neo-border-thin active-press hover:bg-slate-50`}>
+                                            <div className={`w-8 h-8 ${teamColors[i % teamColors.length]} rounded-xl flex items-center justify-center neo-border-thin`}>
+                                                <Icon name="Sword" size={14} />
+                                            </div>
+                                            <span className="sans-font text-sm">{team.name}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
 
         const NavBtn = ({ active, onClick, icon, label }) => (
             <button onClick={onClick} className={`flex flex-col items-center p-3 rounded-2xl transition-all ${active ? 'pk-blue text-[#374151] neo-border-thin shadow-md' : 'opacity-30 hover:opacity-50'}`}>
