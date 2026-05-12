@@ -707,9 +707,22 @@
                 <div className="space-y-6 animate-in slide-in-from-bottom-4">
                     <div className="text-center space-y-4">
                         <div className="flex flex-col items-center">
-                            <div className={`w-28 h-28 rounded-[2.5rem] ${mStats.realm.color} neo-border flex items-center justify-center rotate-3 shadow-lg relative mb-4`}>
-                                <Icon name={mStats.realm.icon} size={48} className="text-[#374151] -rotate-3" />
-                                <div className="absolute -bottom-2 -right-2 bg-white neo-border-thin px-3 py-1 rounded-full text-xs sans-font shadow-sm">Lv.{mStats.displayLevel}</div>
+                            <div className={`w-28 h-28 rounded-[2.5rem] ${mStats.realm.color} neo-border flex items-center justify-center rotate-3 shadow-lg relative mb-4 overflow-hidden`}>
+                                {user?.photoURL ? (
+                                    <img
+                                        src={user.photoURL}
+                                        alt="avatar"
+                                        className="w-full h-full object-cover -rotate-3"
+                                        onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }}
+                                    />
+                                ) : null}
+                                <div
+                                    className="w-full h-full items-center justify-center -rotate-3"
+                                    style={{ display: user?.photoURL ? 'none' : 'flex' }}
+                                >
+                                    <Icon name={mStats.realm.icon} size={48} className="text-[#374151]" />
+                                </div>
+                                <div className="absolute -bottom-2 -right-2 bg-white neo-border-thin px-3 py-1 rounded-full text-xs sans-font shadow-sm z-10">Lv.{mStats.displayLevel}</div>
                             </div>
                             <p className="sans-font text-lg text-[#374151] tracking-wide">{user?.displayName?.split(' ')[0] || user?.email?.split('@')[0]}</p>
                             <h2 className="sans-font text-2xl text-[#374151] italic tracking-widest">{mStats.realm.title}</h2>
