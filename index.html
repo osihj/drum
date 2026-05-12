@@ -119,17 +119,29 @@
             const handleGoogleLogin = async () => {
                 setLoading(true);
                 setError('');
+                const provider = new firebase.auth.GoogleAuthProvider();
                 try {
-                    const provider = new firebase.auth.GoogleAuthProvider();
-                    await auth.signInWithRedirect(provider);
-                } catch (e) {
-                    setError('登入失敗，請再試一次');
-                    setLoading(false);
+                    await auth.signInWithPopup(provider);
+                } catch (popupError) {
+                    // popup blocked, fallback to redirect
+                    if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/popup-closed-by-user') {
+                        try {
+                            await auth.signInWithRedirect(provider);
+                        } catch (e) {
+                            setError('登入失敗，請再試一次');
+                            setLoading(false);
+                        }
+                    } else {
+                        setError('登入失敗：' + popupError.message);
+                        setLoading(false);
+                    }
                 }
             };
 
             useEffect(() => {
-                auth.getRedirectResult().catch(() => {});
+                auth.getRedirectResult().then(result => {
+                    if (result?.user) setLoading(false);
+                }).catch(() => setLoading(false));
             }, []);
 
             return (
