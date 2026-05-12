@@ -409,7 +409,7 @@
                 return () => unsub();
             }, [user]);
 
-            const handleJoinTeam = (teamId, teamName) => {
+            const isAdmin = user?.email?.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase().trim();
                 setUserProfile(prev => ({ ...prev, teamId, teamName }));
             };
 
@@ -476,8 +476,11 @@
                             <span className="sans-font text-2xl tracking-tighter text-[#374151]">自律動起來</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <span className="text-[10px] sans-font opacity-40 max-w-[80px] truncate">{userProfile?.teamName}</span>
-                            {user?.email === ADMIN_EMAIL && <span className="text-[9px] bg-[#4b5563] text-white px-2 py-0.5 rounded-full sans-font">管理員</span>}
+                            <div className="text-right">
+                                <p className="text-xs sans-font opacity-70 truncate max-w-[80px]">{user?.displayName?.split(' ')[0] || user?.email?.split('@')[0]}</p>
+                                <p className="text-[9px] sans-font opacity-30 truncate max-w-[80px]">{userProfile?.teamName}</p>
+                            </div>
+                            {isAdmin && <span className="text-[9px] bg-[#4b5563] text-white px-2 py-0.5 rounded-full sans-font">管理員</span>}
                             <button onClick={handleSignOut} className="w-8 h-8 bg-slate-100 neo-border-thin rounded-full flex items-center justify-center active-press">
                                 <Icon name="LogOut" size={14} />
                             </button>
@@ -548,12 +551,12 @@
                     )}
 
                     <nav className="fixed bottom-8 left-0 right-0 px-8 z-40">
-                        <div className={`mx-auto flex justify-between items-center bg-white/95 neo-border rounded-[2rem] p-2.5 neo-shadow-sm ${user?.email === ADMIN_EMAIL ? 'max-w-sm' : 'max-w-xs'}`}>
+                        <div className={`mx-auto flex justify-between items-center bg-white/95 neo-border rounded-[2rem] p-2.5 neo-shadow-sm ${isAdmin ? 'max-w-sm' : 'max-w-xs'}`}>
                             <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon="Mountain" label="修煉" />
                             <NavBtn active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} icon="Scroll" label="卷軸" />
                             <NavBtn active={activeTab === 'leaderboard'} onClick={() => setActiveTab('leaderboard')} icon="Trophy" label="排行" />
                             <NavBtn active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon="UserRound" label="洞府" />
-                            {user?.email === ADMIN_EMAIL && <NavBtn active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} icon="Shield" label="後台" />}
+                            {isAdmin && <NavBtn active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} icon="Shield" label="後台" />}
                         </div>
                     </nav>
                 </div>
