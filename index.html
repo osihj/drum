@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>自律動起來 - 修真境界版 V15</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <style type="text/tailwindcss">
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        @layer utilities {
+            .neo-border { @apply border-[3px] border-[#4b5563]; }
+            .neo-border-thin { @apply border-[1.5px] border-[#4b5563]; }
+            .neo-shadow { box-shadow: 6px 6px 0px 0px #4b5563; }
+            .neo-shadow-sm { box-shadow: 3px 3px 0px 0px #4b5563; }
+            .active-press { @apply active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all; }
+            .overlay-blur { backdrop-filter: blur(8px); background-color: rgba(75, 85, 99, 0.4); }
+            .sans-font { font-family: 'Noto Sans TC', sans-serif; font-weight: 900; }
+            .float-anim { animation: float 3s ease-in-out infinite; }
+            @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+            .pk-blue { background-color: #74c0fc; }
+            .pk-yellow { background-color: #ffd43b; }
+            .pk-pink { background-color: #ff8787; }
+            .pk-green { background-color: #8ce99a; }
+            .pk-purple { background-color: #b197fc; }
+            .pk-orange { background-color: #ff922b; }
+            .vibrant-card { background: linear-gradient(135deg, #ffffff 0%, #e7f5ff 100%); }
+        }
+        body { font-family: 'Noto Sans TC', sans-serif; @apply bg-[#f8fafc] text-[#374151] antialiased; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+        const firebaseConfig = {
+            apiKey: "AIzaSyD9KAWLvPjTOIoImxobugT6dQUbQmJiCGg",
+            authDomain: "actiongame-7c8c9.firebaseapp.com",
+            projectId: "actiongame-7c8c9",
+            storageBucket: "actiongame-7c8c9.firebasestorage.app",
+            messagingSenderId: "386021872588",
+            appId: "1:386021872588:web:eb6019fa0a182d3aec4369",
+            measurementId: "G-W6CNY1D4RL"
+        };
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const appId = "discipline-app-v14";
+
+        const formatDateKey = (date) => {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        };
+
+        const getWeekDays = (baseDate = new Date()) => {
+            const start = new Date(baseDate);
+            const day = start.getDay();
+            const diff = start.getDate() - day;
+            start.setDate(diff);
+            start.setHours(0,0,0,0);
+            return Array.from({ length: 7 }, (_, i) => {
+                const d = new Date(start);
+                d.setDate(start.getDate() + i);
+                return d;
+            });
+        };
+
+        const calcScore = (logs) => {
+            const now = new Date();
+            const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            let mActiveDays = 0, mExMins = 0, mStretchMins = 0, mPracCount = 0;
+            Object.entries(logs || {}).forEach(([key, val]) => {
+                if (key.startsWith(prefix)) {
+                    const p = val.practice || 0, e = val.exerciseTime || 0, s = val.stretchTime || 0;
+                    if ((p + e + s + (val.fiveMin || 0)) > 0) mActiveDays++;
+                    mExMins += e; mStretchMins += s; mPracCount += p;
+                }
+            });
+            const totalHours = (mExMins + mStretchMins) / 60;
+            return Math.round((mActiveDays * 10) + totalHours + (mPracCount * 5));
+        };
+
+        const Icon = ({ name, size = 24, className = "", strokeWidth = 3 }) => {
+            const ref = useRef(null);
+            useEffect(() => {
+                if (window.lucide && ref.current) {
+                    ref.current.innerHTML = '';
+                    const icon = window.lucide.icons[name];
+                    if (icon) {
+                        const el = window.lucide.createElement(icon);
+                        el.setAttribute('width', size);
+                        el.setAttribute('height', size);
+                        el.setAttribute('stroke-width', strokeWidth);
+                        ref.current.appendChild(el);
+                    }
+                }
+            }, [name, size, strokeWidth]);
+            return <span ref={ref} className={`inline-flex items-center justify-center ${className}`}></span>;
+        };
+
+        // ─── Login Screen ──────────────────────────────────────────────
+        const LoginScreen = ({ onLogin }) => {
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState('');
+
+            const handleGoogleLogin = async () => {
+                setLoading(true);
+                setError('');
+                try {
+                    const provider = new firebase.auth.GoogleAuthProvider();
+                    await auth.signInWithPopup(provider);
+                } catch (e) {
+                    setError('登入失敗，請再試一次');
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="max-w-md mx-auto min-h-screen flex flex-col items-center justify-center p-8 gap-10">
+                    <div className="text-center space-y-3">
+                        <div className="w-24 h-24 pk-blue neo-border rounded-[2rem] flex items-center justify-center mx-auto neo-shadow float-anim">
+                            <Icon name="Star" size={48} className="text-white" />
+                        </div>
+                        <h1 className="sans-font text-4xl tracking-tighter text-[#374151]">自律動起來</h1>
+                        <p className="text-sm opacity-50 sans-font">修真境界版 · 組隊競修</p>
+                    </div>
+
+                    <div className="w-full bg-white p-8 rounded-[2.5rem] neo-border neo-shadow space-y-5">
+                        <p className="sans-font text-center text-[#374151]/60 text-xs tracking-widest">以 Google 帳號登入，加入門派</p>
+                        <button
+                            onClick={handleGoogleLogin}
+                            disabled={loading}
+                            className="w-full flex items-center justify-center gap-4 bg-white border-[3px] border-[#4b5563] rounded-2xl py-4 active-press neo-shadow-sm hover:bg-slate-50 transition-colors"
+                        >
+                            <svg width="22" height="22" viewBox="0 0 48 48">
+                                <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
+                                <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+                                <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
+                                <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+                            </svg>
+                            <span className="sans-font text-lg text-[#374151]">{loading ? '登入中...' : '使用 Google 登入'}</span>
+                        </button>
+                        {error && <p className="text-center text-red-400 text-xs sans-font">{error}</p>}
+                    </div>
+                </div>
+            );
+        };
+
+        // ─── Team Selection Screen ──────────────────────────────────────
+        const TeamSelectScreen = ({ user, onJoinTeam }) => {
+            const [teams, setTeams] = useState([]);
+            const [newTeamName, setNewTeamName] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [creating, setCreating] = useState(false);
+
+            useEffect(() => {
+                const unsub = db.collection('artifacts').doc(appId).collection('teams')
+                    .onSnapshot(snap => {
+                        const list = [];
+                        snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+                        setTeams(list);
+                    });
+                return () => unsub();
+            }, []);
+
+            const joinTeam = async (teamId, teamName) => {
+                setLoading(true);
+                await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).set({
+                    teamId, teamName,
+                    displayName: user.displayName || user.email,
+                    email: user.email,
+                    photoURL: user.photoURL || '',
+                }, { merge: true });
+                onJoinTeam(teamId, teamName);
+            };
+
+            const createTeam = async () => {
+                const name = newTeamName.trim();
+                if (!name) return;
+                setCreating(true);
+                const ref = db.collection('artifacts').doc(appId).collection('teams').doc();
+                await ref.set({ name, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                await joinTeam(ref.id, name);
+            };
+
+            return (
+                <div className="max-w-md mx-auto min-h-screen flex flex-col p-6 gap-6">
+                    <div className="text-center pt-10 pb-4">
+                        <div className="w-20 h-20 pk-purple neo-border rounded-[2rem] flex items-center justify-center mx-auto mb-4 neo-shadow">
+                            <Icon name="Users" size={40} className="text-white" />
+                        </div>
+                        <h2 className="sans-font text-3xl tracking-tighter">選擇門派</h2>
+                        <p className="text-xs opacity-40 sans-font mt-1">加入或創建你的修煉門派</p>
+                    </div>
+
+                    {/* Existing teams */}
+                    <div className="space-y-3">
+                        {teams.length === 0 && (
+                            <p className="text-center text-xs opacity-30 sans-font py-4">還沒有門派，成為第一個創立者！</p>
+                        )}
+                        {teams.map(t => (
+                            <button key={t.id} onClick={() => joinTeam(t.id, t.name)}
+                                className="w-full bg-white p-5 rounded-2xl neo-border-thin flex items-center justify-between active-press hover:bg-slate-50">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 pk-yellow neo-border-thin rounded-xl flex items-center justify-center">
+                                        <Icon name="Sword" size={18} className="text-[#374151]" />
+                                    </div>
+                                    <span className="sans-font text-lg">{t.name}</span>
+                                </div>
+                                <Icon name="ChevronRight" size={20} className="opacity-30" />
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Create new team */}
+                    <div className="bg-white p-6 rounded-[2rem] neo-border neo-shadow-sm space-y-4">
+                        <p className="sans-font text-xs opacity-50 tracking-widest">創建新門派</p>
+                        <input
+                            type="text"
+                            value={newTeamName}
+                            onChange={e => setNewTeamName(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && createTeam()}
+                            placeholder="輸入門派名稱..."
+                            className="w-full border-[2px] border-[#4b5563] rounded-2xl px-4 py-3 text-sm sans-font focus:outline-none focus:border-[#74c0fc] bg-slate-50"
+                        />
+                        <button onClick={createTeam} disabled={creating || !newTeamName.trim()}
+                            className="w-full pk-green py-4 rounded-2xl neo-border sans-font text-lg active-press disabled:opacity-30">
+                            {creating ? '創立中...' : '⚔️ 創立門派'}
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        // ─── Leaderboard View ───────────────────────────────────────────
+        const LeaderboardView = ({ currentUser, userTeamId }) => {
+            const [leaderboard, setLeaderboard] = useState([]);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                // Fetch all teams
+                const unsubTeams = db.collection('artifacts').doc(appId).collection('teams')
+                    .onSnapshot(async teamSnap => {
+                        const teams = {};
+                        teamSnap.forEach(doc => { teams[doc.id] = { id: doc.id, name: doc.data().name, members: [] }; });
+
+                        // Fetch all users
+                        const usersSnap = await db.collection('artifacts').doc(appId).collection('users').get();
+                        const userPromises = [];
+                        usersSnap.forEach(userDoc => {
+                            const userData = userDoc.data();
+                            if (userData.teamId && teams[userData.teamId]) {
+                                const uid = userDoc.id;
+                                userPromises.push(
+                                    db.collection('artifacts').doc(appId).collection('users').doc(uid)
+                                        .collection('dailyLogs').get()
+                                        .then(logsSnap => {
+                                            const logs = {};
+                                            logsSnap.forEach(d => logs[d.id] = d.data());
+                                            const score = calcScore(logs);
+                                            teams[userData.teamId].members.push({
+                                                uid, name: userData.displayName || userData.email, score
+                                            });
+                                        })
+                                );
+                            }
+                        });
+                        await Promise.all(userPromises);
+
+                        const result = Object.values(teams).map(t => {
+                            const total = t.members.reduce((s, m) => s + m.score, 0);
+                            const avg = t.members.length ? Math.round(total / t.members.length) : 0;
+                            return { ...t, total, avg };
+                        }).sort((a, b) => b.total - a.total);
+
+                        setLeaderboard(result);
+                        setLoading(false);
+                    });
+                return () => unsubTeams();
+            }, []);
+
+            const medals = ['🥇','🥈','🥉'];
+            const teamColors = ['pk-yellow','pk-blue','pk-pink','pk-green','pk-purple','pk-orange'];
+
+            return (
+                <div className="space-y-5 animate-in fade-in duration-300">
+                    <div className="vibrant-card p-6 rounded-[2.5rem] neo-border neo-shadow relative overflow-hidden">
+                        <div className="relative z-10">
+                            <h2 className="sans-font text-2xl text-[#374151] mb-1">門派排行榜</h2>
+                            <p className="text-xs opacity-40 sans-font">本月累積道行競技</p>
+                        </div>
+                        <Icon name="Trophy" size={90} className="absolute -bottom-4 -right-3 text-[#ffd43b]/20 rotate-12" />
+                    </div>
+
+                    {loading && (
+                        <div className="text-center py-12 opacity-30 sans-font text-sm">載入排行榜中...</div>
+                    )}
+
+                    {!loading && leaderboard.length === 0 && (
+                        <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有門派資料</div>
+                    )}
+
+                    {leaderboard.map((team, i) => {
+                        const isMyTeam = team.id === userTeamId;
+                        const color = teamColors[i % teamColors.length];
+                        return (
+                            <div key={team.id} className={`bg-white p-5 rounded-[2rem] ${isMyTeam ? 'neo-border neo-shadow' : 'neo-border-thin'}`}>
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-11 h-11 ${color} neo-border-thin rounded-2xl flex items-center justify-center text-xl font-black`}>
+                                            {i < 3 ? medals[i] : i + 1}
+                                        </div>
+                                        <div>
+                                            <p className="sans-font text-lg">{team.name}</p>
+                                            {isMyTeam && <span className="text-[10px] pk-blue px-2 py-0.5 rounded-full sans-font">我的門派</span>}
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="sans-font text-2xl text-[#374151]">{team.total}</div>
+                                        <div className="text-[10px] opacity-40 sans-font">總道行</div>
+                                    </div>
+                                </div>
+
+                                {/* Stats row */}
+                                <div className="flex gap-3 mb-4">
+                                    <div className="flex-1 bg-slate-50 rounded-2xl p-3 text-center">
+                                        <div className="sans-font text-lg">{team.avg}</div>
+                                        <div className="text-[10px] opacity-40 sans-font">人均道行</div>
+                                    </div>
+                                    <div className="flex-1 bg-slate-50 rounded-2xl p-3 text-center">
+                                        <div className="sans-font text-lg">{team.members.length}</div>
+                                        <div className="text-[10px] opacity-40 sans-font">門人數</div>
+                                    </div>
+                                </div>
+
+                                {/* Members */}
+                                {team.members.length > 0 && (
+                                    <div className="space-y-1.5">
+                                        {team.members.sort((a,b) => b.score - a.score).map((m, mi) => (
+                                            <div key={m.uid} className="flex items-center justify-between text-xs px-2 py-1.5 rounded-xl hover:bg-slate-50">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="opacity-30 sans-font w-4">{mi + 1}</span>
+                                                    <span className="sans-font opacity-70 truncate max-w-[160px]">{m.name}</span>
+                                                </div>
+                                                <span className="sans-font font-black">{m.score} 點</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        };
+
+        // ─── Main App ──────────────────────────────────────────────────
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [authReady, setAuthReady] = useState(false);
+            const [userProfile, setUserProfile] = useState(null);
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [isModalOpen, setIsModalOpen] = useState(false);
+            const [dailyLogs, setDailyLogs] = useState({});
+            const todayKey = useMemo(() => formatDateKey(new Date()), []);
+            const currentWeekDays = useMemo(() => getWeekDays(new Date()), []);
+
+            // Auth state
+            useEffect(() => {
+                return auth.onAuthStateChanged(u => {
+                    setUser(u);
+                    setAuthReady(true);
+                });
+            }, []);
+
+            // Load user profile (team info)
+            useEffect(() => {
+                if (!user) return;
+                const unsub = db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
+                    .onSnapshot(snap => {
+                        if (snap.exists) setUserProfile(snap.data());
+                        else setUserProfile(null);
+                    });
+                return () => unsub();
+            }, [user]);
+
+            // Load daily logs
+            useEffect(() => {
+                if (!user) return;
+                const unsub = db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
+                    .collection('dailyLogs').onSnapshot(snap => {
+                        const logs = {};
+                        snap.forEach(doc => logs[doc.id] = doc.data());
+                        setDailyLogs(logs);
+                    });
+                return () => unsub();
+            }, [user]);
+
+            const handleJoinTeam = (teamId, teamName) => {
+                setUserProfile(prev => ({ ...prev, teamId, teamName }));
+            };
+
+            const stats = useMemo(() => {
+                const startOfWeek = currentWeekDays[0];
+                let wEx = 0, wPrac = 0, wFive = 0, wActive = 0;
+                Object.entries(dailyLogs).forEach(([dateStr, data]) => {
+                    const date = new Date(dateStr);
+                    if (date >= startOfWeek) {
+                        const p = Number(data.practice) || 0;
+                        const f = Number(data.fiveMin) || 0;
+                        const e = Number(data.exerciseTime) || 0;
+                        const s = Number(data.stretchTime) || 0;
+                        wPrac += p; wFive += f; wEx += (e + s);
+                        if ((p + f + e + s) > 0) wActive++;
+                    }
+                });
+                return { wEx, wPrac, wFive, wActive };
+            }, [dailyLogs, currentWeekDays]);
+
+            const handleAccumulate = async (type, payload) => {
+                if (!user) return;
+                let incrementVal = type === 'simple' ? 1 : Number(payload.mins);
+                let field = type === 'simple' ? payload : payload.key;
+                window.confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, colors: ['#74c0fc', '#ffd43b', '#ff8787'] });
+                await db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
+                    .collection('dailyLogs').doc(todayKey).set({
+                        [field]: firebase.firestore.FieldValue.increment(incrementVal)
+                    }, { merge: true });
+            };
+
+            const handleClearToday = async () => {
+                if (!user) return;
+                if (window.confirm("確定要清除今日的所有紀錄嗎？")) {
+                    await db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
+                        .collection('dailyLogs').doc(todayKey).delete();
+                }
+            };
+
+            const handleSignOut = async () => {
+                if (window.confirm("確定要登出嗎？")) {
+                    await auth.signOut();
+                    setUserProfile(null);
+                }
+            };
+
+            // ── Render gates ──────────────────────
+            if (!authReady) return (
+                <div className="max-w-md mx-auto min-h-screen flex items-center justify-center">
+                    <div className="text-center opacity-30 sans-font text-sm">載入中...</div>
+                </div>
+            );
+            if (!user) return <LoginScreen />;
+            if (!userProfile?.teamId) return <TeamSelectScreen user={user} onJoinTeam={handleJoinTeam} />;
+
+            // ── Main UI ───────────────────────────
+            return (
+                <div className="max-w-md mx-auto min-h-screen relative flex flex-col">
+                    <header className="bg-white sticky top-0 px-6 py-5 flex justify-between items-center z-30 border-b-[3px] border-[#4b5563]">
+                        <div className="flex items-center space-x-3 text-[#374151]">
+                            <div className="pk-blue p-2 rounded-xl neo-border-thin shadow-sm flex items-center justify-center">
+                                <Icon name="Star" size={20} className="text-white" />
+                            </div>
+                            <span className="sans-font text-2xl tracking-tighter text-[#374151]">自律動起來</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] sans-font opacity-40 max-w-[80px] truncate">{userProfile?.teamName}</span>
+                            <button onClick={handleSignOut} className="w-8 h-8 bg-slate-100 neo-border-thin rounded-full flex items-center justify-center active-press">
+                                <Icon name="LogOut" size={14} />
+                            </button>
+                        </div>
+                    </header>
+
+                    <main className="flex-1 p-6 pb-36 space-y-6">
+                        {activeTab === 'dashboard' && (
+                            <>
+                                <div className="vibrant-card p-7 rounded-[2.5rem] neo-border neo-shadow float-anim relative overflow-hidden">
+                                    <div className="relative z-10">
+                                        <h2 className="sans-font text-3xl text-[#374151] mb-2">今日修煉開始！</h2>
+                                        <div className="flex items-center gap-2">
+                                            <span className="pk-green text-[#374151] px-3 py-1 rounded-full text-[11px] font-black neo-border-thin">道心值</span>
+                                            <p className="text-[#374151]/50 font-black text-xs">累積道行：{stats.wActive} 天</p>
+                                        </div>
+                                    </div>
+                                    <Icon name="Mountain" size={100} className="absolute -bottom-6 -right-4 text-[#ffd43b]/20 rotate-12" />
+                                </div>
+                                <div className="bg-white p-6 rounded-[2rem] neo-border neo-shadow-sm flex items-center justify-between">
+                                    <span className="sans-font text-[#374151]/60 text-xs">本週功力</span>
+                                    <div className="sans-font text-3xl text-[#374151]">{stats.wEx}<span className="text-sm ml-1 opacity-40">分</span></div>
+                                </div>
+                                <div className="bg-white p-5 rounded-[2rem] neo-border neo-shadow-sm">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <span className="sans-font text-[#374151]/60 text-xs">練功/週</span>
+                                        <span className="sans-font text-xl text-pk-yellow">{stats.wPrac}次</span>
+                                    </div>
+                                    <WeekIconsRow days={currentWeekDays} logs={dailyLogs} type="practice" color="pk-yellow" />
+                                </div>
+                                <div className="bg-white p-5 rounded-[2rem] neo-border neo-shadow-sm">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <span className="sans-font text-[#374151]/60 text-xs">五分鐘 / 週</span>
+                                        <span className="sans-font text-xl text-pk-blue">{stats.wFive}次</span>
+                                    </div>
+                                    <WeekIconsRow days={currentWeekDays} logs={dailyLogs} type="fiveMin" color="pk-blue" />
+                                </div>
+                                <button onClick={() => setIsModalOpen(true)} className="w-full pk-pink p-6 rounded-[2.2rem] neo-border neo-shadow active-press flex items-center justify-center gap-4 group">
+                                    <span className="sans-font text-white text-2xl tracking-tighter">立即突破</span>
+                                </button>
+                            </>
+                        )}
+                        {activeTab === 'calendar' && <CalendarView dailyLogs={dailyLogs} />}
+                        {activeTab === 'profile' && <ProfileView dailyLogs={dailyLogs} />}
+                        {activeTab === 'leaderboard' && <LeaderboardView currentUser={user} userTeamId={userProfile?.teamId} />}
+                    </main>
+
+                    {isModalOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 overlay-blur">
+                            <div className="w-full max-w-sm bg-white rounded-[2.5rem] neo-border neo-shadow p-8 relative animate-in zoom-in-95 duration-200">
+                                <button onClick={() => setIsModalOpen(false)} className="absolute -top-4 -right-4 w-10 h-10 bg-white neo-border rounded-full flex items-center justify-center active-press">
+                                    <Icon name="X" size={20} />
+                                </button>
+                                <h3 className="sans-font text-2xl text-[#374151] text-center mb-8 italic">捕捉今日造化</h3>
+                                <div className="grid grid-cols-2 gap-5">
+                                    <MiniActionCard label="練功" count={dailyLogs[todayKey]?.practice || 0} onClick={() => handleAccumulate('simple', 'practice')} color="pk-yellow" />
+                                    <MiniActionCard label="五分鐘" count={dailyLogs[todayKey]?.fiveMin || 0} onClick={() => handleAccumulate('simple', 'fiveMin')} color="pk-blue" />
+                                    <TimeActionCard label="運動" total={dailyLogs[todayKey]?.exerciseTime || 0} onAdd={(mins) => handleAccumulate('time', { key: 'exerciseTime', mins })} />
+                                    <TimeActionCard label="拉筋" total={dailyLogs[todayKey]?.stretchTime || 0} onAdd={(mins) => handleAccumulate('time', { key: 'stretchTime', mins })} />
+                                </div>
+                                <div className="mt-8 flex flex-col gap-3">
+                                    <button onClick={() => setIsModalOpen(false)} className="w-full py-5 bg-[#4b5563] text-white rounded-3xl sans-font text-xl tracking-widest active-press">修煉圓滿</button>
+                                    <button onClick={handleClearToday} className="w-full py-2 text-[#4b5563]/40 sans-font text-xs hover:text-red-400 transition-colors">清除今日紀錄</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <nav className="fixed bottom-8 left-0 right-0 px-8 z-40">
+                        <div className="max-w-xs mx-auto flex justify-between items-center bg-white/95 neo-border rounded-[2rem] p-2.5 neo-shadow-sm">
+                            <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon="Mountain" label="修煉" />
+                            <NavBtn active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} icon="Scroll" label="卷軸" />
+                            <NavBtn active={activeTab === 'leaderboard'} onClick={() => setActiveTab('leaderboard')} icon="Trophy" label="排行" />
+                            <NavBtn active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon="UserRound" label="洞府" />
+                        </div>
+                    </nav>
+                </div>
+            );
+        };
+
+        const WeekIconsRow = ({ days, logs, type, color }) => (
+            <div className="flex justify-between">
+                {days.map((date, i) => {
+                    const key = formatDateKey(date);
+                    const isDone = (logs[key]?.[type] || 0) > 0;
+                    const isToday = key === formatDateKey(new Date());
+                    return (
+                        <div key={i} className="flex flex-col items-center gap-2">
+                            <div className={`w-9 h-9 rounded-xl neo-border-thin flex items-center justify-center transition-all ${isDone ? color : 'bg-slate-50 opacity-20'} ${isToday ? 'scale-110 ring-2 ring-[#4b5563]/20' : ''}`}>
+                                {isDone ? <Icon name="Smile" size={18} className={color === 'pk-yellow' ? 'text-[#374151]' : 'text-white'} /> : <div className="w-1 h-1 bg-slate-300 rounded-full"/>}
+                            </div>
+                            <span className="text-[10px] sans-font opacity-40">{date.getDate()}</span>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+
+        const CalendarView = ({ dailyLogs }) => {
+            const [viewMode, setViewMode] = useState('week');
+            const [viewDate, setViewDate] = useState(new Date());
+            const monthData = useMemo(() => {
+                const year = viewDate.getFullYear();
+                const month = viewDate.getMonth();
+                const firstDay = new Date(year, month, 1).getDay();
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const grid = [];
+                for (let i = 0; i < firstDay; i++) grid.push(null);
+                for (let d = 1; d <= daysInMonth; d++) grid.push(new Date(year, month, d));
+                return grid;
+            }, [viewDate]);
+            const currentWeekList = useMemo(() => getWeekDays(new Date()), []);
+            return (
+                <div className="space-y-5 animate-in fade-in duration-300">
+                    <div className="flex bg-white rounded-2xl neo-border-thin p-1">
+                        <button onClick={() => setViewMode('week')} className={`flex-1 py-2 sans-font text-xs rounded-xl transition-all ${viewMode === 'week' ? 'pk-blue text-[#374151]' : 'opacity-40'}`}>週誌</button>
+                        <button onClick={() => setViewMode('month')} className={`flex-1 py-2 sans-font text-xs rounded-xl transition-all ${viewMode === 'month' ? 'pk-blue text-[#374151]' : 'opacity-40'}`}>月曆</button>
+                    </div>
+                    {viewMode === 'month' ? (
+                        <div className="bg-white p-6 rounded-[2.5rem] neo-border neo-shadow">
+                            <div className="flex justify-between items-center mb-6">
+                                <button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1))} className="active-press"><Icon name="ChevronLeft" size={24} /></button>
+                                <h2 className="sans-font text-xl italic">{viewDate.getFullYear()} / {viewDate.getMonth() + 1}</h2>
+                                <button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1))} className="active-press"><Icon name="ChevronRight" size={24} /></button>
+                            </div>
+                            <div className="grid grid-cols-7 gap-2">
+                                {['日','一','二','三','四','五','六'].map(w => <div key={w} className="text-center text-[10px] sans-font opacity-30">{w}</div>)}
+                                {monthData.map((date, i) => {
+                                    if (!date) return <div key={i} />;
+                                    const key = formatDateKey(date);
+                                    const hasLog = dailyLogs[key] && Object.values(dailyLogs[key]).some(v => v > 0);
+                                    return (
+                                        <div key={i} className={`aspect-square flex flex-col items-center justify-center rounded-xl text-sm sans-font relative ${key === formatDateKey(new Date()) ? 'pk-blue text-white neo-border-thin' : ''}`}>
+                                            {hasLog ? <Icon name="Smile" size={20} className="text-pk-pink" /> : date.getDate()}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {currentWeekList.map((date, i) => {
+                                const key = formatDateKey(date);
+                                const data = dailyLogs[key] || {};
+                                const totalEx = (Number(data.exerciseTime) || 0) + (Number(data.stretchTime) || 0);
+                                const hasActivity = totalEx > 0 || data.practice > 0 || data.fiveMin > 0;
+                                return (
+                                    <div key={key} className={`bg-white p-4 rounded-2xl neo-border-thin flex items-center justify-between ${hasActivity ? 'border-pk-green border-2' : 'opacity-40'}`}>
+                                        <div className="flex flex-col">
+                                            <span className="sans-font text-xs">{date.getMonth() + 1}/{date.getDate()}</span>
+                                            <span className="text-[10px] opacity-40 sans-font">{['星期日','星期一','星期二','星期三','星期四','星期五','星期六'][date.getDay()]}</span>
+                                        </div>
+                                        <div className="flex gap-2 items-center">
+                                            {data.practice > 0 && <span className="pk-yellow px-2 py-0.5 rounded-lg text-[9px] sans-font">練功 {data.practice}</span>}
+                                            {data.fiveMin > 0 && <span className="pk-blue px-2 py-0.5 rounded-lg text-[9px] sans-font text-white">五分鐘 {data.fiveMin}</span>}
+                                            {totalEx > 0 && <span className="pk-pink px-2 py-0.5 rounded-lg text-[9px] sans-font text-white">運動 {totalEx}m</span>}
+                                            {hasActivity && <Icon name="Smile" size={16} className="text-pk-yellow" />}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const ProfileView = ({ dailyLogs }) => {
+            const mStats = useMemo(() => {
+                const now = new Date();
+                const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                let mActiveDays = 0, mExMins = 0, mStretchMins = 0, mPracCount = 0, mFiveCount = 0;
+                Object.entries(dailyLogs).forEach(([key, val]) => {
+                    if (key.startsWith(prefix)) {
+                        const p = val.practice || 0, f = val.fiveMin || 0, e = val.exerciseTime || 0, s = val.stretchTime || 0;
+                        if ((p + f + e + s) > 0) mActiveDays++;
+                        mExMins += e; mStretchMins += s; mPracCount += p; mFiveCount += f;
+                    }
+                });
+                const totalMinutes = mExMins + mStretchMins;
+                const totalHoursNum = totalMinutes / 60;
+                const score = (mActiveDays * 10) + totalHoursNum + (mPracCount * 5);
+                let realm = { title: "自律新星", level: 1, icon: "Sprout", color: "pk-green" };
+                if (score >= 600) realm = { title: "自律仙人", level: 90, icon: "Sun", color: "pk-yellow" };
+                else if (score >= 350) realm = { title: "自律達人", level: 70, icon: "Zap", color: "pk-purple" };
+                else if (score >= 150) realm = { title: "自律英雄", level: 30, icon: "Sword", color: "pk-orange" };
+                else if (score >= 50) realm = { title: "自律俠客", level: 10, icon: "Mountain", color: "pk-blue" };
+                let displayLevel = realm.level + Math.floor((score % 100) / 10);
+                if (score >= 600) displayLevel = 90 + Math.min(9, Math.floor((score - 600) / 50));
+                return { mActiveDays, totalHours: totalHoursNum.toFixed(1), mPracCount, mFiveCount, mExMins, mStretchMins, realm, displayLevel };
+            }, [dailyLogs]);
+
+            return (
+                <div className="space-y-6 animate-in slide-in-from-bottom-4">
+                    <div className="text-center space-y-4">
+                        <div className="flex flex-col items-center">
+                            <div className={`w-28 h-28 rounded-[2.5rem] ${mStats.realm.color} neo-border flex items-center justify-center rotate-3 shadow-lg relative mb-4`}>
+                                <Icon name={mStats.realm.icon} size={48} className="text-[#374151] -rotate-3" />
+                                <div className="absolute -bottom-2 -right-2 bg-white neo-border-thin px-3 py-1 rounded-full text-xs sans-font shadow-sm">Lv.{mStats.displayLevel}</div>
+                            </div>
+                            <h2 className="sans-font text-2xl text-[#374151] italic tracking-widest">{mStats.realm.title}</h2>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <StatBlock label="本月自律" value={mStats.mActiveDays} unit="天" color="pk-green" />
+                        <StatBlock label="修煉時長" value={mStats.totalHours} unit="小時" color="pk-purple" />
+                        <StatBlock label="練功" value={mStats.mPracCount} unit="次" color="pk-yellow" />
+                        <StatBlock label="五分鐘" value={mStats.mFiveCount} unit="次" color="pk-blue" />
+                        <StatBlock label="運動" value={mStats.mExMins} unit="mins" color="pk-orange" />
+                        <StatBlock label="拉筋" value={mStats.mStretchMins} unit="mins" color="pk-pink" />
+                    </div>
+                </div>
+            );
+        };
+
+        const StatBlock = ({ label, value, unit, color }) => (
+            <div className="bg-white p-5 rounded-[2rem] neo-border-thin flex flex-col justify-between h-36 relative overflow-hidden">
+                <div className="sans-font text-xs opacity-60 uppercase tracking-widest relative z-10 font-black">{label}</div>
+                <div className="relative z-10 flex items-baseline">
+                    <span className="sans-font text-4xl text-[#374151]">{value}</span>
+                    <span className="sans-font text-xs ml-1.5 opacity-40">{unit}</span>
+                </div>
+                <div className={`absolute -right-4 -bottom-4 w-16 h-16 ${color} rounded-full opacity-10`}></div>
+            </div>
+        );
+
+        const MiniActionCard = ({ label, count, onClick, color }) => (
+            <button onClick={onClick} className={`aspect-square ${color} neo-border rounded-[1.8rem] flex flex-col items-center justify-center gap-2 active-press group`}>
+                <span className="sans-font text-xs text-[#374151]">{label}</span>
+                <div className="bg-white w-10 h-10 rounded-2xl neo-border-thin flex items-center justify-center text-sm font-black group-hover:scale-110 transition-transform">{count}</div>
+            </button>
+        );
+
+        const TimeActionCard = ({ label, total, onAdd }) => (
+            <div className="aspect-square bg-white neo-border rounded-[1.8rem] flex flex-col items-center justify-around p-3">
+                <span className="sans-font text-xs text-[#374151]">{label}</span>
+                <select onChange={(e) => { if(e.target.value) onAdd(e.target.value); e.target.value = ""; }} className="w-full text-[11px] py-1.5 neo-border-thin rounded-full text-center focus:outline-none bg-slate-50 sans-font">
+                    <option value="">+時辰</option>
+                    {[5,15,30,60].map(m => <option key={m} value={m}>+{m}m</option>)}
+                </select>
+                <span className="text-[10px] sans-font opacity-40">{total} 分鐘</span>
+            </div>
+        );
+
+        const NavBtn = ({ active, onClick, icon, label }) => (
+            <button onClick={onClick} className={`flex flex-col items-center p-3 rounded-2xl transition-all ${active ? 'pk-blue text-[#374151] neo-border-thin shadow-md' : 'opacity-30 hover:opacity-50'}`}>
+                <Icon name={icon} size={20} className={active ? 'text-white' : ''} />
+                <span className="text-[9px] sans-font mt-1">{label}</span>
+            </button>
+        );
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
