@@ -315,7 +315,7 @@
                 <div className="space-y-5 animate-in fade-in duration-300">
                     <div className="vibrant-card p-6 rounded-[2.5rem] neo-border neo-shadow relative overflow-hidden">
                         <div className="relative z-10">
-                            <h2 className="sans-font text-2xl text-[#374151] mb-1">門派排行榜</h2>
+                            <h2 className="sans-font text-2xl text-[#374151] mb-1">風雲榜</h2>
                             <p className="text-xs opacity-40 sans-font">本月累積道行競技</p>
                         </div>
                         <Icon name="Trophy" size={90} className="absolute -bottom-4 -right-3 text-[#ffd43b]/20 rotate-12" />
@@ -496,7 +496,6 @@
                         <div className="flex items-center gap-2">
                             <div className="text-right">
                                 <p className="text-xs sans-font opacity-70 truncate max-w-[80px]">{user?.displayName?.split(' ')[0] || user?.email?.split('@')[0]}</p>
-                                <p className="text-[9px] sans-font opacity-30 truncate max-w-[80px]">{userProfile?.teamName}</p>
                             </div>
                             {isAdmin && <span className="text-[9px] bg-[#4b5563] text-white px-2 py-0.5 rounded-full sans-font">管理員</span>}
                             <button onClick={handleSignOut} className="w-8 h-8 bg-slate-100 neo-border-thin rounded-full flex items-center justify-center active-press">
@@ -505,7 +504,7 @@
                         </div>
                     </header>
 
-                    <main className="flex-1 p-6 pb-36 space-y-6">
+                    <main className="flex-1 p-6 pb-24 space-y-6">
                         {activeTab === 'dashboard' && (
                             <>
                                 <div className="vibrant-card p-7 rounded-[2.5rem] neo-border neo-shadow float-anim relative overflow-hidden">
@@ -542,7 +541,7 @@
                             </>
                         )}
                         {activeTab === 'calendar' && <CalendarView dailyLogs={dailyLogs} />}
-                        {activeTab === 'profile' && <ProfileView dailyLogs={dailyLogs} isAdmin={isAdmin} />}
+                        {activeTab === 'profile' && <ProfileView dailyLogs={dailyLogs} isAdmin={isAdmin} user={user} />}
                         {activeTab === 'leaderboard' && <LeaderboardView currentUser={user} userTeamId={userProfile?.teamId} />}
                     </main>
 
@@ -567,11 +566,11 @@
                         </div>
                     )}
 
-                    <nav className="fixed bottom-8 left-0 right-0 px-8 z-40">
-                        <div className="max-w-xs mx-auto flex justify-between items-center bg-white/95 neo-border rounded-[2rem] p-2.5 neo-shadow-sm">
-                            <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon="Mountain" label="修煉" />
-                            <NavBtn active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} icon="Scroll" label="卷軸" />
-                            <NavBtn active={activeTab === 'leaderboard'} onClick={() => setActiveTab('leaderboard')} icon="Trophy" label="排行" />
+                    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t-[3px] border-[#4b5563]">
+                        <div className="max-w-md mx-auto flex justify-around items-center p-2 pb-safe">
+                            <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon="Mountain" label="修煉室" />
+                            <NavBtn active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} icon="Scroll" label="曆誌" />
+                            <NavBtn active={activeTab === 'leaderboard'} onClick={() => setActiveTab('leaderboard')} icon="Trophy" label="風雲榜" />
                             <NavBtn active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon="UserRound" label="洞府" />
                         </div>
                     </nav>
@@ -666,7 +665,7 @@
             );
         };
 
-        const ProfileView = ({ dailyLogs, isAdmin }) => {
+        const ProfileView = ({ dailyLogs, isAdmin, user }) => {
             const mStats = useMemo(() => {
                 const now = new Date();
                 const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -699,6 +698,7 @@
                                 <Icon name={mStats.realm.icon} size={48} className="text-[#374151] -rotate-3" />
                                 <div className="absolute -bottom-2 -right-2 bg-white neo-border-thin px-3 py-1 rounded-full text-xs sans-font shadow-sm">Lv.{mStats.displayLevel}</div>
                             </div>
+                            <p className="sans-font text-lg text-[#374151] tracking-wide">{user?.displayName?.split(' ')[0] || user?.email?.split('@')[0]}</p>
                             <h2 className="sans-font text-2xl text-[#374151] italic tracking-widest">{mStats.realm.title}</h2>
                         </div>
                     </div>
