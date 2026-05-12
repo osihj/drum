@@ -121,12 +121,16 @@
                 setError('');
                 try {
                     const provider = new firebase.auth.GoogleAuthProvider();
-                    await auth.signInWithPopup(provider);
+                    await auth.signInWithRedirect(provider);
                 } catch (e) {
                     setError('登入失敗，請再試一次');
                     setLoading(false);
                 }
             };
+
+            useEffect(() => {
+                auth.getRedirectResult().catch(() => {});
+            }, []);
 
             return (
                 <div className="max-w-md mx-auto min-h-screen flex flex-col items-center justify-center p-8 gap-10">
