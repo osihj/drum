@@ -409,9 +409,11 @@
                 return () => unsub();
             }, [user]);
 
-            const isAdmin = user?.email?.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase().trim();
+            const handleJoinTeam = (teamId, teamName) => {
                 setUserProfile(prev => ({ ...prev, teamId, teamName }));
             };
+
+            const isAdmin = user?.email?.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase().trim();
 
             const stats = useMemo(() => {
                 const startOfWeek = currentWeekDays[0];
