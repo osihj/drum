@@ -650,7 +650,7 @@
                     )}
 
                     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white" style={{borderTop:'1px solid var(--c-border)'}}>
-                        <div className="max-w-md mx-auto flex justify-around items-center p-2 pb-safe">
+                        <div className="max-w-md mx-auto flex justify-around items-center" style={{padding:'4px 0 6px'}}>
                             <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} navIcon="mountain" label="修煉室" />
                             <NavBtn active={activeTab === 'leaderboard'} onClick={() => setActiveTab('leaderboard')} navIcon="scroll" label="風雲榜" />
                             <NavBtn active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} navIcon="hourglass" label="曆誌" />
@@ -703,11 +703,11 @@
             }, [viewDate]);
             return (
                 <div className="space-y-4 animate-in fade-in duration-300">
-                    <div className="flex bg-white r-card p-1" style={{border:'1px solid var(--c-border)'}}>
-                        <button onClick={() => setViewMode('week')} className={`flex-1 py-2 sans-font text-xs r-btn transition-all ${viewMode === 'week' ? 'pk-blue' : ''}`}
-                            style={{color: viewMode === 'week' ? 'var(--c-primary-text)' : 'var(--c-muted)'}}>週曆</button>
-                        <button onClick={() => setViewMode('month')} className={`flex-1 py-2 sans-font text-xs r-btn transition-all ${viewMode === 'month' ? 'pk-blue' : ''}`}
-                            style={{color: viewMode === 'month' ? 'var(--c-primary-text)' : 'var(--c-muted)'}}>月誌</button>
+                    <div className="flex bg-white r-card" style={{border:'1px solid var(--c-border)', padding:'3px'}}>
+                        <button onClick={() => setViewMode('week')} className={`flex-1 sans-font text-xs r-btn transition-all ${viewMode === 'week' ? 'pk-blue' : ''}`}
+                            style={{color: viewMode === 'week' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>週曆</button>
+                        <button onClick={() => setViewMode('month')} className={`flex-1 sans-font text-xs r-btn transition-all ${viewMode === 'month' ? 'pk-blue' : ''}`}
+                            style={{color: viewMode === 'month' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>月誌</button>
                     </div>
                     {viewMode === 'month' ? (
                         <div className="bg-white p-5 r-card card-shadow">
@@ -879,7 +879,7 @@
 
                         {/* 第二行 - 本月自律、運動、拉筋 */}
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'10px'}}>
-                            <div style={{background:'#ffffff', border:'2px solid #ffd43b', borderRadius:'12px', padding:'12px', textAlign:'center'}}>
+                            <div style={{background:'#ffffff', border:'2px solid #b197fc', borderRadius:'12px', padding:'12px', textAlign:'center'}}>
                                 <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'6px'}}>本月自律</div>
                                 <div style={{display:'flex', alignItems:'baseline', gap:'3px', justifyContent:'center'}}>
                                     <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937'}}>{mStats.mActiveDays}</span>
@@ -1138,11 +1138,11 @@
                     </div>
 
                     {/* Sub tabs */}
-                    <div className="flex bg-white r-card p-1" style={{border:'1px solid var(--c-border)'}}>
-                        <button onClick={() => setTab('teams')} className={`flex-1 py-2 sans-font text-xs r-btn transition-all ${tab === 'teams' ? 'pk-blue' : ''}`}
-                            style={{color: tab === 'teams' ? 'var(--c-primary-text)' : 'var(--c-muted)'}}>門派管理</button>
-                        <button onClick={() => setTab('users')} className={`flex-1 py-2 sans-font text-xs r-btn transition-all ${tab === 'users' ? 'pk-blue' : ''}`}
-                            style={{color: tab === 'users' ? 'var(--c-primary-text)' : 'var(--c-muted)'}}>成員管理</button>
+                    <div className="flex bg-white r-card" style={{border:'1px solid var(--c-border)', padding:'3px'}}>
+                        <button onClick={() => setTab('teams')} className={`flex-1 sans-font text-xs r-btn transition-all ${tab === 'teams' ? 'pk-blue' : ''}`}
+                            style={{color: tab === 'teams' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>門派管理</button>
+                        <button onClick={() => setTab('users')} className={`flex-1 sans-font text-xs r-btn transition-all ${tab === 'users' ? 'pk-blue' : ''}`}
+                            style={{color: tab === 'users' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>成員管理</button>
                     </div>
 
                     {/* ── Teams tab ── */}
@@ -1303,13 +1303,13 @@
         };
 
         const NavBtn = ({ active, onClick, navIcon, label }) => (
-            <button onClick={onClick} className={`flex flex-col items-center px-4 py-2 r-btn transition-all relative ${active ? '' : ''}`}
+            <button onClick={onClick} className={`flex flex-col items-center px-4 py-1 r-btn transition-all relative ${active ? '' : ''}`}
                 style={{color: active ? 'var(--c-primary-text)' : 'var(--c-muted)'}}>
                 {active && <span style={{position:'absolute',bottom:0,left:'50%',transform:'translateX(-50%)',width:'20px',height:'3px',background:'var(--c-primary)',borderRadius:'2px 2px 0 0'}}></span>}
-                <span className="inline-flex items-center justify-center">
+                <span className="inline-flex items-center justify-center" style={{transform:'scale(0.85)'}}>
                     {NavIcons[navIcon]}
                 </span>
-                <span className="text-[9px] sans-font mt-0.5">{label}</span>
+                <span className="text-[9px] sans-font" style={{marginTop:'1px'}}>{label}</span>
             </button>
         );
 
