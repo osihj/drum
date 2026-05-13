@@ -796,32 +796,95 @@
                 return { mActiveDays, totalHours: totalHoursNum.toFixed(1), mPracCount, mFiveCount, mExMins, mStretchMins, realm, displayLevel };
             }, [dailyLogs]);
 
+            const colorMap = {
+                修煉時長: '#b197fc',
+                練功: '#ffd43b',
+                五分鐘: '#74c0fc',
+                本月自律: '#ffd43b',
+                運動: '#ff922b',
+                拉筋: '#ff8787'
+            };
+
             return (
-                <div className="space-y-6 animate-in slide-in-from-bottom-4">
-                    <div className="text-center space-y-4">
-                        <div className="flex flex-col items-center">
-                            <div className={`w-24 h-24 r-card ${mStats.realm.color} neo-border flex items-center justify-center rotate-3 relative mb-3 overflow-hidden`}>
+                <div className="space-y-4 animate-in slide-in-from-bottom-4">
+                    {/* 用戶信息卡片 */}
+                    <div className="bg-white r-card card-shadow p-5" style={{display:'flex', gap:'1rem', alignItems:'center'}}>
+                        {/* 頭像 */}
+                        <div style={{flexShrink:0}}>
+                            <div style={{width:'72px', height:'72px', borderRadius:'50%', background:'linear-gradient(135deg, #74c0fc 0%, #5dbdff 100%)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'32px', color:'white', fontWeight:'500', border:'2px solid white', boxShadow:'0 2px 8px rgba(0,0,0,0.08)'}}>
                                 {user?.photoURL ? (
-                                    <img src={user.photoURL} alt="avatar" className="w-full h-full object-cover -rotate-3"
-                                        onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
-                                ) : null}
-                                <div className="w-full h-full items-center justify-center -rotate-3" style={{ display: user?.photoURL ? 'none' : 'flex' }}>
-                                    <Icon name={mStats.realm.icon} size={40} style={{color:'var(--c-text)'}} />
-                                </div>
+                                    <img src={user.photoURL} alt="avatar" style={{width:'100%', height:'100%', objectFit:'cover', borderRadius:'50%'}} />
+                                ) : (
+                                    <Icon name={mStats.realm.icon} size={32} style={{color:'white'}} />
+                                )}
                             </div>
-                            <p className="sans-font text-base tracking-wide" style={{color:'var(--c-text)'}}>{user?.displayName?.split(' ')[0] || user?.email?.split('@')[0]}</p>
-                            <h2 className="sans-font text-2xl italic tracking-widest" style={{color:'var(--c-text)'}}>{mStats.realm.title}</h2>
-                            <span className="mt-1 bg-white neo-border-thin px-3 py-0.5 rounded-full text-sm sans-font" style={{color:'var(--c-text)'}}  >Lv.{mStats.displayLevel}</span>
+                        </div>
+                        {/* 用戶信息 */}
+                        <div style={{flex:1}}>
+                            <h2 className="sans-font" style={{fontSize:'16px', fontWeight:'500', margin:'0 0 2px 0', color:'var(--c-text)'}}>{user?.displayName?.split(' ')[0] || user?.email?.split('@')[0]}</h2>
+                            <p className="sans-font" style={{fontSize:'13px', color:'var(--c-text-sub)', margin:0}}>{mStats.realm.title}</p>
+                        </div>
+                        {/* 等級卡片 */}
+                        <div style={{background:'#e0f2fe', border:'0.5px solid #74c0fc', borderRadius:'12px', padding:'12px 14px', textAlign:'center', flexShrink:0}}>
+                            <div className="sans-font" style={{fontSize:'18px', fontWeight:'500', color:'#0e4f7a'}}>Lv.{mStats.displayLevel}</div>
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <StatBlock label="本月自律" value={mStats.mActiveDays} unit="天" color="pk-green" />
-                        <StatBlock label="修煉時長" value={mStats.totalHours} unit="小時" color="pk-purple" />
-                        <StatBlock label="練功" value={mStats.mPracCount} unit="次" color="pk-yellow" />
-                        <StatBlock label="五分鐘" value={mStats.mFiveCount} unit="次" color="pk-blue" />
-                        <StatBlock label="運動" value={mStats.mExMins} unit="mins" color="pk-orange" />
-                        <StatBlock label="拉筋" value={mStats.mStretchMins} unit="mins" color="pk-pink" />
+
+                    {/* 統計卡片區域 */}
+                    <div style={{padding:'0 0.5rem'}}>
+                        <h3 className="sans-font" style={{fontSize:'13px', fontWeight:'500', color:'#6b7280', margin:'0 0 1rem 0', textTransform:'uppercase', letterSpacing:'0.5px'}}>本月統計</h3>
+                        
+                        {/* 第一行 - 3個卡片 */}
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'10px', marginBottom:'10px'}}>
+                            <div style={{background:'#ffffff', border:'0.5px solid #e5e7eb', borderRadius:'12px', borderBottom:'3px solid #b197fc', padding:'12px', textAlign:'center'}}>
+                                <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'6px'}}>修煉時長</div>
+                                <div style={{display:'flex', alignItems:'baseline', gap:'3px', justifyContent:'center'}}>
+                                    <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937'}}>{mStats.totalHours}</span>
+                                    <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>小時</span>
+                                </div>
+                            </div>
+                            <div style={{background:'#ffffff', border:'0.5px solid #e5e7eb', borderRadius:'12px', borderBottom:'3px solid #ffd43b', padding:'12px', textAlign:'center'}}>
+                                <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'6px'}}>練功</div>
+                                <div style={{display:'flex', alignItems:'baseline', gap:'3px', justifyContent:'center'}}>
+                                    <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937'}}>{mStats.mPracCount}</span>
+                                    <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>次</span>
+                                </div>
+                            </div>
+                            <div style={{background:'#ffffff', border:'0.5px solid #e5e7eb', borderRadius:'12px', borderBottom:'3px solid #74c0fc', padding:'12px', textAlign:'center'}}>
+                                <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'6px'}}>五分鐘</div>
+                                <div style={{display:'flex', alignItems:'baseline', gap:'3px', justifyContent:'center'}}>
+                                    <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937'}}>{mStats.mFiveCount}</span>
+                                    <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>次</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 第二行 - 本月自律、運動、拉筋 */}
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'10px'}}>
+                            <div style={{background:'#ffffff', border:'0.5px solid #e5e7eb', borderRadius:'12px', borderBottom:'3px solid #ffd43b', padding:'12px', textAlign:'center'}}>
+                                <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'6px'}}>本月自律</div>
+                                <div style={{display:'flex', alignItems:'baseline', gap:'3px', justifyContent:'center'}}>
+                                    <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937'}}>{mStats.mActiveDays}</span>
+                                    <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>天</span>
+                                </div>
+                            </div>
+                            <div style={{background:'#ffffff', border:'0.5px solid #e5e7eb', borderRadius:'12px', borderBottom:'3px solid #ff922b', padding:'12px', textAlign:'center'}}>
+                                <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'6px'}}>運動</div>
+                                <div style={{display:'flex', alignItems:'baseline', gap:'3px', justifyContent:'center'}}>
+                                    <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937'}}>{mStats.mExMins}</span>
+                                    <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>分鐘</span>
+                                </div>
+                            </div>
+                            <div style={{background:'#ffffff', border:'0.5px solid #e5e7eb', borderRadius:'12px', borderBottom:'3px solid #ff8787', padding:'12px', textAlign:'center'}}>
+                                <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'6px'}}>拉筋</div>
+                                <div style={{display:'flex', alignItems:'baseline', gap:'3px', justifyContent:'center'}}>
+                                    <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937'}}>{mStats.mStretchMins}</span>
+                                    <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>分鐘</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
+
                     {isAdmin && (
                         <div className="mt-4">
                             <div className="flex items-center gap-2 mb-3">
