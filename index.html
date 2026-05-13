@@ -793,14 +793,32 @@
                 else if (atScore >= 150) realm = { title: "自律英雄", level: 30, icon: "Sword", color: "pk-orange" };
                 else if (atScore >= 50) realm = { title: "自律俠客", level: 10, icon: "Mountain", color: "pk-blue" };
                 const displayLevel = calcLevel(atScore);
-                return { mActiveDays, totalHours: totalHoursNum.toFixed(1), mPracCount, mFiveCount, mExMins, mStretchMins, realm, displayLevel };
+                // 週資料計算
+                const getWeekPrefix = (offset) => {
+                    const d = new Date(); d.setDate(d.getDate() - d.getDay() + offset * 7);
+                    return Array.from({length:7}, (_,i) => { const dd = new Date(d); dd.setDate(d.getDate()+i); return formatDateKey(dd); });
+                };
+                const thisDays = getWeekPrefix(0); const lastDays = getWeekPrefix(-1);
+                const sumWeek = (days) => days.reduce((acc, k) => {
+                    const v = dailyLogs[k] || {};
+                    return { ex: acc.ex+(v.exerciseTime||0), st: acc.st+(v.stretchTime||0), pr: acc.pr+(v.practice||0), fi: acc.fi+(v.fiveMin||0) };
+                }, {ex:0,st:0,pr:0,fi:0});
+                const tw = sumWeek(thisDays); const lw = sumWeek(lastDays);
+                const pct = (a,b) => b===0 ? null : Math.round((a-b)/b*100);
+                const weekComp = [
+                    { label:'運動', thisVal:tw.ex, lastVal:lw.ex, unit:'分', color:'#ff922b' },
+                    { label:'拉筋', thisVal:tw.st, lastVal:lw.st, unit:'分', color:'#ff8787' },
+                    { label:'練功', thisVal:tw.pr, lastVal:lw.pr, unit:'次', color:'#ffd43b' },
+                    { label:'五分鐘', thisVal:tw.fi, lastVal:lw.fi, unit:'次', color:'#74c0fc' },
+                ];
+                return { mActiveDays, totalHours: totalHoursNum.toFixed(1), mPracCount, mFiveCount, mExMins, mStretchMins, realm, displayLevel, weekComp };
             }, [dailyLogs]);
 
             const colorMap = {
                 修煉時長: '#b197fc',
                 練功: '#ffd43b',
                 五分鐘: '#74c0fc',
-                本月自律: '#ffd43b',
+                本月自律: '#b197fc',
                 運動: '#ff922b',
                 拉筋: '#ff8787'
             };
@@ -825,8 +843,8 @@
                             <p className="sans-font" style={{fontSize:'13px', color:'var(--c-text-sub)', margin:0}}>{mStats.realm.title}</p>
                         </div>
                         {/* 等級卡片 */}
-                        <div style={{background:'#e0f2fe', border:'0.5px solid #74c0fc', borderRadius:'12px', padding:'12px 14px', textAlign:'center', flexShrink:0}}>
-                            <div className="sans-font" style={{fontSize:'18px', fontWeight:'500', color:'#0e4f7a'}}>Lv.{mStats.displayLevel}</div>
+                        <div style={{background:'#8ce99a', border:'0.5px solid #4caf6e', borderRadius:'12px', padding:'12px 14px', textAlign:'center', flexShrink:0}}>
+                            <div className="sans-font" style={{fontSize:'18px', fontWeight:'500', color:'#1a4731'}}>Lv.{mStats.displayLevel}</div>
                         </div>
                     </div>
 
@@ -836,21 +854,21 @@
                         
                         {/* 第一行 - 3個卡片 */}
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'10px', marginBottom:'10px'}}>
-                            <div style={{background:'#ffffff', border:'0.5px solid #e5e7eb', borderRadius:'12px', borderBottom:'3px solid #b197fc', padding:'12px', textAlign:'center'}}>
+                            <div style={{background:'#ffffff', border:'2px solid #b197fc', borderRadius:'12px', padding:'12px', textAlign:'center'}}>
                                 <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'6px'}}>修煉時長</div>
                                 <div style={{display:'flex', alignItems:'baseline', gap:'3px', justifyContent:'center'}}>
                                     <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937'}}>{mStats.totalHours}</span>
                                     <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>小時</span>
                                 </div>
                             </div>
-                            <div style={{background:'#ffffff', border:'0.5px solid #e5e7eb', borderRadius:'12px', borderBottom:'3px solid #ffd43b', padding:'12px', textAlign:'center'}}>
+                            <div style={{background:'#ffffff', border:'2px solid #ffd43b', borderRadius:'12px', padding:'12px', textAlign:'center'}}>
                                 <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'6px'}}>練功</div>
                                 <div style={{display:'flex', alignItems:'baseline', gap:'3px', justifyContent:'center'}}>
                                     <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937'}}>{mStats.mPracCount}</span>
                                     <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>次</span>
                                 </div>
                             </div>
-                            <div style={{background:'#ffffff', border:'0.5px solid #e5e7eb', borderRadius:'12px', borderBottom:'3px solid #74c0fc', padding:'12px', textAlign:'center'}}>
+                            <div style={{background:'#ffffff', border:'2px solid #74c0fc', borderRadius:'12px', padding:'12px', textAlign:'center'}}>
                                 <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'6px'}}>五分鐘</div>
                                 <div style={{display:'flex', alignItems:'baseline', gap:'3px', justifyContent:'center'}}>
                                     <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937'}}>{mStats.mFiveCount}</span>
@@ -861,21 +879,21 @@
 
                         {/* 第二行 - 本月自律、運動、拉筋 */}
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'10px'}}>
-                            <div style={{background:'#ffffff', border:'0.5px solid #e5e7eb', borderRadius:'12px', borderBottom:'3px solid #ffd43b', padding:'12px', textAlign:'center'}}>
+                            <div style={{background:'#ffffff', border:'2px solid #ffd43b', borderRadius:'12px', padding:'12px', textAlign:'center'}}>
                                 <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'6px'}}>本月自律</div>
                                 <div style={{display:'flex', alignItems:'baseline', gap:'3px', justifyContent:'center'}}>
                                     <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937'}}>{mStats.mActiveDays}</span>
                                     <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>天</span>
                                 </div>
                             </div>
-                            <div style={{background:'#ffffff', border:'0.5px solid #e5e7eb', borderRadius:'12px', borderBottom:'3px solid #ff922b', padding:'12px', textAlign:'center'}}>
+                            <div style={{background:'#ffffff', border:'2px solid #ff922b', borderRadius:'12px', padding:'12px', textAlign:'center'}}>
                                 <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'6px'}}>運動</div>
                                 <div style={{display:'flex', alignItems:'baseline', gap:'3px', justifyContent:'center'}}>
                                     <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937'}}>{mStats.mExMins}</span>
                                     <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>分鐘</span>
                                 </div>
                             </div>
-                            <div style={{background:'#ffffff', border:'0.5px solid #e5e7eb', borderRadius:'12px', borderBottom:'3px solid #ff8787', padding:'12px', textAlign:'center'}}>
+                            <div style={{background:'#ffffff', border:'2px solid #ff8787', borderRadius:'12px', padding:'12px', textAlign:'center'}}>
                                 <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'6px'}}>拉筋</div>
                                 <div style={{display:'flex', alignItems:'baseline', gap:'3px', justifyContent:'center'}}>
                                     <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937'}}>{mStats.mStretchMins}</span>
@@ -884,6 +902,122 @@
                             </div>
                         </div>
                     </div>
+
+                    {/* 週對比 */}
+                    <div style={{padding:'0 0.5rem'}}>
+                        <h3 className="sans-font" style={{fontSize:'13px', fontWeight:'500', color:'#6b7280', margin:'0 0 1rem 0', textTransform:'uppercase', letterSpacing:'0.5px'}}>週對比</h3>
+                        <div className="bg-white r-card card-shadow" style={{padding:'14px 16px'}}>
+                            <div style={{display:'flex', gap:'14px', marginBottom:'12px'}}>
+                                <div style={{display:'flex', alignItems:'center', gap:'5px'}}>
+                                    <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#4b5563', flexShrink:0}}></div>
+                                    <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>本週</span>
+                                </div>
+                                <div style={{display:'flex', alignItems:'center', gap:'5px'}}>
+                                    <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#9ca3af', flexShrink:0}}></div>
+                                    <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>上週</span>
+                                </div>
+                            </div>
+                            {mStats.weekComp.map(({label, thisVal, lastVal, unit, color}) => {
+                                const maxVal = Math.max(thisVal, lastVal, 1);
+                                const diff = lastVal === 0 ? null : Math.round((thisVal - lastVal) / lastVal * 100);
+                                const deltaLabel = diff === null ? '—' : diff > 0 ? `▲ ${diff}%` : diff < 0 ? `▼ ${Math.abs(diff)}%` : '— 持平';
+                                const deltaStyle = diff === null || diff === 0
+                                    ? {background:'#f3f4f6', color:'#6b7280'}
+                                    : diff > 0 ? {background:'#f0fdf4', color:'#15803d'} : {background:'#fff0f0', color:'#b91c1c'};
+                                return (
+                                    <div key={label} style={{display:'flex', alignItems:'center', gap:'8px', padding:'7px 0', borderBottom:'1px solid #f3f4f6'}}>
+                                        <span className="sans-font" style={{fontSize:'11px', color:'#6b7280', width:'46px', flexShrink:0}}>{label}</span>
+                                        <div style={{flex:1, display:'flex', flexDirection:'column', gap:'4px'}}>
+                                            <div style={{height:'6px', background:'#f3f4f6', borderRadius:'3px', overflow:'hidden', position:'relative'}}>
+                                                <div style={{position:'absolute', left:0, top:0, bottom:0, width:`${(thisVal/maxVal)*100}%`, background:color, borderRadius:'3px'}}></div>
+                                            </div>
+                                            <div style={{height:'6px', background:'#f3f4f6', borderRadius:'3px', overflow:'hidden', position:'relative'}}>
+                                                <div style={{position:'absolute', left:0, top:0, bottom:0, width:`${(lastVal/maxVal)*100}%`, background:color, opacity:0.35, borderRadius:'3px'}}></div>
+                                            </div>
+                                        </div>
+                                        <span className="sans-font" style={{fontSize:'10px', color:'#1f2937', width:'34px', textAlign:'right', flexShrink:0}}>{thisVal}{unit}</span>
+                                        <span className="sans-font" style={{fontSize:'10px', padding:'2px 5px', borderRadius:'5px', flexShrink:0, minWidth:'46px', textAlign:'center', ...deltaStyle}}>{deltaLabel}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* 修煉足跡 */}
+                    {(() => {
+                        const now = new Date();
+                        const year = now.getFullYear();
+                        const month = now.getMonth();
+                        const today = now.getDate();
+                        const daysInMonth = new Date(year, month+1, 0).getDate();
+                        const firstDay = new Date(year, month, 1).getDay();
+                        const prefix = `${year}-${String(month+1).padStart(2,'0')}`;
+                        // 計算連續天數
+                        let streak = 0;
+                        for (let d = today; d >= 1; d--) {
+                            const key = `${prefix}-${String(d).padStart(2,'0')}`;
+                            const v = dailyLogs[key] || {};
+                            if ((v.practice||0)+(v.fiveMin||0)+(v.exerciseTime||0)+(v.stretchTime||0) > 0) streak++;
+                            else break;
+                        }
+                        // 每天強度 0-3
+                        const intensity = {};
+                        for (let d = 1; d <= daysInMonth; d++) {
+                            const key = `${prefix}-${String(d).padStart(2,'0')}`;
+                            const v = dailyLogs[key] || {};
+                            const total = (v.exerciseTime||0) + (v.stretchTime||0);
+                            const acts = (v.practice||0) + (v.fiveMin||0);
+                            if (total >= 60 || acts >= 3) intensity[d] = 3;
+                            else if (total >= 30 || acts >= 2) intensity[d] = 2;
+                            else if (total > 0 || acts > 0) intensity[d] = 1;
+                            else intensity[d] = 0;
+                        }
+                        const heatColors = ['#f3f4f6','#bbf7d0','#4ade80','#16a34a'];
+                        const heatText   = ['#d1d5db','#166534','#ffffff','#ffffff'];
+                        const cells = [];
+                        for (let i = 0; i < firstDay; i++) cells.push(<div key={`e${i}`} style={{height:'26px'}}></div>);
+                        for (let d = 1; d <= daysInMonth; d++) {
+                            const lv = d > today ? -1 : intensity[d];
+                            const bg = lv === -1 ? 'transparent' : heatColors[lv];
+                            const tc = lv === -1 ? '#e5e7eb' : heatText[lv];
+                            const isToday = d === today;
+                            cells.push(
+                                <div key={d} style={{
+                                    height:'26px', borderRadius:'5px', display:'flex',
+                                    alignItems:'center', justifyContent:'center',
+                                    background: bg, color: tc,
+                                    fontSize:'12px', fontWeight:'900',
+                                    fontFamily:"'Noto Sans TC',sans-serif",
+                                    outline: isToday ? '2px solid #16a34a' : 'none',
+                                    outlineOffset: '-1px'
+                                }}>{d}</div>
+                            );
+                        }
+                        return (
+                            <div style={{padding:'0 0.5rem'}}>
+                                <h3 className="sans-font" style={{fontSize:'13px', fontWeight:'500', color:'#6b7280', margin:'0 0 1rem 0', textTransform:'uppercase', letterSpacing:'0.5px'}}>修煉足跡</h3>
+                                <div className="bg-white r-card card-shadow" style={{padding:'14px 16px'}}>
+                                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px'}}>
+                                        <span className="sans-font" style={{fontSize:'13px', color:'#1f2937'}}>{year}年 {month+1}月</span>
+                                        <span className="sans-font" style={{fontSize:'11px', color:'#6b7280'}}>連續 {streak} 天</span>
+                                    </div>
+                                    <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'2px', marginBottom:'4px'}}>
+                                        {['日','一','二','三','四','五','六'].map(d => (
+                                            <div key={d} style={{textAlign:'center', fontSize:'9px', color:'#9ca3af', fontFamily:"'Noto Sans TC',sans-serif", padding:'2px 0'}}>{d}</div>
+                                        ))}
+                                    </div>
+                                    <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'2px'}}>{cells}</div>
+                                    <div style={{display:'flex', alignItems:'center', gap:'4px', justifyContent:'flex-end', marginTop:'8px'}}>
+                                        <span style={{fontSize:'10px', color:'#9ca3af', fontFamily:"'Noto Sans TC',sans-serif"}}>少</span>
+                                        {['#f3f4f6','#bbf7d0','#4ade80','#16a34a'].map(c => (
+                                            <div key={c} style={{width:'10px', height:'10px', borderRadius:'3px', background:c}}></div>
+                                        ))}
+                                        <span style={{fontSize:'10px', color:'#9ca3af', fontFamily:"'Noto Sans TC',sans-serif"}}>多</span>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {isAdmin && (
                         <div className="mt-4">
