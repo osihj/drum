@@ -462,7 +462,7 @@
                                         <div className="flex items-start justify-between mb-3">
                                             <div className="flex items-center gap-2">
                                                 <div>
-                                                    <p className="sans-font text-base" style={{color:'#374151'}}>{i+1}. {team.name}</p>
+                                                    <p className="sans-font text-base" style={{color:'#374151'}}>{team.name}</p>
                                                 </div>
                                                 {isMyTeam && <span className="text-[10px] pk-blue px-2 py-0.5 rounded-full sans-font ml-1" style={{color:'var(--c-primary-text)'}}>我的陣營</span>}
                                             </div>
@@ -511,10 +511,6 @@
                                     <div key={m.uid} className="bg-white r-card flex items-center gap-3"
                                         style={{padding:'12px 16px', border: isMe ? '1.5px solid var(--c-primary)' : '1px solid var(--c-border)',
                                             boxShadow: isMe ? '0 0 0 3px rgba(116,192,252,0.15)' : '0 1px 3px rgba(0,0,0,0.04)'}}>
-                                        {/* Rank */}
-                                        <div className="sans-font flex-shrink-0" style={{fontSize:'13px', width:'22px', textAlign:'center'}}>
-                                            {i < 3 ? medalLabel(i) : <span style={{color:'#d1d5db'}}>{i+1}</span>}
-                                        </div>
                                         {/* Name + team badge */}
                                         <div style={{flex:1, minWidth:0}}>
                                             <div className="flex items-center gap-2 flex-wrap">
