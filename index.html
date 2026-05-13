@@ -1,29 +1,40 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
-<title>自律動起來</title>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>自律動起來</title>
-    
+    <meta name="description" content="自律動起來 - 開啟自律生活的第一步">
+    <meta name="theme-color" content="#74c0fc">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="自律動起來">
-    <meta name="theme-color" content="#74C0FC">
-
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%2374C0FC'/%3E%3Cpath d='M90 40l13 32 35 3-26 23 8 34-30-18-30 18 8-34-26-23 35-3z' fill='white'/%3E%3C/svg%3E">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%2374C0FC'/%3E%3Cpath d='M90 40l13 32 35 3-26 23 8 34-30-18-30 18 8-34-26-23 35-3z' fill='white'/%3E%3C/svg%3E">
-
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <style>
-        /* ... 你原本的 CSS 樣式保持不變 ... */
-    </style>
-</head>
+    <title>自律動起來</title>
+    
+    <!-- ═══════════════════════════════════════════════════════════
+         Web App 圖示配置 - 讓用戶能將應用加入主畫面
+         ═══════════════════════════════════════════════════════════ -->
+    
+    <!-- iOS Safari 應用圖示 (Apple Touch Icon) -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%2374c0fc' rx='40'/%3E%3Cpath d='M90 55 L105 85 L140 90 L115 115 L120 150 L90 130 L60 150 L65 115 L40 90 L75 85 Z' fill='white'/%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" sizes="167x167" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 167 167'%3E%3Crect width='167' height='167' fill='%2374c0fc' rx='38'/%3E%3Cpath d='M83.5 52 L97 80 L128 85 L106 105 L111 135 L83.5 117 L56 135 L61 105 L39 85 L70 80 Z' fill='white'/%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" sizes="152x152" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 152 152'%3E%3Crect width='152' height='152' fill='%2374c0fc' rx='36'/%3E%3Cpath d='M76 48 L89 74 L118 79 L98 97 L103 126 L76 109 L49 126 L54 97 L34 79 L63 74 Z' fill='white'/%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" sizes="120x120" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' fill='%2374c0fc' rx='28'/%3E%3Cpath d='M60 38 L71 60 L95 64 L78 79 L82 103 L60 87 L38 103 L42 79 L25 64 L49 60 Z' fill='white'/%3E%3C/svg%3E">
+    
+    <!-- Android / 通用瀏覽器圖示 -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' fill='%2374c0fc' rx='48'/%3E%3Cpath d='M96 50 L110 80 L142 86 L120 107 L125 139 L96 120 L67 139 L72 107 L50 86 L82 80 Z' fill='white'/%3E%3C/svg%3E">
+    <link rel="shortcut icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' fill='%2374c0fc' rx='48'/%3E%3Cpath d='M96 50 L110 80 L142 86 L120 107 L125 139 L96 120 L67 139 L72 107 L50 86 L82 80 Z' fill='white'/%3E%3C/svg%3E">
+    
+    <!-- Web App Manifest (Android 主畫面安裝) -->
+    <link rel="manifest" href="data:application/json,%7B%22name%22:%22%E8%87%AA%E5%BE%8B%E5%8B%95%E8%B5%B7%E4%BE%86%22,%22short_name%22:%22%E8%87%AA%E5%BE%8B%E5%8B%95%E8%B5%B7%E4%BE%86%22,%22start_url%22:%22/%22,%22display%22:%22standalone%22,%22scope%22:%22/%22,%22orientation%22:%22portrait-primary%22,%22theme_color%22:%22%2374c0fc%22,%22background_color%22:%22%23f8fafc%22,%22description%22:%22%E8%87%AA%E5%BE%8B%E5%8B%95%E8%B5%B7%E4%BE%86%20-%20%E9%96%8B%E5%95%9F%E8%87%AA%E5%BE%8B%E7%94%9F%E6%B4%BB%E7%9A%84%E7%AC%AC%E4%B8%80%E6%AD%A5%22,%22icons%22:%5B%7B%22src%22:%22data:image/svg+xml,%253Csvg%2520xmlns='http://www.w3.org/2000/svg'%2520viewBox='0%25200%2520192%2520192'%253E%253Crect%2520width='192'%2520height='192'%2520fill='%2525237
+
+4c0fc'%2520rx='48'/%253E%253Cpath%2520d='M96%252050%2520L110%252080%2520L142%252086%2520L120%252010
+
+7%2520L125%2520139%2520L96%2520120%2520L67%2520139%2520L72%2520107%2520L50%252086%2520L82%252080%2520Z'%2520fill='white'/%253E%253C/svg%253E%22,%22sizes%22:%22192x192%22,%22type%22:%22image/svg+xml%22,%22purpose%22:%22any%22%7D,%7B%22src%22:%22data:image/svg+xml,%253Csvg%2520xmlns='http://www.w3.org/2000/svg'%2520viewBox='0%25200%2520512%2520512'%253E%253Crect%2520width='512'%2520height='512'%2520fill='%25237
+
+4c0fc'%2520rx='128'/%253E%253Cpath%2520d='M256%2520132%2520L280%2520212%2520L368%2520224%2520L304%2520280%2520L320%2520368%2520L256%2520320%2520L192%2520368%2520L208%2520280%2520L144%2520224%2520L232%2520212%2520Z'%2520fill='white'/%253E%253C/svg%253E%22,%22sizes%22:%22512x512%22,%22type%22:%22image/svg+xml%22,%22purpose%22:%22any%22%7D%5D%7D">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
