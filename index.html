@@ -469,11 +469,11 @@
                                                 {isMyTeam && <span className="text-[10px] pk-blue px-2 py-0.5 rounded-full sans-font ml-1" style={{color:'var(--c-primary-text)'}}>我的陣營</span>}
                                             </div>
                                             <div className="flex items-stretch gap-2">
-                                                <div className="rounded-xl text-center flex flex-col items-center justify-center" style={{padding:'10px 12px', minWidth:'58px', background:'#f0fdf4', border:'1px solid #bbf7d0'}}>
+                                                <div className="rounded-xl text-center flex flex-col items-center justify-center" style={{padding:'10px 12px', minWidth:'58px', background:`${accentColor}18`, border:`1px solid ${accentColor}60`}}>
                                                     <div className="sans-font text-lg" style={{lineHeight:'1.2', color:'#374151'}}>{team.total}</div>
                                                     <div className="sans-font" style={{fontSize:'9px', color:'#9ca3af'}}>總點</div>
                                                 </div>
-                                                <div className="rounded-xl text-center flex flex-col items-center justify-center" style={{padding:'10px 12px', minWidth:'58px', background:'#f0fdf4', border:'1px solid #bbf7d0'}}>
+                                                <div className="rounded-xl text-center flex flex-col items-center justify-center" style={{padding:'10px 12px', minWidth:'58px', background:`${accentColor}18`, border:`1px solid ${accentColor}60`}}>
                                                     <div className="sans-font text-lg" style={{lineHeight:'1.2', color:'#374151'}}>{team.avg}</div>
                                                     <div className="sans-font" style={{fontSize:'9px', color:'#9ca3af'}}>均值</div>
                                                 </div>
@@ -963,7 +963,7 @@
                     {/* Header */}
                     <div className="vibrant-card p-5 r-card float-anim relative overflow-hidden" style={{boxShadow:'0 1px 4px rgba(0,0,0,0.06)', marginBottom:'16px'}}>
                         <h2 className="sans-font text-2xl mb-1" style={{color:'var(--c-text)'}}>里程碑</h2>
-                        <p className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>選每天目標 · 系統自動計算週目標</p>
+                        <p className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>立目標、勤精進 (系統以週為單位計算)</p>
                     </div>
 
                     {/* 進行中 */}
@@ -989,11 +989,7 @@
                     {setItems.length > 0 && (
                         <div style={{background:'#fff', borderRadius:'12px', padding:'12px 16px',
                             border:'0.5px solid var(--c-border)', display:'flex', alignItems:'center',
-                            justifyContent:'space-between', marginTop:'8px'}}>
-                            <div>
-                                <div className="sans-font" style={{fontSize:'22px', fontWeight:'500', color:'var(--c-text)'}}>{doneItems.length} / {setItems.length}</div>
-                                <div className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)', marginTop:'1px'}}>本週里程碑達成</div>
-                            </div>
+                            justifyContent:'flex-end', marginTop:'8px'}}>
                             <div style={{textAlign:'right'}}>
                                 <div className="sans-font" style={{fontSize:'12px', fontWeight:'500', color:'var(--c-text)'}}>
                                     {doneItems.length === setItems.length ? '本週全數達標！' : `還差 ${setItems.length - doneItems.length} 項`}
