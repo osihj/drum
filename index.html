@@ -353,18 +353,29 @@
         // ─── Leaderboard View ───────────────────────────────────────────
         const LeaderboardView = ({ currentUser, userTeamId }) => {
             const [leaderboard, setLeaderboard] = useState([]);
+            const [allMembers, setAllMembers] = useState([]);
             const [loading, setLoading] = useState(true);
+            const [lbTab, setLbTab] = useState('teams'); // 'teams' | 'members'
+
+            // calc active days this month from logs
+            const calcActiveDays = (logs) => {
+                const now = new Date();
+                const prefix = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+                return Object.entries(logs).filter(([k,v]) =>
+                    k.startsWith(prefix) && ((v.practice||0)+(v.fiveMin||0)+(v.exerciseTime||0)+(v.stretchTime||0)) > 0
+                ).length;
+            };
 
             useEffect(() => {
-                // Fetch all teams
                 const unsubTeams = db.collection('artifacts').doc(appId).collection('teams')
                     .onSnapshot(async teamSnap => {
                         const teams = {};
                         teamSnap.forEach(doc => { teams[doc.id] = { id: doc.id, name: doc.data().name, members: [] }; });
 
-                        // Fetch all users
                         const usersSnap = await db.collection('artifacts').doc(appId).collection('users').get();
                         const userPromises = [];
+                        const membersFlat = [];
+
                         usersSnap.forEach(userDoc => {
                             const userData = userDoc.data();
                             if (userData.teamId && teams[userData.teamId]) {
@@ -377,9 +388,16 @@
                                             logsSnap.forEach(d => logs[d.id] = d.data());
                                             const score = calcScore(logs);
                                             const lv = calcLevel(calcAllTimeScore(logs));
-                                            teams[userData.teamId].members.push({
-                                                uid, name: userData.displayName || userData.email, score, lv
-                                            });
+                                            const activeDays = calcActiveDays(logs);
+                                            const member = {
+                                                uid,
+                                                name: userData.displayName || userData.email,
+                                                teamId: userData.teamId,
+                                                teamName: teams[userData.teamId]?.name || '',
+                                                score, lv, activeDays
+                                            };
+                                            teams[userData.teamId].members.push(member);
+                                            membersFlat.push(member);
                                         })
                                 );
                             }
@@ -394,76 +412,139 @@
                         }).sort((a, b) => b.avgLv - a.avgLv);
 
                         setLeaderboard(result);
+                        setAllMembers(membersFlat.sort((a, b) => b.lv - a.lv));
                         setLoading(false);
                     });
                 return () => unsubTeams();
             }, []);
 
-            const teamColors = ['pk-yellow','pk-blue','pk-pink','pk-green','pk-purple','pk-orange'];
-            const teamBorderColors = ['pk-border-yellow','pk-border-blue','pk-border-pink','pk-border-green','pk-border-purple','pk-border-orange'];
             const teamAccentColors = ['#ffd43b','#74c0fc','#ff8787','#8ce99a','#b197fc','#ff922b'];
 
+            // medal colors for top 3
+            const medalColor = (i) => ['#f59e0b','#94a3b8','#b45309'][i] || '#e5e7eb';
+            const medalLabel = (i) => ['🥇','🥈','🥉'][i] || `${i+1}`;
+
             return (
-                <div className="space-y-4 animate-in fade-in duration-300">
-                    {/* 風雲榜外框 - 統一大小 */}
+                <div className="space-y-4 animate-in fade-in duration-300" style={{paddingBottom:'2rem'}}>
+                    {/* Header */}
                     <div className="vibrant-card p-5 r-card float-anim relative overflow-hidden" style={{boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
                         <div className="relative z-10">
-                            <h2 className="sans-font text-2xl mb-2" style={{color:'var(--c-text)'}}>風雲榜</h2>
+                            <h2 className="sans-font text-2xl mb-1" style={{color:'var(--c-text)'}}>風雲榜</h2>
                             <p className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>本月道行 · 等級永久累積</p>
                         </div>
                     </div>
 
-                    {loading && (
-                        <div className="text-center py-12 opacity-30 sans-font text-sm">載入排行榜中...</div>
-                    )}
+                    {/* Tab switcher */}
+                    <div className="flex bg-white r-card" style={{border:'1px solid var(--c-border)', padding:'3px'}}>
+                        <button onClick={() => setLbTab('teams')}
+                            className={`flex-1 sans-font text-xs r-btn transition-all ${lbTab==='teams' ? 'pk-blue' : ''}`}
+                            style={{color: lbTab==='teams' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>
+                            ⚔️ 門派排名
+                        </button>
+                        <button onClick={() => setLbTab('members')}
+                            className={`flex-1 sans-font text-xs r-btn transition-all ${lbTab==='members' ? 'pk-blue' : ''}`}
+                            style={{color: lbTab==='members' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>
+                            🧑‍🤝‍🧑 門派成員
+                        </button>
+                    </div>
 
-                    {!loading && leaderboard.length === 0 && (
-                        <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有門派資料</div>
-                    )}
+                    {loading && <div className="text-center py-12 opacity-30 sans-font text-sm">載入中...</div>}
 
-                    {leaderboard.map((team, i) => {
-                        const isMyTeam = team.id === userTeamId;
-                        const accentColor = teamAccentColors[i % teamAccentColors.length];
-                        return (
-                            <div key={team.id} className="bg-white rounded-[1.5rem] overflow-hidden"
-                                style={{border: `0.5px solid #e5e7eb`, borderLeft: `4px solid ${accentColor}`, padding: '16px 18px', boxShadow: `2px 2px 10px 0px ${accentColor}40, 0 1px 3px rgba(0,0,0,0.05)`}}>
-                                {/* Team header */}
-                                <div className="flex items-start justify-between mb-3">
-                                    <div>
-                                        <p className="sans-font text-lg text-[#374151]">{team.name}</p>
-                                        {isMyTeam && <span className="text-[10px] pk-blue px-2 py-0.5 rounded-full sans-font">我的陣營</span>}
-                                    </div>
-                                    {/* Stats boxes */}
-                                    <div className="flex items-stretch gap-2">
-                                        <div className="rounded-xl text-center flex flex-col items-center justify-center" style={{padding: '12px 14px', minWidth: '64px', background:'#f0fdf4', border:'1px solid #bbf7d0'}}>
-                                            <div className="sans-font text-xl text-[#374151]" style={{lineHeight: '1.2', marginBottom: '4px'}}>{team.total}</div>
-                                            <div className="sans-font" style={{fontSize: '10px', color: '#9ca3af', lineHeight: '1.3'}}>總點</div>
-                                        </div>
-                                        <div className="rounded-xl text-center flex flex-col items-center justify-center" style={{padding: '12px 14px', minWidth: '64px', background:'#f0fdf4', border:'1px solid #bbf7d0'}}>
-                                            <div className="sans-font text-xl text-[#374151]" style={{lineHeight: '1.2', marginBottom: '4px'}}>{team.avg}</div>
-                                            <div className="sans-font" style={{fontSize: '10px', color: '#9ca3af', lineHeight: '1.3'}}>均值</div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Members */}
-                                {team.members.length > 0 && (
-                                    <div style={{borderTop: '0.5px solid #f3f4f6', paddingTop: '8px'}}>
-                                        {team.members.sort((a,b) => b.lv - a.lv).map((m, mi) => (
-                                            <div key={m.uid} className="flex items-center justify-between" style={{padding: '6px 4px'}}>
-                                                <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                                                    <span className="sans-font" style={{fontSize: '11px', color: '#d1d5db', width: '14px'}}>{mi + 1}</span>
-                                                    <span className="sans-font text-base" style={{color: '#374151'}}>{m.name}</span>
-                                                    <span className="sans-font" style={{fontSize: '12px', color: '#9ca3af', lineHeight: '1', alignSelf: 'center'}}>&nbsp;Lv.{m.lv}</span>
+                    {/* ── 門派排名 tab ── */}
+                    {!loading && lbTab === 'teams' && (
+                        <div className="space-y-3">
+                            {leaderboard.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有門派資料</div>}
+                            {leaderboard.map((team, i) => {
+                                const isMyTeam = team.id === userTeamId;
+                                const accentColor = teamAccentColors[i % teamAccentColors.length];
+                                return (
+                                    <div key={team.id} className="bg-white rounded-[1.5rem] overflow-hidden"
+                                        style={{border:`0.5px solid #e5e7eb`, borderLeft:`4px solid ${accentColor}`, padding:'16px 18px', boxShadow:`2px 2px 10px 0px ${accentColor}40, 0 1px 3px rgba(0,0,0,0.05)`}}>
+                                        {/* Team header */}
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div className="flex items-center gap-2">
+                                                <span className="sans-font text-lg" style={{minWidth:'24px'}}>{medalLabel(i)}</span>
+                                                <div>
+                                                    <p className="sans-font text-base" style={{color:'#374151'}}>{team.name}</p>
+                                                    <p className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>{team.members.length} 位修士</p>
                                                 </div>
-                                                <span className="sans-font text-sm" style={{color: '#374151'}}>{m.score} 點</span>
+                                                {isMyTeam && <span className="text-[10px] pk-blue px-2 py-0.5 rounded-full sans-font ml-1" style={{color:'var(--c-primary-text)'}}>我的陣營</span>}
                                             </div>
-                                        ))}
+                                            <div className="flex items-stretch gap-2">
+                                                <div className="rounded-xl text-center flex flex-col items-center justify-center" style={{padding:'10px 12px', minWidth:'58px', background:'#f0fdf4', border:'1px solid #bbf7d0'}}>
+                                                    <div className="sans-font text-lg" style={{lineHeight:'1.2', color:'#374151'}}>{team.total}</div>
+                                                    <div className="sans-font" style={{fontSize:'9px', color:'#9ca3af'}}>總點</div>
+                                                </div>
+                                                <div className="rounded-xl text-center flex flex-col items-center justify-center" style={{padding:'10px 12px', minWidth:'58px', background:'#f0fdf4', border:'1px solid #bbf7d0'}}>
+                                                    <div className="sans-font text-lg" style={{lineHeight:'1.2', color:'#374151'}}>{team.avg}</div>
+                                                    <div className="sans-font" style={{fontSize:'9px', color:'#9ca3af'}}>均值</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {/* Members mini list */}
+                                        {team.members.length > 0 && (
+                                            <div style={{borderTop:'0.5px solid #f3f4f6', paddingTop:'8px'}}>
+                                                {team.members.sort((a,b) => b.lv - a.lv).map((m, mi) => (
+                                                    <div key={m.uid} className="flex items-center justify-between" style={{padding:'5px 4px'}}>
+                                                        <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                                                            <span className="sans-font" style={{fontSize:'11px', color:'#d1d5db', width:'14px'}}>{mi+1}</span>
+                                                            <span className="sans-font text-sm" style={{color:'#374151'}}>{m.name}</span>
+                                                            <span className="sans-font" style={{fontSize:'11px', color:'#9ca3af'}}>Lv.{m.lv}</span>
+                                                        </div>
+                                                        <span className="sans-font text-xs" style={{color:'#6b7280'}}>{m.score} 點</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
-                        );
-                    })}
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* ── 門派成員 tab ── */}
+                    {!loading && lbTab === 'members' && (
+                        <div className="space-y-2">
+                            {allMembers.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有成員資料</div>}
+                            {allMembers.map((m, i) => {
+                                const isMe = m.uid === currentUser?.uid;
+                                // find team color
+                                const teamIdx = leaderboard.findIndex(t => t.id === m.teamId);
+                                const accentColor = teamAccentColors[teamIdx >= 0 ? teamIdx % teamAccentColors.length : 0];
+                                return (
+                                    <div key={m.uid} className="bg-white r-card flex items-center gap-3"
+                                        style={{padding:'12px 16px', border: isMe ? '1.5px solid var(--c-primary)' : '1px solid var(--c-border)',
+                                            boxShadow: isMe ? '0 0 0 3px rgba(116,192,252,0.15)' : '0 1px 3px rgba(0,0,0,0.04)'}}>
+                                        {/* Rank */}
+                                        <div className="sans-font flex-shrink-0" style={{fontSize:'13px', width:'22px', textAlign:'center'}}>
+                                            {i < 3 ? medalLabel(i) : <span style={{color:'#d1d5db'}}>{i+1}</span>}
+                                        </div>
+                                        {/* Name + team badge */}
+                                        <div style={{flex:1, minWidth:0}}>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="sans-font text-sm" style={{color:'#1f2937'}}>{m.name}{isMe ? ' （我）' : ''}</span>
+                                                <span className="sans-font" style={{fontSize:'9px', padding:'1px 7px', borderRadius:'99px', background:`${accentColor}28`, color: accentColor === '#ffd43b' ? '#6b4f00' : '#374151', border:`1px solid ${accentColor}60`}}>
+                                                    {m.teamName}
+                                                </span>
+                                            </div>
+                                            {/* Progress bar: active days / 30 */}
+                                            <div style={{marginTop:'5px', display:'flex', alignItems:'center', gap:'6px'}}>
+                                                <div style={{flex:1, height:'4px', background:'#f3f4f6', borderRadius:'2px', overflow:'hidden'}}>
+                                                    <div style={{height:'100%', width:`${Math.min(100, Math.round(m.activeDays/30*100))}%`, background: accentColor, borderRadius:'2px'}}></div>
+                                                </div>
+                                                <span className="sans-font" style={{fontSize:'9px', color:'#9ca3af', flexShrink:0}}>活躍 {m.activeDays} 天</span>
+                                            </div>
+                                        </div>
+                                        {/* Level + score */}
+                                        <div style={{textAlign:'right', flexShrink:0}}>
+                                            <div className="sans-font" style={{fontSize:'15px', fontWeight:'500', color:'#1f2937'}}>Lv.{m.lv}</div>
+                                            <div className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>{m.score} 點</div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             );
         };
