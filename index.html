@@ -964,11 +964,6 @@
                     <div className="vibrant-card p-5 r-card float-anim relative overflow-hidden" style={{boxShadow:'0 1px 4px rgba(0,0,0,0.06)', marginBottom:'16px'}}>
                         <h2 className="sans-font text-2xl mb-1" style={{color:'var(--c-text)'}}>里程碑</h2>
                         <p className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>選每天目標 · 系統自動計算週目標</p>
-                        {/* 調試信息 */}
-                        <div style={{marginTop:'8px', padding:'8px', background:'#f3f4f6', borderRadius:'6px', fontSize:'9px', color:'#6b7280', fontFamily:'monospace'}}>
-                            <div>Goals: {Object.keys(goals).length > 0 ? JSON.stringify(goals) : '尚未設定'}</div>
-                            <div>SetItems: {setItems.length} | Done: {doneItems.length}</div>
-                        </div>
                     </div>
 
                     {/* 進行中 */}
@@ -1299,14 +1294,13 @@
                             else if (eitherTwo || hasAny) intensity[d] = 1;
                             else intensity[d] = 0;
                         }
-                        const heatColors = ['#f3f4f6','#dcfce7','#bbf7d0','#4ade80','#16a34a'];
-                        const heatText   = ['#d1d5db','#166534','#166534','#ffffff','#ffffff'];
+                        const heatColors = ['#f3f4f6','#f3f4f6','#f3f4f6','#f3f4f6','#f3f4f6'];
+                        const heatText   = ['#d1d5db','#d1d5db','#d1d5db','#d1d5db','#d1d5db'];
                         const cells = [];
                         for (let i = 0; i < firstDay; i++) cells.push(<div key={`e${i}`} style={{height:'26px'}}></div>);
                         for (let d = 1; d <= daysInMonth; d++) {
                             const isFuture = isCurrentMonth && d > today;
                             const lv = isFuture ? -1 : intensity[d];
-                            const gold = !isFuture && isGold[d];
                             const bg = lv === -1 ? 'transparent' : heatColors[Math.min(lv, 4)];
                             const tc = lv === -1 ? '#e5e7eb' : heatText[Math.min(lv, 4)];
                             const isToday = isCurrentMonth && d === today;
@@ -1317,7 +1311,7 @@
                                     background: bg, color: tc,
                                     fontSize:'12px', fontWeight:'900',
                                     fontFamily:"'Noto Sans TC',sans-serif",
-                                    outline: gold ? '2px solid #f59e0b' : isToday ? '2px solid #16a34a' : 'none',
+                                    outline: isToday ? '2px solid #74c0fc' : 'none',
                                     outlineOffset: '-1px',
                                 }}>{d}</div>
                             );
