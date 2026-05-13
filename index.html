@@ -425,8 +425,8 @@
                         const isMyTeam = team.id === userTeamId;
                         const accentColor = teamAccentColors[i % teamAccentColors.length];
                         return (
-                            <div key={team.id} className={`bg-white rounded-[1.5rem] overflow-hidden ${isMyTeam ? 'neo-shadow' : ''}`}
-                                style={{border: `0.5px solid #e5e7eb`, borderLeft: `4px solid ${accentColor}`, padding: '16px 18px', animation: 'float 3s ease-in-out infinite'}}>
+                            <div key={team.id} className="bg-white rounded-[1.5rem] overflow-hidden"
+                                style={{border: `0.5px solid #e5e7eb`, borderLeft: `4px solid ${accentColor}`, padding: '16px 18px'}}>
                                 {/* Team header */}
                                 <div className="flex items-start justify-between mb-3">
                                     <div>
@@ -808,7 +808,7 @@
             return (
                 <div className="space-y-4 animate-in slide-in-from-bottom-4">
                     {/* 用戶信息卡片 */}
-                    <div className="bg-white r-card card-shadow p-5" style={{display:'flex', gap:'1rem', alignItems:'center'}}>
+                    <div className="bg-white r-card card-shadow p-5 float-anim" style={{display:'flex', gap:'1rem', alignItems:'center'}}>
                         {/* 頭像 */}
                         <div style={{flexShrink:0}}>
                             <div style={{width:'72px', height:'72px', borderRadius:'50%', background:'linear-gradient(135deg, #74c0fc 0%, #5dbdff 100%)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'32px', color:'white', fontWeight:'500', border:'2px solid white', boxShadow:'0 2px 8px rgba(0,0,0,0.08)'}}>
