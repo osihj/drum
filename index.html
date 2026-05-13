@@ -717,13 +717,34 @@
                                         { label:'運動',   val: exer, border:'#ff922b' },
                                         { label:'拉筋',   val: stre, border:'#34d399' },
                                     ];
+
+                                    // 本週日～六 7 天
+                                    const todayIdx = now.getDay(); // 0=日
+                                    const weekBarDays = Array.from({length:7}, (_, i) => {
+                                        const d = new Date(now);
+                                        d.setDate(now.getDate() - todayIdx + i);
+                                        return d;
+                                    });
+                                    const barLabels = ['日','一','二','三','四','五','六'];
+
+                                    // 每天活躍量（practice + fiveMin + exerciseTime/10 + stretchTime/10，換算成相對分數）
+                                    const barScores = weekBarDays.map(d => {
+                                        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                                        const log = dailyLogs[key] || {};
+                                        return (Number(log.practice)||0)*5 + (Number(log.fiveMin)||0)*5 + (Number(log.exerciseTime)||0) + (Number(log.stretchTime)||0);
+                                    });
+                                    const maxScore = Math.max(...barScores, 1);
+                                    const BAR_MAX_H = 56; // px
+
                                     return (
                                         <div style={{background:'var(--c-surface)', borderRadius:'16px', padding:'10px 10px 12px', border:'0.5px solid var(--c-border)'}}>
+                                            {/* 日期列 */}
                                             <div style={{padding:'0 4px 8px', display:'flex', alignItems:'baseline', gap:'6px'}}>
                                                 <span className="sans-font" style={{fontSize:'13px', fontWeight:'500', color:'var(--c-text)'}}>{dateLabel}</span>
                                                 <span className="sans-font" style={{fontSize:'11px', color:'var(--c-muted)'}}>{weekLabel}</span>
                                             </div>
-                                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:'8px'}}>
+                                            {/* 四格 */}
+                                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:'8px', marginBottom:'10px'}}>
                                                 {cols.map(c => (
                                                     <div key={c.label} style={{
                                                         background:'#fff',
@@ -736,6 +757,33 @@
                                                         <div className="sans-font" style={{fontSize:'11px', color: c.val>0 ? 'var(--c-muted)' : '#c0c0c0'}}>{c.label}</div>
                                                     </div>
                                                 ))}
+                                            </div>
+                                            {/* 本週直條圖 */}
+                                            <div style={{borderTop:'0.5px solid var(--c-border)', paddingTop:'10px'}}>
+                                                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px'}}>
+                                                    <span className="sans-font" style={{fontSize:'11px', color:'var(--c-muted)'}}>本週活躍量</span>
+                                                    <span className="sans-font" style={{fontSize:'11px', color:'var(--c-muted)'}}>今日進行中</span>
+                                                </div>
+                                                <div style={{display:'flex', alignItems:'flex-end', gap:'5px', height:`${BAR_MAX_H + 18}px`}}>
+                                                    {weekBarDays.map((d, i) => {
+                                                        const isToday = i === todayIdx;
+                                                        const score = barScores[i];
+                                                        const barH = score > 0 ? Math.max(6, Math.round(score / maxScore * BAR_MAX_H)) : 4;
+                                                        return (
+                                                            <div key={i} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:'5px'}}>
+                                                                <div style={{
+                                                                    width:'100%',
+                                                                    height:`${barH}px`,
+                                                                    background: isToday ? '#d3f9d8' : score > 0 ? '#8ce99a' : 'var(--c-border)',
+                                                                    border: isToday ? '1.5px solid #40c057' : 'none',
+                                                                    borderRadius:'4px 4px 0 0',
+                                                                    alignSelf:'flex-end'
+                                                                }}></div>
+                                                                <span className="sans-font" style={{fontSize:'9px', color: isToday ? '#40c057' : 'var(--c-muted)', fontWeight: isToday ? '500' : '400'}}>{barLabels[i]}</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
                                         </div>
                                     );
