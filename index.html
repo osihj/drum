@@ -712,23 +712,28 @@
                                     const exer = Number(td.exerciseTime)||0;
                                     const stre = Number(td.stretchTime)||0;
                                     const cols = [
-                                        { label:'練功', val: prac, unit:'次', color:'#ffd43b' },
-                                        { label:'五分鐘', val: five, unit:'次', color:'#74c0fc' },
-                                        { label:'運動', val: exer, unit:'分', color:'#ff922b' },
-                                        { label:'拉筋', val: stre, unit:'分', color:'#34d399' },
+                                        { label:'練功',   val: prac, border:'#ffd43b', bg:'#fffde7', numColor:'#7a5c00', lblColor:'#a07a00' },
+                                        { label:'五分鐘', val: five, border:'#38bdf8', bg:'#e6f6ff', numColor:'#0c5a80', lblColor:'#0e7aaa' },
+                                        { label:'運動',   val: exer, border:'#ff922b', bg:'#fff4eb', numColor:'#7a3c00', lblColor:'#a05200' },
+                                        { label:'拉筋',   val: stre, border:'#34d399', bg:'#eafaf3', numColor:'#0a5c38', lblColor:'#0d7a4e' },
                                     ];
                                     return (
-                                        <div className="bg-white r-card" style={{border:'0.5px solid var(--c-border)', overflow:'hidden'}}>
-                                            <div style={{padding:'9px 14px', borderBottom:'0.5px solid var(--c-border)', display:'flex', alignItems:'baseline', gap:'6px'}}>
+                                        <div style={{background:'var(--c-surface)', borderRadius:'16px', padding:'10px 10px 12px', border:'0.5px solid var(--c-border)'}}>
+                                            <div style={{padding:'0 4px 8px', display:'flex', alignItems:'baseline', gap:'6px'}}>
                                                 <span className="sans-font" style={{fontSize:'13px', fontWeight:'500', color:'var(--c-text)'}}>{dateLabel}</span>
                                                 <span className="sans-font" style={{fontSize:'11px', color:'var(--c-muted)'}}>{weekLabel}</span>
                                             </div>
-                                            <div style={{display:'flex'}}>
-                                                {cols.map((c, i) => (
-                                                    <div key={c.label} style={{flex:1, padding:'18px 6px', textAlign:'center', borderRight: i<3 ? '0.5px solid var(--c-border)' : 'none'}}>
-                                                        <div style={{width:'7px', height:'7px', borderRadius:'50%', background:c.color, margin:'0 auto 8px'}}></div>
-                                                        <div className="sans-font" style={{fontSize:'26px', fontWeight:'500', color: c.val>0 ? 'var(--c-text)' : 'var(--c-muted)', lineHeight:1}}>{c.val>0 ? c.val : '—'}</div>
-                                                        <div className="sans-font" style={{fontSize:'12px', color:'var(--c-muted)', marginTop:'7px'}}>{c.label}</div>
+                                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:'8px'}}>
+                                                {cols.map(c => (
+                                                    <div key={c.label} style={{
+                                                        background: c.bg,
+                                                        border: `1.5px solid ${c.border}`,
+                                                        borderRadius:'12px',
+                                                        padding:'12px 6px 10px',
+                                                        display:'flex', flexDirection:'column', alignItems:'center', gap:'6px'
+                                                    }}>
+                                                        <div className="sans-font" style={{fontSize:'24px', fontWeight:'500', lineHeight:1, color: c.val>0 ? c.numColor : '#c0c0c0'}}>{c.val>0 ? c.val : '—'}</div>
+                                                        <div className="sans-font" style={{fontSize:'11px', color: c.val>0 ? c.lblColor : '#c0c0c0'}}>{c.label}</div>
                                                     </div>
                                                 ))}
                                             </div>
