@@ -712,8 +712,18 @@
                                 <div className="grid grid-cols-2 gap-4">
                                     <MiniActionCard label="練功" count={dailyLogs[todayKey]?.practice || 0} onClick={() => handleAccumulate('simple', 'practice')} color="pk-yellow" />
                                     <MiniActionCard label="五分鐘" count={dailyLogs[todayKey]?.fiveMin || 0} onClick={() => handleAccumulate('simple', 'fiveMin')} color="pk-blue" />
-                                    <TimeActionCard label="運動" total={dailyLogs[todayKey]?.exerciseTime || 0} onAdd={(mins) => handleAccumulate('time', { key: 'exerciseTime', mins })} />
-                                    <TimeActionCard label="拉筋" total={dailyLogs[todayKey]?.stretchTime || 0} onAdd={(mins) => handleAccumulate('time', { key: 'stretchTime', mins })} />
+                                    <TimeActionCard label="運動"
+                                        total={dailyLogs[todayKey]?.exerciseTime || 0}
+                                        onAdd={(mins) => handleAccumulate('time', { key: 'exerciseTime', mins })}
+                                        onAddDay={() => handleAccumulate('time', { key: 'exerciseTime', mins: 1 })}
+                                        daysCount={currentWeekDays.filter(d => (dailyLogs[formatDateKey(d)]?.exerciseTime || 0) > 0).length}
+                                    />
+                                    <TimeActionCard label="拉筋"
+                                        total={dailyLogs[todayKey]?.stretchTime || 0}
+                                        onAdd={(mins) => handleAccumulate('time', { key: 'stretchTime', mins })}
+                                        onAddDay={() => handleAccumulate('time', { key: 'stretchTime', mins: 1 })}
+                                        daysCount={currentWeekDays.filter(d => (dailyLogs[formatDateKey(d)]?.stretchTime || 0) > 0).length}
+                                    />
                                 </div>
                                 <div className="mt-6 flex flex-col gap-2">
                                     <button onClick={() => setIsModalOpen(false)} className="w-full py-4 r-btn sans-font text-lg tracking-widest active-press text-white neo-border neo-shadow-sm" style={{background:'var(--c-text)'}}>修煉圓滿</button>
@@ -728,7 +738,7 @@
                             <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} navIcon="mountain" label="修煉室" />
                             <NavBtn active={activeTab === 'leaderboard'} onClick={() => setActiveTab('leaderboard')} navIcon="scroll" label="風雲榜" />
                             <NavBtn active={activeTab === 'milestone'} onClick={() => setActiveTab('milestone')} navIcon="milestone" label="里程碑" />
-                            <NavBtn active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} navIcon="gate" label="洞府" />
+                            <NavBtn active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} navIcon="gate" label="小天地" />
                         </div>
                     </nav>
                 </div>
@@ -843,10 +853,10 @@
                                     </span>
                                 )}
                                 <span className="sans-font" style={{fontSize:'10px', padding:'2px 9px', borderRadius:'99px', fontWeight:'500',
-                                    background: isDone ? '#f0fdf4' : '#eff6ff',
-                                    color: isDone ? '#166534' : '#1d4ed8',
-                                    border: isDone ? '0.5px solid #bbf7d0' : '0.5px solid #bfdbfe'}}>
-                                    {isDone ? '達標' : '進行中'}
+                                    background: isDone ? '#f0fdf4' : 'transparent',
+                                    color: isDone ? '#166534' : 'transparent',
+                                    border: isDone ? '0.5px solid #bbf7d0' : 'none'}}>
+                                    {isDone ? '達標' : ''}
                                 </span>
                             </div>
                         </div>
@@ -861,11 +871,11 @@
                         </div>
                         <div style={{display:'flex', justifyContent:'space-between', marginTop:'5px'}}>
                             <span className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)'}}>本週已完成 {actual} {m.unit}</span>
-                            <span className="sans-font" style={{fontSize:'10px',
-                                color: isDone ? '#166534' : '#1d4ed8',
-                                fontWeight: isDone ? '500' : '400'}}>
-                                {isDone ? '里程碑達成 🎯' : `還差 ${goal - actual} ${m.unit}`}
-                            </span>
+                            {!isDone && (
+                                <span className="sans-font" style={{fontSize:'10px', color:'#1d4ed8'}}>
+                                    {`尚欠 ${goal - actual} ${m.unit}`}
+                                </span>
+                            )}
                         </div>
                     </div>
                 );
@@ -882,7 +892,6 @@
                     {/* 進行中 */}
                     {inProgressItems.length > 0 && (
                         <>
-                            <p className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)', letterSpacing:'0.5px', padding:'0 2px 6px'}}>進行中</p>
                             {inProgressItems.map(renderCard)}
                         </>
                     )}
@@ -1304,16 +1313,34 @@
             </button>
         );
 
-        const TimeActionCard = ({ label, total, onAdd }) => (
-            <div className="aspect-square bg-white neo-border r-card flex flex-col items-center justify-around p-3 neo-shadow-sm">
-                <span className="sans-font text-xs" style={{color:'var(--c-text)'}}>{label}</span>
-                <select onChange={(e) => { if(e.target.value) onAdd(e.target.value); e.target.value = ""; }} className="w-full text-[11px] py-1.5 r-btn text-center focus:outline-none bg-slate-50 sans-font neo-border-thin">
-                    <option value="">+時辰</option>
-                    {[5,15,30,60].map(m => <option key={m} value={m}>+{m}m</option>)}
-                </select>
-                <span className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>{total} 分鐘</span>
-            </div>
-        );
+        const TimeActionCard = ({ label, total, onAdd, onAddDay, daysCount }) => {
+            const [mode, setMode] = React.useState('min'); // 'min' | 'day'
+            return (
+                <div className="aspect-square bg-white neo-border r-card flex flex-col items-center justify-around p-3 neo-shadow-sm">
+                    <div className="flex items-center justify-between w-full">
+                        <span className="sans-font text-xs" style={{color:'var(--c-text)'}}>{label}</span>
+                        <button onClick={() => setMode(m => m === 'min' ? 'day' : 'min')}
+                            className="sans-font r-badge active-press"
+                            style={{fontSize:'9px', padding:'1px 7px', border:'0.5px solid var(--c-border-strong)', color:'var(--c-text-sub)', background:'var(--c-surface)'}}>
+                            {mode === 'min' ? '分鐘' : '天數'}
+                        </button>
+                    </div>
+                    {mode === 'min' ? (
+                        <select onChange={(e) => { if(e.target.value) onAdd(e.target.value); e.target.value = ""; }} className="w-full text-[11px] py-1.5 r-btn text-center focus:outline-none bg-slate-50 sans-font neo-border-thin">
+                            <option value="">+時辰</option>
+                            {[5,15,30,60].map(m => <option key={m} value={m}>+{m}m</option>)}
+                        </select>
+                    ) : (
+                        <button onClick={onAddDay} className="w-full py-1.5 r-btn text-[11px] sans-font neo-border-thin active-press" style={{background:'var(--c-surface)', color:'var(--c-text)'}}>
+                            + 記錄今天
+                        </button>
+                    )}
+                    <span className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>
+                        {mode === 'min' ? `${total} 分鐘` : `${daysCount} 天`}
+                    </span>
+                </div>
+            );
+        };
 
         // ─── Admin View ─────────────────────────────────────────────────
         const AdminView = () => {
@@ -1530,11 +1557,13 @@
             ),
             scroll: (
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 3a2 2 0 0 0-2 2v1h14V5a2 2 0 0 0-2-2H5z" />
-                    <path d="M3 6v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6H3z" />
-                    <path d="M17 6a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2" />
-                    <line x1="7" y1="10" x2="13" y2="10" />
-                    <line x1="7" y1="14" x2="11" y2="14" />
+                    <path d="M8 3H6a2 2 0 0 0-2 2v1c0 1.1.9 2 2 2h1" />
+                    <path d="M18 3h2a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-1" />
+                    <path d="M8 3h8" />
+                    <path d="M8 8h8" />
+                    <path d="M8 8v11a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V8" />
+                    <path d="M6 8a2 2 0 0 0-2 2v1a2 2 0 0 0 2 2h1" />
+                    <path d="M18 8a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-1" />
                 </svg>
             ),
             hourglass: (
