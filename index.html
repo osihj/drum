@@ -797,8 +797,8 @@
 
         // 各項目每日預設選項
         const DAILY_OPTIONS = {
-            practice:     [1, 2, 3, 4],
-            fiveMin:      [1, 2, 3, 4],
+            practice:     [1, 2],
+            fiveMin:      [1, 2],
             exerciseTime: [10, 20, 30, 60],
             stretchTime:  [10, 20, 30, 60],
         };
@@ -886,52 +886,54 @@
                             )}
                         </div>
 
-                        {/* A版型：膠囊選項列 */}
-                        <div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom: isUnset ? '0' : '10px'}}>
-                            {opts.map(opt => {
-                                const isActive = daily === opt && !isCustomShown;
-                                return (
-                                    <button key={opt} onClick={() => selectDaily(m.key, opt)}
+                        {/* 未設定時：顯示膠囊選項列 */}
+                        {isUnset && (
+                            <div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom: '0'}}>
+                                {opts.map(opt => {
+                                    const isActive = daily === opt && !isCustomShown;
+                                    return (
+                                        <button key={opt} onClick={() => selectDaily(m.key, opt)}
+                                            className="sans-font active-press"
+                                            style={{
+                                                padding:'5px 13px', borderRadius:'99px', fontSize:'12px', cursor:'pointer',
+                                                border: isActive ? 'none' : '0.5px solid var(--c-border-strong)',
+                                                background: isActive ? m.color : 'var(--c-surface)',
+                                                color: isActive ? '#1f2937' : 'var(--c-text-sub)',
+                                                fontWeight: isActive ? '500' : '400',
+                                            }}>
+                                            {opt} {m.unit}
+                                        </button>
+                                    );
+                                })}
+                                {/* 自訂 */}
+                                {isCustomShown ? (
+                                    <input
+                                        ref={el => customRefs.current[m.key] = el}
+                                        type="number" inputMode="numeric"
+                                        value={customInput[m.key] || ''}
+                                        onChange={e => setCustomInput(prev => ({ ...prev, [m.key]: e.target.value }))}
+                                        onBlur={() => confirmCustom(m.key)}
+                                        onKeyDown={e => e.key === 'Enter' && confirmCustom(m.key)}
+                                        placeholder={`自訂 ${m.unit}`}
+                                        style={{width:'80px', fontSize:'12px', padding:'5px 10px', borderRadius:'99px',
+                                            border:'1px solid var(--c-primary)', outline:'none', textAlign:'center',
+                                            fontFamily:"'Noto Sans TC',sans-serif", background:'#fff'}}
+                                    />
+                                ) : (
+                                    <button onClick={() => {
+                                            setShowCustom(prev => ({ ...prev, [m.key]: true }));
+                                            setTimeout(() => customRefs.current[m.key]?.focus(), 50);
+                                        }}
                                         className="sans-font active-press"
-                                        style={{
-                                            padding:'5px 13px', borderRadius:'99px', fontSize:'12px', cursor:'pointer',
-                                            border: isActive ? 'none' : '0.5px solid var(--c-border-strong)',
-                                            background: isActive ? m.color : 'var(--c-surface)',
-                                            color: isActive ? '#1f2937' : 'var(--c-text-sub)',
-                                            fontWeight: isActive ? '500' : '400',
-                                        }}>
-                                        {opt} {m.unit}
+                                        style={{padding:'5px 13px', borderRadius:'99px', fontSize:'12px', cursor:'pointer',
+                                            border:'0.5px dashed var(--c-border-strong)', background:'var(--c-surface)', color:'var(--c-muted)'}}>
+                                        自訂
                                     </button>
-                                );
-                            })}
-                            {/* 自訂 */}
-                            {isCustomShown ? (
-                                <input
-                                    ref={el => customRefs.current[m.key] = el}
-                                    type="number" inputMode="numeric"
-                                    value={customInput[m.key] || ''}
-                                    onChange={e => setCustomInput(prev => ({ ...prev, [m.key]: e.target.value }))}
-                                    onBlur={() => confirmCustom(m.key)}
-                                    onKeyDown={e => e.key === 'Enter' && confirmCustom(m.key)}
-                                    placeholder={`自訂 ${m.unit}`}
-                                    style={{width:'80px', fontSize:'12px', padding:'5px 10px', borderRadius:'99px',
-                                        border:'1px solid var(--c-primary)', outline:'none', textAlign:'center',
-                                        fontFamily:"'Noto Sans TC',sans-serif", background:'#fff'}}
-                                />
-                            ) : (
-                                <button onClick={() => {
-                                        setShowCustom(prev => ({ ...prev, [m.key]: true }));
-                                        setTimeout(() => customRefs.current[m.key]?.focus(), 50);
-                                    }}
-                                    className="sans-font active-press"
-                                    style={{padding:'5px 13px', borderRadius:'99px', fontSize:'12px', cursor:'pointer',
-                                        border:'0.5px dashed var(--c-border-strong)', background:'var(--c-surface)', color:'var(--c-muted)'}}>
-                                    自訂
-                                </button>
-                            )}
-                        </div>
+                                )}
+                            </div>
+                        )}
 
-                        {/* 週目標結果 + 進度條（已設定才顯示） */}
+                        {/* 已設定時：只顯示進度條，不顯示膠囊選項 */}
                         {!isUnset && (
                             <>
                                 <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
