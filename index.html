@@ -754,34 +754,26 @@
                                             </div>
                                             {/* 本週堆疊條圖 */}
                                             {(() => {
-                                                const STACK_MAX_H = 64;
+                                                const STACK_MAX_H = 100;
                                                 const segments = [
-                                                    { field:'practice',     bg:'#fff3b0', border:'#ffd43b', scale: v => v * 8 },
-                                                    { field:'fiveMin',      bg:'#d0f0ff', border:'#38bdf8', scale: v => v * 8 },
-                                                    { field:'exerciseTime', bg:'#ffe5cc', border:'#ff922b', scale: v => v * 0.6 },
-                                                    { field:'stretchTime',  bg:'#d4f7e7', border:'#34d399', scale: v => v * 0.6 },
+                                                    { field:'practice',     bg:'#fff3b0', border:'#ffd43b', scale: v => Math.min(v * 8,   20) },
+                                                    { field:'fiveMin',      bg:'#d0f0ff', border:'#38bdf8', scale: v => Math.min(v * 8,   20) },
+                                                    { field:'exerciseTime', bg:'#ffe5cc', border:'#ff922b', scale: v => Math.min(v * 0.1, 20) },
+                                                    { field:'stretchTime',  bg:'#d4f7e7', border:'#34d399', scale: v => Math.min(v * 0.1, 20) },
                                                 ];
                                                 const dayTotals = weekBarDays.map(d => {
                                                     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
                                                     const log = dailyLogs[key] || {};
-                                                    return segments.map(s => Math.min(s.scale(Number(log[s.field])||0), 20));
+                                                    return segments.map(s => s.scale(Number(log[s.field])||0));
                                                 });
                                                 const maxTotal = Math.max(...dayTotals.map(segs => segs.reduce((a,b)=>a+b,0)), 1);
                                                 return (
-                                                    <div style={{borderTop:'0.5px solid var(--c-border)', paddingTop:'10px'}}>
-                                                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'6px'}}>
+                                                    <div style={{borderTop:'0.5px solid var(--c-border)', paddingTop:'12px'}}>
+                                                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px'}}>
                                                             <span className="sans-font" style={{fontSize:'11px', color:'var(--c-muted)'}}>本週活躍量</span>
                                                             <span className="sans-font" style={{fontSize:'11px', color:'var(--c-muted)'}}>今日進行中</span>
                                                         </div>
-                                                        <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'10px', flexWrap:'wrap'}}>
-                                                            {[{label:'練功',bg:'#fff3b0',border:'#ffd43b'},{label:'五分鐘',bg:'#d0f0ff',border:'#38bdf8'},{label:'運動',bg:'#ffe5cc',border:'#ff922b'},{label:'拉筋',bg:'#d4f7e7',border:'#34d399'}].map(l => (
-                                                                <div key={l.label} style={{display:'flex', alignItems:'center', gap:'3px'}}>
-                                                                    <div style={{width:'8px', height:'8px', borderRadius:'2px', background:l.bg, border:`1px solid ${l.border}`}}></div>
-                                                                    <span className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)'}}>{l.label}</span>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                        <div style={{display:'flex', alignItems:'flex-end', gap:'5px', height:`${STACK_MAX_H + 18}px`}}>
+                                                        <div style={{display:'flex', alignItems:'flex-end', gap:'5px', height:`${STACK_MAX_H + 22}px`}}>
                                                             {weekBarDays.map((d, i) => {
                                                                 const isToday = i === todayIdx;
                                                                 const segs = dayTotals[i];
