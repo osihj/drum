@@ -420,9 +420,7 @@
 
             const teamAccentColors = ['#ffd43b','#74c0fc','#ff8787','#8ce99a','#b197fc','#ff922b'];
 
-            // medal colors for top 3
-            const medalColor = (i) => ['#f59e0b','#94a3b8','#b45309'][i] || '#e5e7eb';
-            const medalLabel = (i) => ['🥇','🥈','🥉'][i] || `${i+1}`;
+
 
             return (
                 <div className="space-y-4 animate-in fade-in duration-300" style={{paddingBottom:'2rem'}}>
@@ -430,7 +428,7 @@
                     <div className="vibrant-card p-5 r-card float-anim relative overflow-hidden" style={{boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
                         <div className="relative z-10">
                             <h2 className="sans-font text-2xl mb-1" style={{color:'var(--c-text)'}}>風雲榜</h2>
-                            <p className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>本月道行 · 等級永久累積</p>
+                            <p className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>陣營同心，共修道行</p>
                         </div>
                     </div>
 
@@ -439,12 +437,12 @@
                         <button onClick={() => setLbTab('teams')}
                             className={`flex-1 sans-font text-xs r-btn transition-all ${lbTab==='teams' ? 'pk-blue' : ''}`}
                             style={{color: lbTab==='teams' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>
-                            ⚔️ 門派排名
+                            陣營
                         </button>
                         <button onClick={() => setLbTab('members')}
                             className={`flex-1 sans-font text-xs r-btn transition-all ${lbTab==='members' ? 'pk-blue' : ''}`}
                             style={{color: lbTab==='members' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>
-                            🧑‍🤝‍🧑 門派成員
+                            成員
                         </button>
                     </div>
 
@@ -463,10 +461,8 @@
                                         {/* Team header */}
                                         <div className="flex items-start justify-between mb-3">
                                             <div className="flex items-center gap-2">
-                                                <span className="sans-font text-lg" style={{minWidth:'24px'}}>{medalLabel(i)}</span>
                                                 <div>
-                                                    <p className="sans-font text-base" style={{color:'#374151'}}>{team.name}</p>
-                                                    <p className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>{team.members.length} 位修士</p>
+                                                    <p className="sans-font text-base" style={{color:'#374151'}}>{i+1}. {team.name}</p>
                                                 </div>
                                                 {isMyTeam && <span className="text-[10px] pk-blue px-2 py-0.5 rounded-full sans-font ml-1" style={{color:'var(--c-primary-text)'}}>我的陣營</span>}
                                             </div>
