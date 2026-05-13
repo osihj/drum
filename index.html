@@ -243,7 +243,7 @@
                     </div>
 
                     <div className="w-full bg-white p-6 r-card card-shadow space-y-4">
-                        <p className="sans-font text-center text-xs tracking-widest" style={{color:'var(--c-text-sub)'}}>以 Google 帳號登入，加入門派</p>
+                        <p className="sans-font text-center text-xs tracking-widest" style={{color:'var(--c-text-sub)'}}>以 Google 帳號登入，加入陣營</p>
                         <button
                             onClick={handleGoogleLogin}
                             disabled={loading}
@@ -264,11 +264,19 @@
         };
 
         // ─── Team Selection Screen ──────────────────────────────────────
-        const TeamSelectScreen = ({ user, onJoinTeam }) => {
+        const TeamSelectScreen = ({ user, onJoinTeam, existingName }) => {
             const [teams, setTeams] = useState([]);
             const [newTeamName, setNewTeamName] = useState('');
             const [loading, setLoading] = useState(false);
             const [creating, setCreating] = useState(false);
+            // 若 Firestore 已有 displayName（舊用戶），直接跳到陣營選擇
+            const [step, setStep] = useState(existingName ? 'team' : 'name');
+            const [customName, setCustomName] = useState(existingName || '');
+            const nameInputRef = React.useRef(null);
+
+            useEffect(() => {
+                if (step === 'name' && nameInputRef.current) nameInputRef.current.focus();
+            }, [step]);
 
             useEffect(() => {
                 const unsub = db.collection('artifacts').doc(appId).collection('teams')
@@ -280,11 +288,15 @@
                 return () => unsub();
             }, []);
 
+            const confirmName = () => {
+                if (customName.trim()) setStep('team');
+            };
+
             const joinTeam = async (teamId, teamName) => {
                 setLoading(true);
                 await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).set({
                     teamId, teamName,
-                    displayName: user.displayName || user.email,
+                    displayName: customName.trim() || user.displayName || user.email,
                     email: user.email,
                     photoURL: user.photoURL || '',
                 }, { merge: true });
@@ -300,6 +312,65 @@
                 await joinTeam(ref.id, name);
             };
 
+            // ── Step 1: 名號設定 ──
+            if (step === 'name') return (
+                <div className="max-w-md mx-auto min-h-screen flex flex-col items-center justify-center p-6 gap-8">
+                    {/* 頭像 */}
+                    <div style={{position:'relative'}}>
+                        {user.photoURL ? (
+                            <img src={user.photoURL} alt="avatar"
+                                style={{width:'80px', height:'80px', borderRadius:'50%', objectFit:'cover', border:'2px solid #e9ecef'}} />
+                        ) : (
+                            <div style={{width:'80px', height:'80px', borderRadius:'50%', background:'#e9ecef', display:'flex', alignItems:'center', justifyContent:'center'}}>
+                                <Icon name="User" size={36} style={{color:'#9ca3af'}} />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 歡迎文字 */}
+                    <div style={{textAlign:'center'}}>
+                        <p className="sans-font" style={{fontSize:'12px', color:'#9ca3af', letterSpacing:'0.08em', marginBottom:'8px'}}>歡迎加入自律動起來</p>
+                        <h2 className="sans-font" style={{fontSize:'26px', fontWeight:'500', color:'#374151', lineHeight:1.2}}>閣下，請賜名號</h2>
+                    </div>
+
+                    {/* 名號輸入 */}
+                    <div style={{width:'100%'}}>
+                        <div style={{background:'#fff', border:'1.5px solid #e9ecef', borderRadius:'14px', padding:'16px 18px', marginBottom:'12px'}}>
+                            <p className="sans-font" style={{fontSize:'11px', color:'#9ca3af', marginBottom:'8px'}}>閣下：</p>
+                            <input
+                                ref={nameInputRef}
+                                type="text"
+                                value={customName}
+                                onChange={e => setCustomName(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && confirmName()}
+                                placeholder="請輸入您的名號..."
+                                className="sans-font"
+                                style={{
+                                    width:'100%', border:'none', outline:'none',
+                                    fontSize:'20px', color:'#374151',
+                                    background:'transparent',
+                                    fontFamily:"'Noto Sans TC', sans-serif"
+                                }}
+                            />
+                        </div>
+                        <button
+                            onClick={confirmName}
+                            disabled={!customName.trim()}
+                            className="w-full sans-font active-press"
+                            style={{
+                                background: customName.trim() ? '#374151' : '#e9ecef',
+                                color: customName.trim() ? '#fff' : '#9ca3af',
+                                border:'none', borderRadius:'12px',
+                                padding:'16px', fontSize:'16px', fontWeight:'500',
+                                transition:'all 0.2s', cursor: customName.trim() ? 'pointer' : 'default'
+                            }}>
+                            確認名號，前往選擇陣營
+                        </button>
+                    </div>
+                </div>
+            );
+
+            // ── Step 2: 選擇陣營 ──
             return (
                 <div className="max-w-md mx-auto min-h-screen flex flex-col p-6 gap-6">
                     <div className="text-center pt-10 pb-4">
@@ -307,7 +378,9 @@
                             <Icon name="Users" size={32} className="text-white" />
                         </div>
                         <h2 className="sans-font text-3xl tracking-tighter" style={{color:'var(--c-text)'}}>選擇陣營</h2>
-                        <p className="text-xs sans-font mt-1" style={{color:'var(--c-muted)'}}>加入或創建你的修煉門派</p>
+                        <p className="text-xs sans-font mt-1" style={{color:'var(--c-muted)'}}>
+                            <span style={{color:'#374151', fontWeight:'500'}}>{customName}</span>，加入或創建你的修煉門派
+                        </p>
                     </div>
 
                     {/* Existing teams */}
@@ -346,6 +419,12 @@
                             {creating ? '創立中...' : '創立門派'}
                         </button>
                     </div>
+
+                    {/* 返回修改名號 */}
+                    <button onClick={() => setStep('name')} className="sans-font text-center w-full"
+                        style={{fontSize:'12px', color:'#9ca3af', background:'none', border:'none', padding:'4px'}}>
+                        ← 修改名號
+                    </button>
                 </div>
             );
         };
@@ -664,7 +743,7 @@
                 </div>
             );
             if (!user) return <LoginScreen />;
-            if (!userProfile?.teamId) return <TeamSelectScreen user={user} onJoinTeam={handleJoinTeam} />;
+            if (!userProfile?.teamId) return <TeamSelectScreen user={user} onJoinTeam={handleJoinTeam} existingName={userProfile?.displayName || ''} />;
 
             // ── Main UI ───────────────────────────
             return (
