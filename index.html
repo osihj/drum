@@ -344,13 +344,14 @@
             const teamAccentColors = ['#ffd43b','#74c0fc','#ff8787','#8ce99a','#b197fc','#ff922b'];
 
             return (
-                <div className="space-y-5 animate-in fade-in duration-300">
-                    <div className="vibrant-card p-6 rounded-[2.5rem] neo-border neo-shadow relative overflow-hidden">
-                        <div className="relative z-10">
-                            <h2 className="sans-font text-2xl text-[#374151] mb-1">風雲榜</h2>
-                            <p className="text-xs opacity-40 sans-font">本月道行 · 等級永久累積</p>
+                <div className="space-y-4 animate-in fade-in duration-300">
+                    {/* Compact header strip */}
+                    <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-2">
+                            <Icon name="Trophy" size={20} className="text-[#ffd43b]" />
+                            <h2 className="sans-font text-xl text-[#374151]">風雲榜</h2>
                         </div>
-                        <Icon name="Trophy" size={90} className="absolute -bottom-4 -right-3 text-[#ffd43b]/20 rotate-12" />
+                        <p className="text-[10px] opacity-40 sans-font">本月道行 · 等級永久累積</p>
                     </div>
 
                     {loading && (
@@ -369,7 +370,7 @@
                         return (
                             <div key={team.id} className={`p-5 rounded-[2rem] border-[3px] ${borderClass} ${isMyTeam ? 'neo-shadow' : ''}`}>
                                 {/* Team header */}
-                                <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-3">
                                         <div className={`w-3 h-3 rounded-full ${dotColor}`} style={{boxShadow: `0 0 0 3px ${accentColor}44`}}></div>
                                         <div>
@@ -377,23 +378,24 @@
                                             {isMyTeam && <span className="text-[10px] pk-blue px-2 py-0.5 rounded-full sans-font">我的陣營</span>}
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-4">
-                                        <div className="text-center">
-                                            <div className="text-[10px] opacity-40 sans-font">均值</div>
-                                            <div className="sans-font text-base text-[#374151]">{team.avg} 點</div>
+                                    {/* Stats boxes: 陣營點數 left, 均值 right */}
+                                    <div className="flex items-center gap-2">
+                                        <div className="bg-white/70 border-[1.5px] rounded-2xl px-3 py-2 text-center min-w-[64px]" style={{borderColor: accentColor}}>
+                                            <div className="sans-font text-xl text-[#374151] leading-tight">{team.total}</div>
+                                            <div className="text-[9px] opacity-50 sans-font mt-0.5">陣營點數</div>
                                         </div>
-                                        <div className="text-right">
-                                            <div className="text-[10px] opacity-40 sans-font">陣營點數</div>
-                                            <div className="sans-font text-2xl text-[#374151]">{team.total}</div>
+                                        <div className="bg-white/70 border-[1.5px] rounded-2xl px-3 py-2 text-center min-w-[56px]" style={{borderColor: accentColor}}>
+                                            <div className="sans-font text-xl text-[#374151] leading-tight">{team.avg}</div>
+                                            <div className="text-[9px] opacity-50 sans-font mt-0.5">均值</div>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Members — sorted by level desc */}
                                 {team.members.length > 0 && (
-                                    <div className="space-y-1.5">
+                                    <div className="space-y-1">
                                         {team.members.sort((a,b) => b.lv - a.lv).map((m, mi) => (
-                                            <div key={m.uid} className="flex items-center justify-between px-2 py-2 rounded-xl hover:bg-white/60">
+                                            <div key={m.uid} className="flex items-center justify-between px-2 py-1.5 rounded-xl hover:bg-white/60">
                                                 <div className="flex items-center gap-2">
                                                     <span className="opacity-30 sans-font text-xs w-4">{mi + 1}</span>
                                                     <span className="sans-font text-base opacity-80 truncate max-w-[130px]">{m.name}</span>
