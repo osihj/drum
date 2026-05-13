@@ -612,7 +612,16 @@
             const handleTap = (type, payload) => {
                 const field = type === 'simple' ? payload : payload.key;
                 const inc = type === 'simple' ? 1 : Number(payload.mins);
-                setPendingTaps(prev => ({ ...prev, [field]: (prev[field] || 0) + inc }));
+                setPendingTaps(prev => {
+                    if (type === 'simple' && prev[field]) {
+                        const n = {...prev}; delete n[field]; return n;
+                    }
+                    return { ...prev, [field]: (prev[field] || 0) + inc };
+                });
+            };
+
+            const handleCancel = (field) => {
+                setPendingTaps(prev => { const n = {...prev}; delete n[field]; return n; });
             };
 
             const handleCommit = async () => {
@@ -751,12 +760,14 @@
                                     <MiniActionCard label="五分鐘" onClick={() => handleTap('simple', 'fiveMin')} bgColor="#74c0fc" tapped={(pendingTaps['fiveMin'] || 0) > 0} />
                                     <TimeActionCard label="運動"
                                         onSelect={(mins) => handleTap('time', { key: 'exerciseTime', mins })}
+                                        onCancel={() => handleCancel('exerciseTime')}
                                         bgColor="#ff922b"
                                         tapped={(pendingTaps['exerciseTime'] || 0) > 0}
                                         selectedMins={pendingTaps['exerciseTime'] || 0}
                                     />
                                     <TimeActionCard label="拉筋"
                                         onSelect={(mins) => handleTap('time', { key: 'stretchTime', mins })}
+                                        onCancel={() => handleCancel('stretchTime')}
                                         bgColor="#34d399"
                                         tapped={(pendingTaps['stretchTime'] || 0) > 0}
                                         selectedMins={pendingTaps['stretchTime'] || 0}
@@ -1379,52 +1390,52 @@
 
         const MiniActionCard = ({ label, onClick, bgColor, tapped }) => {
             return (
-                <button onClick={tapped ? undefined : onClick}
-                    className="aspect-square r-card flex flex-col items-center justify-center gap-3 neo-shadow-sm"
+                <button onClick={onClick}
+                    className="aspect-square r-card flex flex-col items-center justify-center gap-3 neo-shadow-sm active-press"
                     style={{
-                        background: tapped ? '#fee2e2' : bgColor,
+                        background: tapped ? '#fee2e2' : `${bgColor}cc`,
                         border: tapped ? '2px solid #ef4444' : `1.5px solid ${bgColor}`,
-                        cursor: tapped ? 'default' : 'pointer',
                         transition: 'all 0.15s',
-                        opacity: tapped ? 1 : 1,
                     }}>
-                    <span className="sans-font" style={{fontSize:'15px', color: tapped ? '#991b1b' : 'var(--c-text)', fontWeight:'900'}}>{label}</span>
+                    <span className="sans-font" style={{fontSize:'18px', color: tapped ? '#991b1b' : 'var(--c-text)', fontWeight:'900'}}>{label}</span>
                     {tapped
-                        ? <span className="sans-font" style={{fontSize:'11px', color:'#ef4444', fontWeight:'500', background:'#fecaca', padding:'3px 10px', borderRadius:'99px'}}>已選取</span>
-                        : <span className="sans-font" style={{fontSize:'11px', color:'rgba(0,0,0,0.35)'}}>點擊選取</span>
+                        ? <span className="sans-font" style={{fontSize:'12px', color:'#ef4444', fontWeight:'500', background:'#fecaca', padding:'3px 12px', borderRadius:'99px'}}>已選取</span>
+                        : <span className="sans-font" style={{fontSize:'12px', color:'rgba(0,0,0,0.35)'}}>點擊選取</span>
                     }
                 </button>
             );
         };
 
-        const TimeActionCard = ({ label, onSelect, bgColor, tapped, selectedMins }) => {
+        const TimeActionCard = ({ label, onSelect, onCancel, bgColor, tapped, selectedMins }) => {
             const [open, setOpen] = React.useState(false);
             const options = [10, 20, 30, 60];
             return (
                 <div className="aspect-square r-card flex flex-col items-center justify-center gap-2 neo-shadow-sm relative"
+                    onClick={tapped ? onCancel : undefined}
                     style={{
-                        background: tapped ? '#fee2e2' : bgColor,
+                        background: tapped ? '#fee2e2' : `${bgColor}cc`,
                         border: tapped ? '2px solid #ef4444' : `1.5px solid ${bgColor}`,
                         transition: 'all 0.15s',
                         padding: '12px',
+                        cursor: tapped ? 'pointer' : 'default',
                     }}>
-                    <span className="sans-font" style={{fontSize:'15px', color: tapped ? '#991b1b' : 'var(--c-text)', fontWeight:'900'}}>{label}</span>
+                    <span className="sans-font" style={{fontSize:'18px', color: tapped ? '#991b1b' : 'var(--c-text)', fontWeight:'900'}}>{label}</span>
                     {tapped
-                        ? <span className="sans-font" style={{fontSize:'11px', color:'#ef4444', fontWeight:'500', background:'#fecaca', padding:'3px 10px', borderRadius:'99px'}}>{selectedMins} 分鐘</span>
+                        ? <span className="sans-font" style={{fontSize:'12px', color:'#ef4444', fontWeight:'500', background:'#fecaca', padding:'3px 12px', borderRadius:'99px'}}>{selectedMins} 分鐘</span>
                         : (
-                            <div style={{position:'relative', width:'100%'}}>
+                            <div style={{position:'relative', width:'100%'}} onClick={e => e.stopPropagation()}>
                                 <button onClick={() => setOpen(o => !o)}
                                     className="w-full sans-font active-press"
-                                    style={{fontSize:'11px', background:'rgba(255,255,255,0.75)', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:'8px', padding:'6px 10px', color:'var(--c-text)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+                                    style={{fontSize:'12px', background:'rgba(255,255,255,0.75)', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:'8px', padding:'7px 10px', color:'var(--c-text)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
                                     <span>選擇時間</span>
-                                    <span style={{fontSize:'9px', opacity:0.5}}>{open ? '▲' : '▼'}</span>
+                                    <span style={{fontSize:'10px', opacity:0.5}}>{open ? '▲' : '▼'}</span>
                                 </button>
                                 {open && (
                                     <div style={{position:'absolute', top:'calc(100% + 4px)', left:0, right:0, background:'white', border:'1px solid var(--c-border)', borderRadius:'10px', overflow:'hidden', zIndex:10, boxShadow:'0 4px 12px rgba(0,0,0,0.1)'}}>
                                         {options.map(m => (
                                             <button key={m} onClick={() => { onSelect(m); setOpen(false); }}
                                                 className="w-full sans-font active-press"
-                                                style={{display:'block', padding:'9px 14px', fontSize:'13px', textAlign:'left', color:'var(--c-text)', borderBottom:'0.5px solid var(--c-border)', background:'white'}}>
+                                                style={{display:'block', padding:'10px 14px', fontSize:'14px', textAlign:'left', color:'var(--c-text)', borderBottom:'0.5px solid var(--c-border)', background:'white'}}>
                                                 {m} 分鐘
                                             </button>
                                         ))}
