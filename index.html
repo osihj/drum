@@ -1288,23 +1288,24 @@
                             const hasBothMove = exer > 0 && stre > 0;
                             const totalMove = exer + stre;
                             const hasAny = prac > 0 || five > 0 || exer > 0 || stre > 0;
-                            if (bothTwo && hasBothMove) { intensity[d] = 4; isGold[d] = totalMove >= 120; }
+                            // 邏輯保留，但不會在UI上顯示深綠和金邊
+                            if (bothTwo && hasBothMove) { intensity[d] = 3; isGold[d] = totalMove >= 120; }
                             else if (bothTwo && hasAnyMove) intensity[d] = 3;
                             else if (bothTwo) intensity[d] = 2;
                             else if (eitherTwo || hasAny) intensity[d] = 1;
                             else intensity[d] = 0;
                         }
-                        // 色系：灰→淡綠→中綠→亮綠（深綠和金邊保留給未來的技能解鎖功能）
-                        const heatColors = ['#f3f4f6','#dcfce7','#bbf7d0','#4ade80','#4ade80'];
-                        const heatText   = ['#d1d5db','#166534','#166534','#ffffff','#ffffff'];
+                        // 色系：灰→淡綠→中綠→亮綠（深綠和金邊保留給未來的技能解鎖功能，現在隱藏）
+                        const heatColors = ['#f3f4f6','#dcfce7','#bbf7d0','#4ade80'];
+                        const heatText   = ['#d1d5db','#166534','#166534','#ffffff'];
                         const cells = [];
                         for (let i = 0; i < firstDay; i++) cells.push(<div key={`e${i}`} style={{height:'26px'}}></div>);
                         for (let d = 1; d <= daysInMonth; d++) {
                             const isFuture = isCurrentMonth && d > today;
                             const lv = isFuture ? -1 : intensity[d];
                             // const gold = !isFuture && isGold[d]; // 註釋：金邊保留給未來使用
-                            const bg = lv === -1 ? 'transparent' : heatColors[Math.min(lv, 4)];
-                            const tc = lv === -1 ? '#e5e7eb' : heatText[Math.min(lv, 4)];
+                            const bg = lv === -1 ? 'transparent' : heatColors[Math.min(lv, 3)];
+                            const tc = lv === -1 ? '#e5e7eb' : heatText[Math.min(lv, 3)];
                             const isToday = isCurrentMonth && d === today;
                             cells.push(
                                 <div key={d} style={{
