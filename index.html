@@ -755,9 +755,6 @@
                             <div className="w-2 h-2 rounded-full pk-blue"></div>
                         </div>
                         <div className="absolute right-5 flex items-center gap-2">
-                            <div className="text-right">
-                                <p className="text-xs sans-font truncate max-w-[80px]" style={{color:'var(--c-text-sub)'}}>{user?.displayName?.split(' ')[0] || user?.email?.split('@')[0]}</p>
-                            </div>
                             {isAdmin && <span className="text-[9px] px-2 py-0.5 rounded-full sans-font" style={{background:'var(--c-text)',color:'#fff'}}>管理員</span>}
                             <button onClick={handleSignOut} className="w-8 h-8 bg-slate-100 neo-border-thin rounded-full flex items-center justify-center active-press">
                                 <Icon name="LogOut" size={13} />
@@ -897,7 +894,7 @@
                         )}
                         {activeTab === 'calendar' && <CalendarView dailyLogs={dailyLogs} />}
                         {activeTab === 'milestone' && <MilestoneView dailyLogs={dailyLogs} user={user} />}
-                        {activeTab === 'profile' && <ProfileView dailyLogs={dailyLogs} isAdmin={isAdmin} user={user} />}
+                        {activeTab === 'profile' && <ProfileView dailyLogs={dailyLogs} isAdmin={isAdmin} user={user} userProfile={userProfile} />}
                         {activeTab === 'leaderboard' && <LeaderboardView currentUser={user} userTeamId={userProfile?.teamId} />}
                     </main>
 
@@ -1255,7 +1252,7 @@
             );
         };
 
-        const ProfileView = ({ dailyLogs, isAdmin, user }) => {
+        const ProfileView = ({ dailyLogs, isAdmin, user, userProfile }) => {
             const mStats = useMemo(() => {
                 const now = new Date();
                 const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -1326,7 +1323,7 @@
                         </div>
                         {/* 用戶信息 */}
                         <div style={{flex:1}}>
-                            <h2 className="sans-font" style={{fontSize:'16px', fontWeight:'500', margin:'0 0 2px 0', color:'var(--c-text)'}}>{user?.displayName?.split(' ')[0] || user?.email?.split('@')[0]}</h2>
+                            <h2 className="sans-font" style={{fontSize:'16px', fontWeight:'500', margin:'0 0 2px 0', color:'var(--c-text)'}}>{userProfile?.displayName || user?.displayName?.split(' ')[0] || user?.email?.split('@')[0]}</h2>
                             <p className="sans-font" style={{fontSize:'13px', color:'var(--c-text-sub)', margin:0}}>{mStats.realm.title}</p>
                         </div>
                         {/* 等級卡片 */}
