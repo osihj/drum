@@ -1232,41 +1232,56 @@
                     {/* 修煉足跡 */}
                     {(() => {
                         const now = new Date();
-                        const year = now.getFullYear();
-                        const month = now.getMonth();
-                        const today = now.getDate();
-                        const daysInMonth = new Date(year, month+1, 0).getDate();
-                        const firstDay = new Date(year, month, 1).getDay();
-                        const prefix = `${year}-${String(month+1).padStart(2,'0')}`;
-                        // 計算連續天數
+                        const todayYear = now.getFullYear();
+                        const todayMonth = now.getMonth();
+                        const todayDate = now.getDate();
+                        const [fpOffset, setFpOffset] = useState(0);
+                        const viewYear = new Date(todayYear, todayMonth + fpOffset, 1).getFullYear();
+                        const viewMonth = new Date(todayYear, todayMonth + fpOffset, 1).getMonth();
+                        const isCurrentMonth = (viewYear === todayYear && viewMonth === todayMonth);
+                        const today = isCurrentMonth ? todayDate : 0;
+                        const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+                        const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+                        const prefix = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}`;
+                        // 連續天數（從今天往回跨月）
                         let streak = 0;
-                        for (let d = today; d >= 1; d--) {
-                            const key = `${prefix}-${String(d).padStart(2,'0')}`;
-                            const v = dailyLogs[key] || {};
-                            if ((v.practice||0)+(v.fiveMin||0)+(v.exerciseTime||0)+(v.stretchTime||0) > 0) streak++;
+                        const sd = new Date(now); sd.setHours(0,0,0,0);
+                        for (let i = 0; i < 365; i++) {
+                            const k = formatDateKey(sd);
+                            const v = dailyLogs[k] || {};
+                            if ((v.practice||0)+(v.fiveMin||0)+(v.exerciseTime||0)+(v.stretchTime||0) > 0) { streak++; sd.setDate(sd.getDate()-1); }
                             else break;
                         }
-                        // 每天強度 0-3
-                        const intensity = {};
+                        // 新強度邏輯
+                        const intensity = {}; const isGold = {};
                         for (let d = 1; d <= daysInMonth; d++) {
                             const key = `${prefix}-${String(d).padStart(2,'0')}`;
                             const v = dailyLogs[key] || {};
-                            const total = (v.exerciseTime||0) + (v.stretchTime||0);
-                            const acts = (v.practice||0) + (v.fiveMin||0);
-                            if (total >= 60 || acts >= 3) intensity[d] = 3;
-                            else if (total >= 30 || acts >= 2) intensity[d] = 2;
-                            else if (total > 0 || acts > 0) intensity[d] = 1;
+                            const prac = v.practice||0, five = v.fiveMin||0;
+                            const exer = v.exerciseTime||0, stre = v.stretchTime||0;
+                            const bothTwo = prac >= 2 && five >= 2;
+                            const eitherTwo = (prac >= 2 || five >= 2) && !bothTwo;
+                            const hasAnyMove = exer > 0 || stre > 0;
+                            const hasBothMove = exer > 0 && stre > 0;
+                            const totalMove = exer + stre;
+                            const hasAny = prac > 0 || five > 0 || exer > 0 || stre > 0;
+                            if (bothTwo && hasBothMove) { intensity[d] = 4; isGold[d] = totalMove >= 120; }
+                            else if (bothTwo && hasAnyMove) intensity[d] = 3;
+                            else if (bothTwo) intensity[d] = 2;
+                            else if (eitherTwo || hasAny) intensity[d] = 1;
                             else intensity[d] = 0;
                         }
-                        const heatColors = ['#f3f4f6','#bbf7d0','#4ade80','#16a34a'];
-                        const heatText   = ['#d1d5db','#166534','#ffffff','#ffffff'];
+                        const heatColors = ['#f3f4f6','#dcfce7','#bbf7d0','#4ade80','#16a34a'];
+                        const heatText   = ['#d1d5db','#166534','#166534','#ffffff','#ffffff'];
                         const cells = [];
                         for (let i = 0; i < firstDay; i++) cells.push(<div key={`e${i}`} style={{height:'26px'}}></div>);
                         for (let d = 1; d <= daysInMonth; d++) {
-                            const lv = d > today ? -1 : intensity[d];
-                            const bg = lv === -1 ? 'transparent' : heatColors[lv];
-                            const tc = lv === -1 ? '#e5e7eb' : heatText[lv];
-                            const isToday = d === today;
+                            const isFuture = isCurrentMonth && d > today;
+                            const lv = isFuture ? -1 : intensity[d];
+                            const gold = !isFuture && isGold[d];
+                            const bg = lv === -1 ? 'transparent' : heatColors[Math.min(lv, 4)];
+                            const tc = lv === -1 ? '#e5e7eb' : heatText[Math.min(lv, 4)];
+                            const isToday = isCurrentMonth && d === today;
                             cells.push(
                                 <div key={d} style={{
                                     height:'26px', borderRadius:'5px', display:'flex',
@@ -1274,8 +1289,8 @@
                                     background: bg, color: tc,
                                     fontSize:'12px', fontWeight:'900',
                                     fontFamily:"'Noto Sans TC',sans-serif",
-                                    outline: isToday ? '2px solid #16a34a' : 'none',
-                                    outlineOffset: '-1px'
+                                    outline: gold ? '2px solid #f59e0b' : isToday ? '2px solid #16a34a' : 'none',
+                                    outlineOffset: '-1px',
                                 }}>{d}</div>
                             );
                         }
@@ -1284,7 +1299,17 @@
                                 <h3 className="sans-font" style={{fontSize:'13px', fontWeight:'500', color:'#6b7280', margin:'0 0 1rem 0', textTransform:'uppercase', letterSpacing:'0.5px'}}>修煉足跡</h3>
                                 <div className="bg-white r-card card-shadow" style={{padding:'14px 16px'}}>
                                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px'}}>
-                                        <span className="sans-font" style={{fontSize:'13px', color:'#1f2937'}}>{year}年 {month+1}月</span>
+                                        <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                                            <button onClick={() => setFpOffset(o => o - 1)}
+                                                style={{width:'24px', height:'24px', borderRadius:'6px', border:'1px solid var(--c-border)', background:'var(--c-surface)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer'}}>
+                                                <Icon name="ChevronLeft" size={14} />
+                                            </button>
+                                            <span className="sans-font" style={{fontSize:'13px', color:'#1f2937', minWidth:'72px', textAlign:'center'}}>{viewYear}年 {viewMonth+1}月</span>
+                                            <button onClick={() => setFpOffset(o => Math.min(0, o + 1))}
+                                                style={{width:'24px', height:'24px', borderRadius:'6px', border:'1px solid var(--c-border)', background:'var(--c-surface)', display:'flex', alignItems:'center', justifyContent:'center', cursor: isCurrentMonth ? 'not-allowed' : 'pointer', opacity: isCurrentMonth ? 0.35 : 1}}>
+                                                <Icon name="ChevronRight" size={14} />
+                                            </button>
+                                        </div>
                                         <span className="sans-font" style={{fontSize:'11px', color:'#6b7280'}}>連續 {streak} 天</span>
                                     </div>
                                     <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'2px', marginBottom:'4px'}}>
@@ -1295,10 +1320,11 @@
                                     <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'2px'}}>{cells}</div>
                                     <div style={{display:'flex', alignItems:'center', gap:'4px', justifyContent:'flex-end', marginTop:'8px'}}>
                                         <span style={{fontSize:'10px', color:'#9ca3af', fontFamily:"'Noto Sans TC',sans-serif"}}>少</span>
-                                        {['#f3f4f6','#bbf7d0','#4ade80','#16a34a'].map(c => (
+                                        {['#f3f4f6','#dcfce7','#bbf7d0','#4ade80','#16a34a'].map(c => (
                                             <div key={c} style={{width:'10px', height:'10px', borderRadius:'3px', background:c}}></div>
                                         ))}
-                                        <span style={{fontSize:'10px', color:'#9ca3af', fontFamily:"'Noto Sans TC',sans-serif"}}>多</span>
+                                        <div style={{width:'10px', height:'10px', borderRadius:'3px', background:'#16a34a', outline:'2px solid #f59e0b', outlineOffset:'-1px'}}></div>
+                                        <span style={{fontSize:'10px', color:'#9ca3af', fontFamily:"'Noto Sans TC',sans-serif"}}>多✨</span>
                                     </div>
                                 </div>
                             </div>
