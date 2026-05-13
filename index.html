@@ -550,6 +550,7 @@
             const [userProfile, setUserProfile] = useState(null);
             const [activeTab, setActiveTab] = useState('dashboard');
             const [isModalOpen, setIsModalOpen] = useState(false);
+            const [recentlyTapped, setRecentlyTapped] = useState({});
             const [dailyLogs, setDailyLogs] = useState({});
             const todayKey = useMemo(() => formatDateKey(new Date()), []);
             const currentWeekDays = useMemo(() => getWeekDays(new Date()), []);
@@ -612,6 +613,8 @@
                 if (!user) return;
                 let incrementVal = type === 'simple' ? 1 : Number(payload.mins);
                 let field = type === 'simple' ? payload : payload.key;
+                setRecentlyTapped(prev => ({ ...prev, [field]: true }));
+                setTimeout(() => setRecentlyTapped(prev => { const n = {...prev}; delete n[field]; return n; }), 1200);
                 window.confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, colors: ['#74c0fc', '#ffd43b', '#ff8787'] });
                 await db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
                     .collection('dailyLogs').doc(todayKey).set({
@@ -733,23 +736,25 @@
                                 </button>
                                 <h3 className="sans-font text-xl mb-6 italic text-center" style={{color:'var(--c-text)'}}>捕捉今日造化</h3>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <MiniActionCard label="練功" count={dailyLogs[todayKey]?.practice || 0} onClick={() => handleAccumulate('simple', 'practice')} color="pk-yellow" />
-                                    <MiniActionCard label="五分鐘" count={dailyLogs[todayKey]?.fiveMin || 0} onClick={() => handleAccumulate('simple', 'fiveMin')} color="pk-blue" />
+                                    <MiniActionCard label="練功" count={dailyLogs[todayKey]?.practice || 0} onClick={() => handleAccumulate('simple', 'practice')} bgColor="#ffd43b" tapped={recentlyTapped['practice']} />
+                                    <MiniActionCard label="五分鐘" count={dailyLogs[todayKey]?.fiveMin || 0} onClick={() => handleAccumulate('simple', 'fiveMin')} bgColor="#74c0fc" tapped={recentlyTapped['fiveMin']} />
                                     <TimeActionCard label="運動"
                                         total={dailyLogs[todayKey]?.exerciseTime || 0}
                                         onAdd={(mins) => handleAccumulate('time', { key: 'exerciseTime', mins })}
                                         onAddDay={() => handleAccumulate('time', { key: 'exerciseTime', mins: 1 })}
                                         daysCount={currentWeekDays.filter(d => (dailyLogs[formatDateKey(d)]?.exerciseTime || 0) > 0).length}
+                                        bgColor="#ff922b" tapped={recentlyTapped['exerciseTime']}
                                     />
                                     <TimeActionCard label="拉筋"
                                         total={dailyLogs[todayKey]?.stretchTime || 0}
                                         onAdd={(mins) => handleAccumulate('time', { key: 'stretchTime', mins })}
                                         onAddDay={() => handleAccumulate('time', { key: 'stretchTime', mins: 1 })}
                                         daysCount={currentWeekDays.filter(d => (dailyLogs[formatDateKey(d)]?.stretchTime || 0) > 0).length}
+                                        bgColor="#34d399" tapped={recentlyTapped['stretchTime']}
                                     />
                                 </div>
                                 <div className="mt-6 flex flex-col gap-2">
-                                    <button onClick={() => setIsModalOpen(false)} className="w-full py-4 r-btn sans-font text-lg tracking-widest active-press text-white neo-border neo-shadow-sm" style={{background:'var(--c-text)'}}>修煉圓滿</button>
+                                    <button onClick={() => setIsModalOpen(false)} className="w-full py-4 r-btn sans-font text-lg tracking-widest active-press text-white neo-border neo-shadow-sm" style={{background:'#b197fc', borderColor:'#9775fa'}}>修煉圓滿</button>
                                     <button onClick={handleClearToday} className="w-full py-2 sans-font text-xs hover:text-red-400 transition-colors" style={{color:'var(--c-muted)'}}>清除今日紀錄</button>
                                 </div>
                             </div>
@@ -1363,28 +1368,44 @@
             </div>
         );
 
-        const MiniActionCard = ({ label, count, onClick, color }) => (
-            <button onClick={onClick} className={`aspect-square ${color} neo-border r-card flex flex-col items-center justify-center gap-2 active-press group neo-shadow-sm`}>
-                <span className="sans-font text-xs" style={{color:'var(--c-text)'}}>{label}</span>
-                <div className="bg-white w-9 h-9 r-btn neo-border-thin flex items-center justify-center text-sm font-black group-hover:scale-110 transition-transform">{count}</div>
-            </button>
-        );
-
-        const TimeActionCard = ({ label, total, onAdd }) => {
+        const MiniActionCard = ({ label, count, onClick, bgColor, tapped }) => {
+            const bg = tapped ? '#fee2e2' : `${bgColor}33`;
+            const border = tapped ? '2px solid #ef4444' : `1.5px solid ${bgColor}88`;
+            const numBorder = tapped ? '1.5px solid #ef4444' : `1px solid ${bgColor}`;
+            const numColor = tapped ? '#ef4444' : 'var(--c-text)';
+            const labelColor = tapped ? '#991b1b' : 'var(--c-text)';
             return (
-                <div className="aspect-square bg-white neo-border r-card flex flex-col items-center justify-around p-3 neo-shadow-sm">
-                    <span className="sans-font text-xs w-full text-center" style={{color:'var(--c-text)'}}>{label}</span>
+                <button onClick={onClick} className="aspect-square r-card flex flex-col items-center justify-center gap-2 active-press neo-shadow-sm"
+                    style={{background: bg, border: border, transition:'all 0.15s'}}>
+                    <span className="sans-font text-xs" style={{color: labelColor}}>{label}</span>
+                    <div className="bg-white w-9 h-9 r-btn flex items-center justify-center text-sm font-black"
+                        style={{border: numBorder, color: numColor}}>{count}</div>
+                    {tapped && <span className="sans-font" style={{fontSize:'9px', color:'#ef4444', fontWeight:'500'}}>已選取</span>}
+                </button>
+            );
+        };
+
+        const TimeActionCard = ({ label, total, onAdd, bgColor, tapped }) => {
+            const bg = tapped ? '#fee2e2' : `${bgColor}22`;
+            const border = tapped ? '2px solid #ef4444' : `1px solid ${bgColor}66`;
+            const btnBg = tapped ? '#fff5f5' : 'var(--c-surface)';
+            const btnBorder = tapped ? '0.5px solid #fca5a5' : '0.5px solid var(--c-border-strong)';
+            const btnColor = tapped ? '#ef4444' : 'var(--c-text)';
+            return (
+                <div className="aspect-square r-card flex flex-col items-center justify-around p-3 neo-shadow-sm"
+                    style={{background: bg, border: border, transition:'all 0.15s'}}>
+                    <span className="sans-font text-xs w-full text-center" style={{color: tapped ? '#991b1b' : 'var(--c-text)'}}>{label}</span>
                     <div className="grid grid-cols-2 gap-1.5 w-full">
                         {[10,20,30,60].map(m => (
                             <button key={m} onClick={() => onAdd(m)}
                                 className="py-1.5 r-btn sans-font active-press"
-                                style={{fontSize:'11px', background:'var(--c-surface)', border:'0.5px solid var(--c-border-strong)', color:'var(--c-text)'}}>
+                                style={{fontSize:'11px', background: btnBg, border: btnBorder, color: btnColor}}>
                                 +{m}m
                             </button>
                         ))}
                     </div>
-                    <span className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>
-                        {total} 分鐘
+                    <span className="text-[10px] sans-font" style={{color: tapped ? '#ef4444' : 'var(--c-muted)'}}>
+                        {total} 分鐘{tapped ? ' ✓' : ''}
                     </span>
                 </div>
             );
