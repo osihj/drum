@@ -1294,13 +1294,15 @@
                             else if (eitherTwo || hasAny) intensity[d] = 1;
                             else intensity[d] = 0;
                         }
-                        const heatColors = ['#f3f4f6','#f3f4f6','#f3f4f6','#f3f4f6','#f3f4f6'];
-                        const heatText   = ['#d1d5db','#d1d5db','#d1d5db','#d1d5db','#d1d5db'];
+                        // 色系：灰→淡綠→中綠→亮綠（深綠和金邊保留給未來的技能解鎖功能）
+                        const heatColors = ['#f3f4f6','#dcfce7','#bbf7d0','#4ade80','#4ade80'];
+                        const heatText   = ['#d1d5db','#166534','#166534','#ffffff','#ffffff'];
                         const cells = [];
                         for (let i = 0; i < firstDay; i++) cells.push(<div key={`e${i}`} style={{height:'26px'}}></div>);
                         for (let d = 1; d <= daysInMonth; d++) {
                             const isFuture = isCurrentMonth && d > today;
                             const lv = isFuture ? -1 : intensity[d];
+                            // const gold = !isFuture && isGold[d]; // 註釋：金邊保留給未來使用
                             const bg = lv === -1 ? 'transparent' : heatColors[Math.min(lv, 4)];
                             const tc = lv === -1 ? '#e5e7eb' : heatText[Math.min(lv, 4)];
                             const isToday = isCurrentMonth && d === today;
@@ -1311,7 +1313,8 @@
                                     background: bg, color: tc,
                                     fontSize:'12px', fontWeight:'900',
                                     fontFamily:"'Noto Sans TC',sans-serif",
-                                    outline: isToday ? '2px solid #74c0fc' : 'none',
+                                    outline: isToday ? '2px solid #16a34a' : 'none',
+                                    // outline: gold ? '2px solid #f59e0b' : isToday ? '2px solid #16a34a' : 'none', // 註釋：保留原邏輯，未來解開金邊
                                     outlineOffset: '-1px',
                                 }}>{d}</div>
                             );
