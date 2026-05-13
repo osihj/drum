@@ -964,6 +964,11 @@
                     <div className="vibrant-card p-5 r-card float-anim relative overflow-hidden" style={{boxShadow:'0 1px 4px rgba(0,0,0,0.06)', marginBottom:'16px'}}>
                         <h2 className="sans-font text-2xl mb-1" style={{color:'var(--c-text)'}}>里程碑</h2>
                         <p className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>選每天目標 · 系統自動計算週目標</p>
+                        {/* 調試信息 */}
+                        <div style={{marginTop:'8px', padding:'8px', background:'#f3f4f6', borderRadius:'6px', fontSize:'9px', color:'#6b7280', fontFamily:'monospace'}}>
+                            <div>Goals: {Object.keys(goals).length > 0 ? JSON.stringify(goals) : '尚未設定'}</div>
+                            <div>SetItems: {setItems.length} | Done: {doneItems.length}</div>
+                        </div>
                     </div>
 
                     {/* 進行中 */}
