@@ -456,7 +456,6 @@
                                 const isMyTeam = team.id === userTeamId;
                                 const accentColor = teamAccentColors[i % teamAccentColors.length];
                                 const visibleMembers = team.members
-                                    .filter(m => m.uid !== currentUser?.uid)
                                     .sort((a,b) => b.lv - a.lv);
                                 return (
                                     <div key={team.id} className="bg-white rounded-[1.5rem] overflow-hidden"
@@ -703,10 +702,10 @@
                                             </div>
                                             <div style={{display:'flex'}}>
                                                 {cols.map((c, i) => (
-                                                    <div key={c.label} style={{flex:1, padding:'12px 6px', textAlign:'center', borderRight: i<3 ? '0.5px solid var(--c-border)' : 'none'}}>
-                                                        <div style={{width:'6px', height:'6px', borderRadius:'50%', background:c.color, margin:'0 auto 6px'}}></div>
-                                                        <div className="sans-font" style={{fontSize:'20px', fontWeight:'500', color: c.val>0 ? 'var(--c-text)' : 'var(--c-muted)', lineHeight:1}}>{c.val>0 ? c.val : '—'}</div>
-                                                        <div className="sans-font" style={{fontSize:'9px', color:'var(--c-muted)', marginTop:'4px'}}>{c.label}</div>
+                                                    <div key={c.label} style={{flex:1, padding:'18px 6px', textAlign:'center', borderRight: i<3 ? '0.5px solid var(--c-border)' : 'none'}}>
+                                                        <div style={{width:'7px', height:'7px', borderRadius:'50%', background:c.color, margin:'0 auto 8px'}}></div>
+                                                        <div className="sans-font" style={{fontSize:'26px', fontWeight:'500', color: c.val>0 ? 'var(--c-text)' : 'var(--c-muted)', lineHeight:1}}>{c.val>0 ? c.val : '—'}</div>
+                                                        <div className="sans-font" style={{fontSize:'12px', color:'var(--c-muted)', marginTop:'7px'}}>{c.label}</div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -1337,30 +1336,22 @@
             </button>
         );
 
-        const TimeActionCard = ({ label, total, onAdd, onAddDay, daysCount }) => {
-            const [mode, setMode] = React.useState('min'); // 'min' | 'day'
+        const TimeActionCard = ({ label, total, onAdd }) => {
             return (
                 <div className="aspect-square bg-white neo-border r-card flex flex-col items-center justify-around p-3 neo-shadow-sm">
                     <div className="flex items-center justify-between w-full">
                         <span className="sans-font text-xs" style={{color:'var(--c-text)'}}>{label}</span>
-                        <button onClick={() => setMode(m => m === 'min' ? 'day' : 'min')}
-                            className="sans-font r-badge active-press"
+                        <span className="sans-font r-badge"
                             style={{fontSize:'9px', padding:'1px 7px', border:'0.5px solid var(--c-border-strong)', color:'var(--c-text-sub)', background:'var(--c-surface)'}}>
-                            {mode === 'min' ? '分鐘' : '天數'}
-                        </button>
+                            分鐘
+                        </span>
                     </div>
-                    {mode === 'min' ? (
-                        <select onChange={(e) => { if(e.target.value) onAdd(e.target.value); e.target.value = ""; }} className="w-full text-[11px] py-1.5 r-btn text-center focus:outline-none bg-slate-50 sans-font neo-border-thin">
-                            <option value="">+時辰</option>
-                            {[5,15,30,60].map(m => <option key={m} value={m}>+{m}m</option>)}
-                        </select>
-                    ) : (
-                        <button onClick={onAddDay} className="w-full py-1.5 r-btn text-[11px] sans-font neo-border-thin active-press" style={{background:'var(--c-surface)', color:'var(--c-text)'}}>
-                            + 記錄今天
-                        </button>
-                    )}
+                    <select onChange={(e) => { if(e.target.value) onAdd(e.target.value); e.target.value = ""; }} className="w-full text-[11px] py-1.5 r-btn text-center focus:outline-none bg-slate-50 sans-font neo-border-thin">
+                        <option value="">+時辰</option>
+                        {[5,15,30,60].map(m => <option key={m} value={m}>+{m}m</option>)}
+                    </select>
                     <span className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>
-                        {mode === 'min' ? `${total} 分鐘` : `${daysCount} 天`}
+                        {total} 分鐘
                     </span>
                 </div>
             );
