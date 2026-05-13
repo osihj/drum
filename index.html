@@ -747,21 +747,19 @@
                                 </button>
                                 <h3 className="sans-font text-xl mb-6 italic text-center" style={{color:'var(--c-text)'}}>捕捉今日造化</h3>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <MiniActionCard label="練功" count={(dailyLogs[todayKey]?.practice || 0) + (pendingTaps['practice'] || 0)} onClick={() => handleTap('simple', 'practice')} bgColor="#ffd43b" tapped={(pendingTaps['practice'] || 0) > 0} />
-                                    <MiniActionCard label="五分鐘" count={(dailyLogs[todayKey]?.fiveMin || 0) + (pendingTaps['fiveMin'] || 0)} onClick={() => handleTap('simple', 'fiveMin')} bgColor="#74c0fc" tapped={(pendingTaps['fiveMin'] || 0) > 0} />
+                                    <MiniActionCard label="練功" onClick={() => handleTap('simple', 'practice')} bgColor="#ffd43b" tapped={(pendingTaps['practice'] || 0) > 0} />
+                                    <MiniActionCard label="五分鐘" onClick={() => handleTap('simple', 'fiveMin')} bgColor="#74c0fc" tapped={(pendingTaps['fiveMin'] || 0) > 0} />
                                     <TimeActionCard label="運動"
-                                        total={(dailyLogs[todayKey]?.exerciseTime || 0) + (pendingTaps['exerciseTime'] || 0)}
-                                        onAdd={(mins) => handleTap('time', { key: 'exerciseTime', mins })}
-                                        onAddDay={() => handleTap('time', { key: 'exerciseTime', mins: 1 })}
-                                        daysCount={currentWeekDays.filter(d => (dailyLogs[formatDateKey(d)]?.exerciseTime || 0) > 0).length}
-                                        bgColor="#ff922b" tapped={(pendingTaps['exerciseTime'] || 0) > 0}
+                                        onSelect={(mins) => handleTap('time', { key: 'exerciseTime', mins })}
+                                        bgColor="#ff922b"
+                                        tapped={(pendingTaps['exerciseTime'] || 0) > 0}
+                                        selectedMins={pendingTaps['exerciseTime'] || 0}
                                     />
                                     <TimeActionCard label="拉筋"
-                                        total={(dailyLogs[todayKey]?.stretchTime || 0) + (pendingTaps['stretchTime'] || 0)}
-                                        onAdd={(mins) => handleTap('time', { key: 'stretchTime', mins })}
-                                        onAddDay={() => handleTap('time', { key: 'stretchTime', mins: 1 })}
-                                        daysCount={currentWeekDays.filter(d => (dailyLogs[formatDateKey(d)]?.stretchTime || 0) > 0).length}
-                                        bgColor="#34d399" tapped={(pendingTaps['stretchTime'] || 0) > 0}
+                                        onSelect={(mins) => handleTap('time', { key: 'stretchTime', mins })}
+                                        bgColor="#34d399"
+                                        tapped={(pendingTaps['stretchTime'] || 0) > 0}
+                                        selectedMins={pendingTaps['stretchTime'] || 0}
                                     />
                                 </div>
                                 <div className="mt-6 flex flex-col gap-2">
@@ -1379,45 +1377,62 @@
             </div>
         );
 
-        const MiniActionCard = ({ label, count, onClick, bgColor, tapped }) => {
-            const bg = tapped ? '#fee2e2' : bgColor;
-            const border = tapped ? '2px solid #ef4444' : `1.5px solid ${bgColor}`;
-            const numBorder = tapped ? '1.5px solid #ef4444' : '1px solid rgba(0,0,0,0.12)';
-            const numColor = tapped ? '#ef4444' : 'var(--c-text)';
-            const labelColor = tapped ? '#991b1b' : 'var(--c-text)';
+        const MiniActionCard = ({ label, onClick, bgColor, tapped }) => {
             return (
-                <button onClick={onClick} className="aspect-square r-card flex flex-col items-center justify-center gap-2 active-press neo-shadow-sm"
-                    style={{background: bg, border: border, transition:'all 0.15s'}}>
-                    <span className="sans-font text-xs" style={{color: labelColor}}>{label}</span>
-                    <div className="bg-white w-9 h-9 r-btn flex items-center justify-center text-sm font-black"
-                        style={{border: numBorder, color: numColor}}>{count}</div>
-                    {tapped && <span className="sans-font" style={{fontSize:'9px', color:'#ef4444', fontWeight:'500'}}>已選取</span>}
+                <button onClick={tapped ? undefined : onClick}
+                    className="aspect-square r-card flex flex-col items-center justify-center gap-3 neo-shadow-sm"
+                    style={{
+                        background: tapped ? '#fee2e2' : bgColor,
+                        border: tapped ? '2px solid #ef4444' : `1.5px solid ${bgColor}`,
+                        cursor: tapped ? 'default' : 'pointer',
+                        transition: 'all 0.15s',
+                        opacity: tapped ? 1 : 1,
+                    }}>
+                    <span className="sans-font" style={{fontSize:'15px', color: tapped ? '#991b1b' : 'var(--c-text)', fontWeight:'900'}}>{label}</span>
+                    {tapped
+                        ? <span className="sans-font" style={{fontSize:'11px', color:'#ef4444', fontWeight:'500', background:'#fecaca', padding:'3px 10px', borderRadius:'99px'}}>已選取</span>
+                        : <span className="sans-font" style={{fontSize:'11px', color:'rgba(0,0,0,0.35)'}}>點擊選取</span>
+                    }
                 </button>
             );
         };
 
-        const TimeActionCard = ({ label, total, onAdd, bgColor, tapped }) => {
-            const bg = tapped ? '#fee2e2' : bgColor;
-            const border = tapped ? '2px solid #ef4444' : `1px solid ${bgColor}`;
-            const btnBg = tapped ? '#fff5f5' : 'rgba(255,255,255,0.75)';
-            const btnBorder = tapped ? '0.5px solid #fca5a5' : '0.5px solid rgba(0,0,0,0.1)';
-            const btnColor = tapped ? '#ef4444' : 'var(--c-text)';
+        const TimeActionCard = ({ label, onSelect, bgColor, tapped, selectedMins }) => {
+            const [open, setOpen] = React.useState(false);
+            const options = [10, 20, 30, 60];
             return (
-                <div className="aspect-square r-card flex flex-col items-center justify-around p-3 neo-shadow-sm"
-                    style={{background: bg, border: border, transition:'all 0.15s'}}>
-                    <span className="sans-font text-xs w-full text-center" style={{color: tapped ? '#991b1b' : 'var(--c-text)'}}>{label}</span>
-                    <div className="grid grid-cols-2 gap-1.5 w-full">
-                        {[10,20,30,60].map(m => (
-                            <button key={m} onClick={() => onAdd(m)}
-                                className="py-1.5 r-btn sans-font active-press"
-                                style={{fontSize:'11px', background: btnBg, border: btnBorder, color: btnColor}}>
-                                +{m}m
-                            </button>
-                        ))}
-                    </div>
-                    <span className="text-[10px] sans-font" style={{color: tapped ? '#ef4444' : 'var(--c-text)'}}>
-                        {total} 分鐘{tapped ? ' ✓' : ''}
-                    </span>
+                <div className="aspect-square r-card flex flex-col items-center justify-center gap-2 neo-shadow-sm relative"
+                    style={{
+                        background: tapped ? '#fee2e2' : bgColor,
+                        border: tapped ? '2px solid #ef4444' : `1.5px solid ${bgColor}`,
+                        transition: 'all 0.15s',
+                        padding: '12px',
+                    }}>
+                    <span className="sans-font" style={{fontSize:'15px', color: tapped ? '#991b1b' : 'var(--c-text)', fontWeight:'900'}}>{label}</span>
+                    {tapped
+                        ? <span className="sans-font" style={{fontSize:'11px', color:'#ef4444', fontWeight:'500', background:'#fecaca', padding:'3px 10px', borderRadius:'99px'}}>{selectedMins} 分鐘</span>
+                        : (
+                            <div style={{position:'relative', width:'100%'}}>
+                                <button onClick={() => setOpen(o => !o)}
+                                    className="w-full sans-font active-press"
+                                    style={{fontSize:'11px', background:'rgba(255,255,255,0.75)', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:'8px', padding:'6px 10px', color:'var(--c-text)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+                                    <span>選擇時間</span>
+                                    <span style={{fontSize:'9px', opacity:0.5}}>{open ? '▲' : '▼'}</span>
+                                </button>
+                                {open && (
+                                    <div style={{position:'absolute', top:'calc(100% + 4px)', left:0, right:0, background:'white', border:'1px solid var(--c-border)', borderRadius:'10px', overflow:'hidden', zIndex:10, boxShadow:'0 4px 12px rgba(0,0,0,0.1)'}}>
+                                        {options.map(m => (
+                                            <button key={m} onClick={() => { onSelect(m); setOpen(false); }}
+                                                className="w-full sans-font active-press"
+                                                style={{display:'block', padding:'9px 14px', fontSize:'13px', textAlign:'left', color:'var(--c-text)', borderBottom:'0.5px solid var(--c-border)', background:'white'}}>
+                                                {m} 分鐘
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    }
                 </div>
             );
         };
