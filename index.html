@@ -550,7 +550,7 @@
             const [userProfile, setUserProfile] = useState(null);
             const [activeTab, setActiveTab] = useState('dashboard');
             const [isModalOpen, setIsModalOpen] = useState(false);
-            const [recentlyTapped, setRecentlyTapped] = useState({});
+            const [pendingTaps, setPendingTaps] = useState({});
             const [dailyLogs, setDailyLogs] = useState({});
             const todayKey = useMemo(() => formatDateKey(new Date()), []);
             const currentWeekDays = useMemo(() => getWeekDays(new Date()), []);
@@ -609,18 +609,29 @@
                 return { wEx, wPrac, wFive, wActive };
             }, [dailyLogs, currentWeekDays]);
 
-            const handleAccumulate = async (type, payload) => {
-                if (!user) return;
-                let incrementVal = type === 'simple' ? 1 : Number(payload.mins);
-                let field = type === 'simple' ? payload : payload.key;
-                setRecentlyTapped(prev => ({ ...prev, [field]: true }));
-                setTimeout(() => setRecentlyTapped(prev => { const n = {...prev}; delete n[field]; return n; }), 1200);
-                window.confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, colors: ['#74c0fc', '#ffd43b', '#ff8787'] });
-                await db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
-                    .collection('dailyLogs').doc(todayKey).set({
-                        [field]: firebase.firestore.FieldValue.increment(incrementVal)
-                    }, { merge: true });
+            const handleTap = (type, payload) => {
+                const field = type === 'simple' ? payload : payload.key;
+                const inc = type === 'simple' ? 1 : Number(payload.mins);
+                setPendingTaps(prev => ({ ...prev, [field]: (prev[field] || 0) + inc }));
             };
+
+            const handleCommit = async () => {
+                if (!user || Object.keys(pendingTaps).length === 0) {
+                    setIsModalOpen(false);
+                    return;
+                }
+                const updates = {};
+                Object.entries(pendingTaps).forEach(([field, val]) => {
+                    updates[field] = firebase.firestore.FieldValue.increment(val);
+                });
+                await db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
+                    .collection('dailyLogs').doc(todayKey).set(updates, { merge: true });
+                window.confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, colors: ['#74c0fc', '#ffd43b', '#ff8787'] });
+                setPendingTaps({});
+                setIsModalOpen(false);
+            };
+
+            const handleAccumulate = handleTap;
 
             const handleClearToday = async () => {
                 if (!user) return;
@@ -731,30 +742,30 @@
                     {isModalOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-5 overlay-blur">
                             <div className="w-full max-w-sm bg-white r-card neo-border neo-shadow p-6 relative">
-                                <button onClick={() => setIsModalOpen(false)} className="absolute -top-3 -right-3 w-8 h-8 bg-white neo-border rounded-full flex items-center justify-center active-press">
+                                <button onClick={() => { setIsModalOpen(false); setPendingTaps({}); }} className="absolute -top-3 -right-3 w-8 h-8 bg-white neo-border rounded-full flex items-center justify-center active-press">
                                     <Icon name="X" size={16} />
                                 </button>
                                 <h3 className="sans-font text-xl mb-6 italic text-center" style={{color:'var(--c-text)'}}>捕捉今日造化</h3>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <MiniActionCard label="練功" count={dailyLogs[todayKey]?.practice || 0} onClick={() => handleAccumulate('simple', 'practice')} bgColor="#ffd43b" tapped={recentlyTapped['practice']} />
-                                    <MiniActionCard label="五分鐘" count={dailyLogs[todayKey]?.fiveMin || 0} onClick={() => handleAccumulate('simple', 'fiveMin')} bgColor="#74c0fc" tapped={recentlyTapped['fiveMin']} />
+                                    <MiniActionCard label="練功" count={(dailyLogs[todayKey]?.practice || 0) + (pendingTaps['practice'] || 0)} onClick={() => handleTap('simple', 'practice')} bgColor="#ffd43b" tapped={(pendingTaps['practice'] || 0) > 0} />
+                                    <MiniActionCard label="五分鐘" count={(dailyLogs[todayKey]?.fiveMin || 0) + (pendingTaps['fiveMin'] || 0)} onClick={() => handleTap('simple', 'fiveMin')} bgColor="#74c0fc" tapped={(pendingTaps['fiveMin'] || 0) > 0} />
                                     <TimeActionCard label="運動"
-                                        total={dailyLogs[todayKey]?.exerciseTime || 0}
-                                        onAdd={(mins) => handleAccumulate('time', { key: 'exerciseTime', mins })}
-                                        onAddDay={() => handleAccumulate('time', { key: 'exerciseTime', mins: 1 })}
+                                        total={(dailyLogs[todayKey]?.exerciseTime || 0) + (pendingTaps['exerciseTime'] || 0)}
+                                        onAdd={(mins) => handleTap('time', { key: 'exerciseTime', mins })}
+                                        onAddDay={() => handleTap('time', { key: 'exerciseTime', mins: 1 })}
                                         daysCount={currentWeekDays.filter(d => (dailyLogs[formatDateKey(d)]?.exerciseTime || 0) > 0).length}
-                                        bgColor="#ff922b" tapped={recentlyTapped['exerciseTime']}
+                                        bgColor="#ff922b" tapped={(pendingTaps['exerciseTime'] || 0) > 0}
                                     />
                                     <TimeActionCard label="拉筋"
-                                        total={dailyLogs[todayKey]?.stretchTime || 0}
-                                        onAdd={(mins) => handleAccumulate('time', { key: 'stretchTime', mins })}
-                                        onAddDay={() => handleAccumulate('time', { key: 'stretchTime', mins: 1 })}
+                                        total={(dailyLogs[todayKey]?.stretchTime || 0) + (pendingTaps['stretchTime'] || 0)}
+                                        onAdd={(mins) => handleTap('time', { key: 'stretchTime', mins })}
+                                        onAddDay={() => handleTap('time', { key: 'stretchTime', mins: 1 })}
                                         daysCount={currentWeekDays.filter(d => (dailyLogs[formatDateKey(d)]?.stretchTime || 0) > 0).length}
-                                        bgColor="#34d399" tapped={recentlyTapped['stretchTime']}
+                                        bgColor="#34d399" tapped={(pendingTaps['stretchTime'] || 0) > 0}
                                     />
                                 </div>
                                 <div className="mt-6 flex flex-col gap-2">
-                                    <button onClick={() => setIsModalOpen(false)} className="w-full py-4 r-btn sans-font text-lg tracking-widest active-press text-white neo-border neo-shadow-sm" style={{background:'#b197fc', borderColor:'#9775fa'}}>修煉圓滿</button>
+                                    <button onClick={handleCommit} className="w-full py-4 r-btn sans-font text-lg tracking-widest active-press text-white neo-border neo-shadow-sm" style={{background:'#b197fc', borderColor:'#9775fa'}}>修煉圓滿</button>
                                     <button onClick={handleClearToday} className="w-full py-2 sans-font text-xs hover:text-red-400 transition-colors" style={{color:'var(--c-muted)'}}>清除今日紀錄</button>
                                 </div>
                             </div>
@@ -1369,9 +1380,9 @@
         );
 
         const MiniActionCard = ({ label, count, onClick, bgColor, tapped }) => {
-            const bg = tapped ? '#fee2e2' : `${bgColor}33`;
-            const border = tapped ? '2px solid #ef4444' : `1.5px solid ${bgColor}88`;
-            const numBorder = tapped ? '1.5px solid #ef4444' : `1px solid ${bgColor}`;
+            const bg = tapped ? '#fee2e2' : bgColor;
+            const border = tapped ? '2px solid #ef4444' : `1.5px solid ${bgColor}`;
+            const numBorder = tapped ? '1.5px solid #ef4444' : '1px solid rgba(0,0,0,0.12)';
             const numColor = tapped ? '#ef4444' : 'var(--c-text)';
             const labelColor = tapped ? '#991b1b' : 'var(--c-text)';
             return (
@@ -1386,10 +1397,10 @@
         };
 
         const TimeActionCard = ({ label, total, onAdd, bgColor, tapped }) => {
-            const bg = tapped ? '#fee2e2' : `${bgColor}22`;
-            const border = tapped ? '2px solid #ef4444' : `1px solid ${bgColor}66`;
-            const btnBg = tapped ? '#fff5f5' : 'var(--c-surface)';
-            const btnBorder = tapped ? '0.5px solid #fca5a5' : '0.5px solid var(--c-border-strong)';
+            const bg = tapped ? '#fee2e2' : bgColor;
+            const border = tapped ? '2px solid #ef4444' : `1px solid ${bgColor}`;
+            const btnBg = tapped ? '#fff5f5' : 'rgba(255,255,255,0.75)';
+            const btnBorder = tapped ? '0.5px solid #fca5a5' : '0.5px solid rgba(0,0,0,0.1)';
             const btnColor = tapped ? '#ef4444' : 'var(--c-text)';
             return (
                 <div className="aspect-square r-card flex flex-col items-center justify-around p-3 neo-shadow-sm"
@@ -1404,7 +1415,7 @@
                             </button>
                         ))}
                     </div>
-                    <span className="text-[10px] sans-font" style={{color: tapped ? '#ef4444' : 'var(--c-muted)'}}>
+                    <span className="text-[10px] sans-font" style={{color: tapped ? '#ef4444' : 'var(--c-text)'}}>
                         {total} 分鐘{tapped ? ' ✓' : ''}
                     </span>
                 </div>
