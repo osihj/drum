@@ -795,31 +795,52 @@
             { key: 'stretchTime',  label: '拉筋',   unit: '分',  color: '#34d399', field: 'stretchTime' },
         ];
 
+        // 各項目每日預設選項
+        const DAILY_OPTIONS = {
+            practice:     [1, 2, 3, 4],
+            fiveMin:      [1, 2, 3, 4],
+            exerciseTime: [10, 20, 30, 60],
+            stretchTime:  [10, 20, 30, 60],
+        };
+
         const MilestoneView = ({ dailyLogs, user }) => {
             const [goals, setGoals] = useState({});
-            const [editing, setEditing] = useState(null); // key being edited
-            const [inputVal, setInputVal] = useState('');
-            const inputRef = useRef(null);
+            // dailyGoals: { practice: 2, fiveMin: 2, ... } 每天目標量
+            const [dailyGoals, setDailyGoals] = useState({});
+            const [customInput, setCustomInput] = useState({}); // { key: '自訂值字串' }
+            const [showCustom, setShowCustom] = useState({}); // { key: true/false }
+            const customRefs = useRef({});
 
             // Load goals from Firestore
             useEffect(() => {
                 if (!user) return;
                 const unsub = db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
                     .onSnapshot(snap => {
-                        if (snap.exists) setGoals(snap.data().milestoneGoals || {});
+                        if (snap.exists) {
+                            setGoals(snap.data().milestoneGoals || {});
+                            setDailyGoals(snap.data().milestoneDailyGoals || {});
+                        }
                     });
                 return () => unsub();
             }, [user]);
 
-            // Save goal
-            const saveGoal = async (key, val) => {
-                const num = parseInt(val);
-                if (!num || num <= 0) { setEditing(null); return; }
-                const updated = { ...goals, [key]: num };
-                setGoals(updated);
-                setEditing(null);
+            // 選擇每日目標 → 自動存週目標 = daily × 7
+            const selectDaily = async (key, daily) => {
+                const weeklyGoal = daily * 7;
+                const updatedGoals = { ...goals, [key]: weeklyGoal };
+                const updatedDaily = { ...dailyGoals, [key]: daily };
+                setGoals(updatedGoals);
+                setDailyGoals(updatedDaily);
+                setShowCustom(prev => ({ ...prev, [key]: false }));
                 await db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
-                    .set({ milestoneGoals: updated }, { merge: true });
+                    .set({ milestoneGoals: updatedGoals, milestoneDailyGoals: updatedDaily }, { merge: true });
+            };
+
+            // 自訂輸入確認
+            const confirmCustom = async (key) => {
+                const val = parseInt(customInput[key]);
+                if (!val || val <= 0) { setShowCustom(prev => ({ ...prev, [key]: false })); return; }
+                await selectDaily(key, val);
             };
 
             // Calc this week's actual values
@@ -833,73 +854,104 @@
                 return totals;
             }, [dailyLogs]);
 
-            // Streak: count consecutive weeks all set goals were met (simple: check this week only for now)
             const setItems = MILESTONE_KEYS.filter(m => goals[m.key]);
             const doneItems = setItems.filter(m => weekActuals[m.field] >= goals[m.key]);
             const inProgressItems = setItems.filter(m => weekActuals[m.field] < goals[m.key]);
             const unsetItems = MILESTONE_KEYS.filter(m => !goals[m.key]);
 
-            useEffect(() => {
-                if (editing && inputRef.current) inputRef.current.focus();
-            }, [editing]);
-
-            const renderCard = (m) => {
+            const renderCard = (m, isUnset = false) => {
                 const actual = weekActuals[m.field];
                 const goal = goals[m.key] || 0;
+                const daily = dailyGoals[m.key] || 0;
                 const pct = goal > 0 ? Math.min(100, Math.round(actual / goal * 100)) : 0;
                 const isDone = actual >= goal && goal > 0;
-                const isEditingThis = editing === m.key;
+                const opts = DAILY_OPTIONS[m.key];
+                const isCustomShown = showCustom[m.key];
 
                 return (
                     <div key={m.key} style={{
                         background: '#fff', borderRadius: '14px', padding: '14px 16px', marginBottom: '8px',
-                        border: isDone ? '0.5px solid #bbf7d0' : '0.5px solid var(--c-border)'
+                        border: isUnset ? '0.5px dashed var(--c-border-strong)' : isDone ? '0.5px solid #bbf7d0' : '0.5px solid var(--c-border)'
                     }}>
+                        {/* 標題行 */}
                         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'10px'}}>
-                            <span className="sans-font" style={{fontSize:'13px', fontWeight:'500', color:'var(--c-text)'}}>{m.label}</span>
                             <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
-                                {/* Editable target pill */}
-                                {isEditingThis ? (
-                                    <input ref={inputRef} type="number" value={inputVal}
-                                        onChange={e => setInputVal(e.target.value)}
-                                        onBlur={() => saveGoal(m.key, inputVal)}
-                                        onKeyDown={e => e.key === 'Enter' && saveGoal(m.key, inputVal)}
-                                        style={{width:'80px', fontSize:'11px', padding:'2px 8px', borderRadius:'99px',
-                                            border:'1px solid var(--c-primary)', outline:'none', textAlign:'center',
-                                            fontFamily:"'Noto Sans TC',sans-serif"}} />
-                                ) : (
-                                    <span onClick={() => { setEditing(m.key); setInputVal(goal); }}
-                                        className="sans-font" style={{fontSize:'11px', padding:'2px 10px', borderRadius:'99px',
-                                            border:'0.5px solid var(--c-border-strong)', color:'var(--c-text-sub)',
-                                            background:'var(--c-surface)', cursor:'pointer'}}>
-                                        目標 {goal} {m.unit}
-                                    </span>
-                                )}
+                                <div style={{width:'7px', height:'7px', borderRadius:'50%', background:m.color}}></div>
+                                <span className="sans-font" style={{fontSize:'13px', fontWeight:'500', color:'var(--c-text)'}}>{m.label}</span>
+                                {!isUnset && <span className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)'}}>每天 {daily} {m.unit}</span>}
+                            </div>
+                            {isDone && (
                                 <span className="sans-font" style={{fontSize:'10px', padding:'2px 9px', borderRadius:'99px', fontWeight:'500',
-                                    background: isDone ? '#f0fdf4' : 'transparent',
-                                    color: isDone ? '#166534' : 'transparent',
-                                    border: isDone ? '0.5px solid #bbf7d0' : 'none'}}>
-                                    {isDone ? '達標' : ''}
-                                </span>
-                            </div>
-                        </div>
-                        {/* Bar */}
-                        <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
-                            <div style={{flex:1, height:'6px', background:'#f3f4f6', borderRadius:'3px', overflow:'hidden'}}>
-                                <div style={{height:'100%', width:`${pct}%`, background: m.color, borderRadius:'3px'}}></div>
-                            </div>
-                            <span className="sans-font" style={{fontSize:'11px', color:'var(--c-text-sub)', minWidth:'64px', textAlign:'right'}}>
-                                {actual} / {goal} {m.unit}
-                            </span>
-                        </div>
-                        <div style={{display:'flex', justifyContent:'space-between', marginTop:'5px'}}>
-                            <span className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)'}}>本週已完成 {actual} {m.unit}</span>
-                            {!isDone && (
-                                <span className="sans-font" style={{fontSize:'10px', color:'#1d4ed8'}}>
-                                    {`尚欠 ${goal - actual} ${m.unit}`}
-                                </span>
+                                    background:'#f0fdf4', color:'#166534', border:'0.5px solid #bbf7d0'}}>達標</span>
                             )}
                         </div>
+
+                        {/* A版型：膠囊選項列 */}
+                        <div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom: isUnset ? '0' : '10px'}}>
+                            {opts.map(opt => {
+                                const isActive = daily === opt && !isCustomShown;
+                                return (
+                                    <button key={opt} onClick={() => selectDaily(m.key, opt)}
+                                        className="sans-font active-press"
+                                        style={{
+                                            padding:'5px 13px', borderRadius:'99px', fontSize:'12px', cursor:'pointer',
+                                            border: isActive ? 'none' : '0.5px solid var(--c-border-strong)',
+                                            background: isActive ? m.color : 'var(--c-surface)',
+                                            color: isActive ? '#1f2937' : 'var(--c-text-sub)',
+                                            fontWeight: isActive ? '500' : '400',
+                                        }}>
+                                        {opt} {m.unit}
+                                    </button>
+                                );
+                            })}
+                            {/* 自訂 */}
+                            {isCustomShown ? (
+                                <input
+                                    ref={el => customRefs.current[m.key] = el}
+                                    type="number" inputMode="numeric"
+                                    value={customInput[m.key] || ''}
+                                    onChange={e => setCustomInput(prev => ({ ...prev, [m.key]: e.target.value }))}
+                                    onBlur={() => confirmCustom(m.key)}
+                                    onKeyDown={e => e.key === 'Enter' && confirmCustom(m.key)}
+                                    placeholder={`自訂 ${m.unit}`}
+                                    style={{width:'80px', fontSize:'12px', padding:'5px 10px', borderRadius:'99px',
+                                        border:'1px solid var(--c-primary)', outline:'none', textAlign:'center',
+                                        fontFamily:"'Noto Sans TC',sans-serif", background:'#fff'}}
+                                />
+                            ) : (
+                                <button onClick={() => {
+                                        setShowCustom(prev => ({ ...prev, [m.key]: true }));
+                                        setTimeout(() => customRefs.current[m.key]?.focus(), 50);
+                                    }}
+                                    className="sans-font active-press"
+                                    style={{padding:'5px 13px', borderRadius:'99px', fontSize:'12px', cursor:'pointer',
+                                        border:'0.5px dashed var(--c-border-strong)', background:'var(--c-surface)', color:'var(--c-muted)'}}>
+                                    自訂
+                                </button>
+                            )}
+                        </div>
+
+                        {/* 週目標結果 + 進度條（已設定才顯示） */}
+                        {!isUnset && (
+                            <>
+                                <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                                    <div style={{flex:1, height:'6px', background:'#f3f4f6', borderRadius:'3px', overflow:'hidden'}}>
+                                        <div style={{height:'100%', width:`${pct}%`, background: m.color, borderRadius:'3px'}}></div>
+                                    </div>
+                                    <span className="sans-font" style={{fontSize:'11px', color:'var(--c-text-sub)', minWidth:'70px', textAlign:'right'}}>
+                                        {actual} / {goal} {m.unit}
+                                    </span>
+                                </div>
+                                <div style={{display:'flex', justifyContent:'space-between', marginTop:'5px'}}>
+                                    <span className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)'}}>週目標 {goal} {m.unit}</span>
+                                    {!isDone && (
+                                        <span className="sans-font" style={{fontSize:'10px', color:'#1d4ed8'}}>
+                                            尚欠 {goal - actual} {m.unit}
+                                        </span>
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </div>
                 );
             };
@@ -909,21 +961,17 @@
                     {/* Header */}
                     <div className="vibrant-card p-5 r-card float-anim relative overflow-hidden" style={{boxShadow:'0 1px 4px rgba(0,0,0,0.06)', marginBottom:'16px'}}>
                         <h2 className="sans-font text-2xl mb-1" style={{color:'var(--c-text)'}}>里程碑</h2>
-                        <p className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>本週目標自訂 · 每週自動重置</p>
+                        <p className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>選每天目標 · 系統自動計算週目標</p>
                     </div>
 
                     {/* 進行中 */}
-                    {inProgressItems.length > 0 && (
-                        <>
-                            {inProgressItems.map(renderCard)}
-                        </>
-                    )}
+                    {inProgressItems.length > 0 && inProgressItems.map(m => renderCard(m))}
 
                     {/* 達標 */}
                     {doneItems.length > 0 && (
                         <>
                             <p className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)', letterSpacing:'0.5px', padding:'8px 2px 6px'}}>已達標</p>
-                            {doneItems.map(renderCard)}
+                            {doneItems.map(m => renderCard(m))}
                         </>
                     )}
 
@@ -931,33 +979,7 @@
                     {unsetItems.length > 0 && (
                         <>
                             <p className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)', letterSpacing:'0.5px', padding:'8px 2px 6px'}}>尚未設定</p>
-                            {unsetItems.map(m => (
-                                <div key={m.key} onClick={() => { setEditing(m.key); setInputVal(''); }}
-                                    style={{background:'#fff', borderRadius:'14px', padding:'13px 16px', marginBottom:'8px',
-                                        border:'0.5px dashed var(--c-border-strong)', display:'flex', alignItems:'center',
-                                        justifyContent:'space-between', cursor:'pointer'}}>
-                                    {editing === m.key ? (
-                                        <>
-                                            <span className="sans-font" style={{fontSize:'13px', color:'var(--c-text)'}}>{m.label}</span>
-                                            <input ref={inputRef} type="number" value={inputVal}
-                                                onChange={e => setInputVal(e.target.value)}
-                                                onBlur={() => saveGoal(m.key, inputVal)}
-                                                onKeyDown={e => e.key === 'Enter' && saveGoal(m.key, inputVal)}
-                                                placeholder={`輸入目標 ${m.unit}`}
-                                                style={{width:'110px', fontSize:'11px', padding:'3px 10px', borderRadius:'99px',
-                                                    border:'1px solid var(--c-primary)', outline:'none', textAlign:'center',
-                                                    fontFamily:"'Noto Sans TC',sans-serif"}} />
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span className="sans-font" style={{fontSize:'13px', color:'var(--c-muted)'}}>{m.label}</span>
-                                            <span className="sans-font" style={{fontSize:'10px', padding:'3px 10px', borderRadius:'99px',
-                                                border:'0.5px solid var(--c-border-strong)', color:'var(--c-muted)',
-                                                background:'var(--c-surface)'}}>+ 設定目標</span>
-                                        </>
-                                    )}
-                                </div>
-                            ))}
+                            {unsetItems.map(m => renderCard(m, true))}
                         </>
                     )}
 
@@ -974,7 +996,6 @@
                                 <div className="sans-font" style={{fontSize:'12px', fontWeight:'500', color:'var(--c-text)'}}>
                                     {doneItems.length === setItems.length ? '本週全數達標！' : `還差 ${setItems.length - doneItems.length} 項`}
                                 </div>
-                                <div className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)', marginTop:'2px'}}>點擊目標數字可修改</div>
                             </div>
                         </div>
                     )}
@@ -1319,12 +1340,10 @@
                                     </div>
                                     <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'2px'}}>{cells}</div>
                                     <div style={{display:'flex', alignItems:'center', gap:'4px', justifyContent:'flex-end', marginTop:'8px'}}>
-                                        <span style={{fontSize:'10px', color:'#9ca3af', fontFamily:"'Noto Sans TC',sans-serif"}}>少</span>
                                         {['#f3f4f6','#dcfce7','#bbf7d0','#4ade80','#16a34a'].map(c => (
                                             <div key={c} style={{width:'10px', height:'10px', borderRadius:'3px', background:c}}></div>
                                         ))}
                                         <div style={{width:'10px', height:'10px', borderRadius:'3px', background:'#16a34a', outline:'2px solid #f59e0b', outlineOffset:'-1px'}}></div>
-                                        <span style={{fontSize:'10px', color:'#9ca3af', fontFamily:"'Noto Sans TC',sans-serif"}}>多✨</span>
                                     </div>
                                 </div>
                             </div>
