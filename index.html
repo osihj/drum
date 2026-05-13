@@ -406,16 +406,10 @@
             return (
                 <div className="space-y-4 animate-in fade-in duration-300">
                     {/* Compact header strip */}
-                    <div className="flex items-center justify-between px-1 relative">
-                        <div className="flex items-center gap-2 relative">
+                    <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-2">
                             <Icon name="Trophy" size={20} className="text-[#ffd43b]" />
-                            <div className="relative inline-block">
-                                {/* 上浮動圓框 */}
-                                <div className="absolute -top-2 -left-2 w-6 h-6 rounded-full border-2 border-[#ffd43b] opacity-30 float-anim"></div>
-                                {/* 下浮動圓框 */}
-                                <div className="absolute -bottom-2 -right-2 w-5 h-5 rounded-full border-2 border-[#ffd43b] opacity-30 float-anim" style={{animationDelay:'0.5s'}}></div>
-                                <h2 className="sans-font text-xl text-[#374151]">風雲榜</h2>
-                            </div>
+                            <h2 className="sans-font text-xl text-[#374151]">風雲榜</h2>
                         </div>
                         <p className="text-[10px] opacity-40 sans-font">本月道行 · 等級永久累積</p>
                     </div>
@@ -432,7 +426,7 @@
                         const isMyTeam = team.id === userTeamId;
                         const accentColor = teamAccentColors[i % teamAccentColors.length];
                         return (
-                            <div key={team.id} className={`bg-white rounded-[1.5rem] ${isMyTeam ? 'neo-shadow' : ''}`}
+                            <div key={team.id} className={`bg-white rounded-[1.5rem] float-anim overflow-hidden ${isMyTeam ? 'neo-shadow' : ''}`}
                                 style={{border: `0.5px solid #e5e7eb`, borderLeft: `4px solid ${accentColor}`, padding: '16px 18px'}}>
                                 {/* Team header */}
                                 <div className="flex items-start justify-between mb-3">
@@ -598,12 +592,7 @@
                     <main className="flex-1 pb-24 space-y-4" style={{padding:'var(--sp-page)'}}>
                         {activeTab === 'dashboard' && (
                             <>
-                                <div className="vibrant-card p-5 r-card relative overflow-visible" style={{boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
-                                    {/* 上浮動圓框 */}
-                                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 w-8 h-8 rounded-full border-2 pk-blue border-opacity-50 float-anim" style={{borderColor:'var(--c-primary)',opacity:0.3}}></div>
-                                    {/* 下浮動圓框 */}
-                                    <div className="absolute -bottom-4 right-8 w-6 h-6 rounded-full border-2 pk-blue border-opacity-50 float-anim" style={{borderColor:'var(--c-primary)',opacity:0.3,animationDelay:'0.5s'}}></div>
-                                    
+                                <div className="vibrant-card p-5 r-card float-anim relative overflow-hidden" style={{boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
                                     <div className="relative z-10">
                                         <h2 className="sans-font text-2xl mb-2" style={{color:'var(--c-text)'}}>今日修煉開始！</h2>
                                         <div className="flex items-center gap-2">
