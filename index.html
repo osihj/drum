@@ -41,6 +41,7 @@
             .pk-border-purple { border-color: #b197fc !important; background-color: #faf5ff; }
             .pk-border-orange { border-color: #ff922b !important; background-color: #fff7ed; }
             .vibrant-card { background: linear-gradient(135deg, #ffffff 0%, #e7f5ff 100%); }
+            .section-label { font-family: 'Noto Sans TC', sans-serif; font-weight: 900; font-size: 11px; color: #9ca3af; letter-spacing: 0.06em; }
         }
         body { font-family: 'Noto Sans TC', sans-serif; @apply bg-[#f8fafc] text-[#374151] antialiased; }
     </style>
@@ -512,57 +513,59 @@
             // ── Main UI ───────────────────────────
             return (
                 <div className="max-w-md mx-auto min-h-screen relative flex flex-col">
-                    <header className="bg-white sticky top-0 px-6 py-5 flex justify-between items-center z-30 border-b-[3px] border-[#4b5563]">
-                        <div className="flex items-center space-x-3 text-[#374151]">
-                            <div className="pk-blue p-2 rounded-xl neo-border-thin shadow-sm flex items-center justify-center">
-                                <Icon name="Star" size={20} className="text-white" />
+                    <header className="bg-[#f8fafc] sticky top-0 px-6 py-4 flex justify-between items-center z-30" style={{borderBottom: '1px solid #f0f0f0'}}>
+                        <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{background:'#74c0fc'}}>
+                                <Icon name="Star" size={14} className="text-white" />
                             </div>
-                            <span className="sans-font text-2xl tracking-tighter text-[#374151]">自律動起來</span>
+                            <span className="sans-font text-xl tracking-tighter text-[#374151]">自律動起來</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <div className="text-right">
-                                <p className="text-xs sans-font opacity-70 truncate max-w-[80px]">{user?.displayName?.split(' ')[0] || user?.email?.split('@')[0]}</p>
-                            </div>
+                            <p className="text-xs sans-font opacity-50 truncate max-w-[80px]">{user?.displayName?.split(' ')[0] || user?.email?.split('@')[0]}</p>
                             {isAdmin && <span className="text-[9px] bg-[#4b5563] text-white px-2 py-0.5 rounded-full sans-font">管理員</span>}
-                            <button onClick={handleSignOut} className="w-8 h-8 bg-slate-100 neo-border-thin rounded-full flex items-center justify-center active-press">
-                                <Icon name="LogOut" size={14} />
+                            <button onClick={handleSignOut} className="w-8 h-8 bg-white rounded-full flex items-center justify-center active-press" style={{border:'1px solid #e9ecef'}}>
+                                <Icon name="LogOut" size={14} className="opacity-40" />
                             </button>
                         </div>
                     </header>
 
-                    <main className="flex-1 p-6 pb-24 space-y-6">
+                    <main className="flex-1 px-6 pt-6 pb-28 space-y-8">
                         {activeTab === 'dashboard' && (
                             <>
-                                <div className="vibrant-card p-7 rounded-[2.5rem] neo-border neo-shadow float-anim relative overflow-hidden">
-                                    <div className="relative z-10">
-                                        <h2 className="sans-font text-3xl text-[#374151] mb-2">今日修煉開始！</h2>
-                                        <div className="flex items-center gap-2">
-                                            <span className="pk-green text-[#374151] px-3 py-1 rounded-full text-[11px] font-black neo-border-thin">道心值</span>
-                                            <p className="text-[#374151]/50 font-black text-xs">累積道行：{stats.wActive} 天</p>
-                                        </div>
+                                {/* Hero — no card, just text */}
+                                <div className="pt-2">
+                                    <p className="section-label mb-1">今日</p>
+                                    <h2 className="sans-font text-4xl text-[#374151] leading-tight">修煉開始</h2>
+                                    <div className="flex items-center gap-3 mt-3">
+                                        <span className="sans-font text-sm text-[#374151]/40">本週活躍</span>
+                                        <span className="sans-font text-sm text-[#374151]">{stats.wActive} 天</span>
+                                        <span className="sans-font text-sm text-[#374151]/40">·</span>
+                                        <span className="sans-font text-sm text-[#374151]/40">運動</span>
+                                        <span className="sans-font text-sm text-[#374151]">{stats.wEx} 分</span>
                                     </div>
-                                    <Icon name="Mountain" size={100} className="absolute -bottom-6 -right-4 text-[#ffd43b]/20 rotate-12" />
                                 </div>
-                                <div className="bg-white p-6 rounded-[2rem] neo-border neo-shadow-sm flex items-center justify-between">
-                                    <span className="sans-font text-[#374151]/60 text-xs">本週功力</span>
-                                    <div className="sans-font text-3xl text-[#374151]">{stats.wEx}<span className="text-sm ml-1 opacity-40">分</span></div>
-                                </div>
-                                <div className="bg-white p-5 rounded-[2rem] neo-border neo-shadow-sm">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <span className="sans-font text-[#374151]/60 text-xs">練功/週</span>
-                                        <span className="sans-font text-xl text-pk-yellow">{stats.wPrac}次</span>
+
+                                {/* 練功 week row */}
+                                <div>
+                                    <div className="flex justify-between items-baseline mb-3">
+                                        <p className="section-label">練功</p>
+                                        <span className="sans-font text-2xl text-[#374151]">{stats.wPrac} <span className="text-sm opacity-40">次</span></span>
                                     </div>
                                     <WeekIconsRow days={currentWeekDays} logs={dailyLogs} type="practice" color="pk-yellow" />
                                 </div>
-                                <div className="bg-white p-5 rounded-[2rem] neo-border neo-shadow-sm">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <span className="sans-font text-[#374151]/60 text-xs">五分鐘 / 週</span>
-                                        <span className="sans-font text-xl text-pk-blue">{stats.wFive}次</span>
+
+                                {/* 五分鐘 week row */}
+                                <div>
+                                    <div className="flex justify-between items-baseline mb-3">
+                                        <p className="section-label">五分鐘</p>
+                                        <span className="sans-font text-2xl text-[#374151]">{stats.wFive} <span className="text-sm opacity-40">次</span></span>
                                     </div>
                                     <WeekIconsRow days={currentWeekDays} logs={dailyLogs} type="fiveMin" color="pk-blue" />
                                 </div>
-                                <button onClick={() => setIsModalOpen(true)} className="w-full pk-pink p-6 rounded-[2.2rem] neo-border neo-shadow active-press flex items-center justify-center gap-4 group">
-                                    <span className="sans-font text-white text-2xl tracking-tighter">立即突破</span>
+
+                                {/* CTA — only element with visual weight */}
+                                <button onClick={() => setIsModalOpen(true)} className="w-full active-press" style={{background:'#374151', color:'white', borderRadius:'1.25rem', padding:'20px', fontSize:'18px', fontFamily:"'Noto Sans TC', sans-serif", fontWeight:900, letterSpacing:'0.05em', border:'none'}}>
+                                    立即突破
                                 </button>
                             </>
                         )}
@@ -572,27 +575,27 @@
                     </main>
 
                     {isModalOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 overlay-blur">
-                            <div className="w-full max-w-sm bg-white rounded-[2.5rem] neo-border neo-shadow p-8 relative animate-in zoom-in-95 duration-200">
-                                <button onClick={() => setIsModalOpen(false)} className="absolute -top-4 -right-4 w-10 h-10 bg-white neo-border rounded-full flex items-center justify-center active-press">
-                                    <Icon name="X" size={20} />
+                        <div className="fixed inset-0 z-50 flex items-end justify-center p-4 overlay-blur">
+                            <div className="w-full max-w-sm bg-white p-7 relative animate-in slide-in-from-bottom-4 duration-200" style={{borderRadius:'1.75rem', border:'1px solid #e9ecef'}}>
+                                <button onClick={() => setIsModalOpen(false)} className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center active-press" style={{background:'#f3f4f6', borderRadius:'50%'}}>
+                                    <Icon name="X" size={16} className="opacity-40" />
                                 </button>
-                                <h3 className="sans-font text-2xl text-[#374151] text-center mb-8 italic">捕捉今日造化</h3>
-                                <div className="grid grid-cols-2 gap-5">
+                                <h3 className="sans-font text-xl text-[#374151] mb-6">捕捉今日造化</h3>
+                                <div className="grid grid-cols-2 gap-4">
                                     <MiniActionCard label="練功" count={dailyLogs[todayKey]?.practice || 0} onClick={() => handleAccumulate('simple', 'practice')} color="pk-yellow" />
                                     <MiniActionCard label="五分鐘" count={dailyLogs[todayKey]?.fiveMin || 0} onClick={() => handleAccumulate('simple', 'fiveMin')} color="pk-blue" />
                                     <TimeActionCard label="運動" total={dailyLogs[todayKey]?.exerciseTime || 0} onAdd={(mins) => handleAccumulate('time', { key: 'exerciseTime', mins })} />
                                     <TimeActionCard label="拉筋" total={dailyLogs[todayKey]?.stretchTime || 0} onAdd={(mins) => handleAccumulate('time', { key: 'stretchTime', mins })} />
                                 </div>
-                                <div className="mt-8 flex flex-col gap-3">
-                                    <button onClick={() => setIsModalOpen(false)} className="w-full py-5 bg-[#4b5563] text-white rounded-3xl sans-font text-xl tracking-widest active-press">修煉圓滿</button>
-                                    <button onClick={handleClearToday} className="w-full py-2 text-[#4b5563]/40 sans-font text-xs hover:text-red-400 transition-colors">清除今日紀錄</button>
+                                <div className="mt-6 flex flex-col gap-3">
+                                    <button onClick={() => setIsModalOpen(false)} className="w-full active-press sans-font text-lg text-white" style={{background:'#374151', borderRadius:'1rem', padding:'16px', border:'none', fontWeight:900}}>修煉圓滿</button>
+                                    <button onClick={handleClearToday} className="w-full sans-font text-xs active-press" style={{color:'#d1d5db', background:'none', border:'none', padding:'8px'}}>清除今日紀錄</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t-[3px] border-[#4b5563]">
+                    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white" style={{borderTop:'1px solid #f0f0f0'}}>
                         <div className="max-w-md mx-auto flex justify-around items-center p-2 pb-safe">
                             <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} navIcon="mountain" label="修煉室" />
                             <NavBtn active={activeTab === 'leaderboard'} onClick={() => setActiveTab('leaderboard')} navIcon="scroll" label="風雲榜" />
@@ -610,12 +613,25 @@
                     const key = formatDateKey(date);
                     const isDone = (logs[key]?.[type] || 0) > 0;
                     const isToday = key === formatDateKey(new Date());
+                    const colorMap = { 'pk-yellow': '#ffd43b', 'pk-blue': '#74c0fc', 'pk-pink': '#ff8787', 'pk-green': '#8ce99a' };
+                    const bg = isDone ? colorMap[color] || '#e9ecef' : '#f3f4f6';
                     return (
                         <div key={i} className="flex flex-col items-center gap-2">
-                            <div className={`w-9 h-9 rounded-xl neo-border-thin flex items-center justify-center transition-all ${isDone ? color : 'bg-slate-50 opacity-20'} ${isToday ? 'scale-110 ring-2 ring-[#4b5563]/20' : ''}`}>
-                                {isDone ? <Icon name="Smile" size={18} className={color === 'pk-yellow' ? 'text-[#374151]' : 'text-white'} /> : <div className="w-1 h-1 bg-slate-300 rounded-full"/>}
+                            <div
+                                className="w-10 h-10 rounded-2xl flex items-center justify-center transition-all"
+                                style={{
+                                    background: bg,
+                                    transform: isToday ? 'scale(1.1)' : 'scale(1)',
+                                    outline: isToday ? '2px solid #d1d5db' : 'none',
+                                    outlineOffset: '2px'
+                                }}
+                            >
+                                {isDone
+                                    ? <Icon name="Smile" size={18} className={color === 'pk-yellow' ? 'text-[#374151]' : 'text-white'} />
+                                    : <div style={{width:4, height:4, borderRadius:'50%', background:'#d1d5db'}} />
+                                }
                             </div>
-                            <span className="text-[10px] sans-font opacity-40">{date.getDate()}</span>
+                            <span className="sans-font text-[10px] opacity-40">{date.getDate()}</span>
                         </div>
                     );
                 })}
@@ -789,21 +805,25 @@
             </div>
         );
 
-        const MiniActionCard = ({ label, count, onClick, color }) => (
-            <button onClick={onClick} className={`aspect-square ${color} neo-border rounded-[1.8rem] flex flex-col items-center justify-center gap-2 active-press group`}>
-                <span className="sans-font text-xs text-[#374151]">{label}</span>
-                <div className="bg-white w-10 h-10 rounded-2xl neo-border-thin flex items-center justify-center text-sm font-black group-hover:scale-110 transition-transform">{count}</div>
-            </button>
-        );
+        const MiniActionCard = ({ label, count, onClick, color }) => {
+            const colorMap = { 'pk-yellow': '#ffd43b', 'pk-blue': '#74c0fc', 'pk-pink': '#ff8787', 'pk-green': '#8ce99a' };
+            const bg = colorMap[color] || '#e9ecef';
+            return (
+                <button onClick={onClick} className="active-press" style={{aspectRatio:'1', background:bg, borderRadius:'1.25rem', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8, border:'none'}}>
+                    <span className="sans-font text-xs text-[#374151]">{label}</span>
+                    <div style={{background:'rgba(255,255,255,0.7)', width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, fontWeight:900, fontFamily:"'Noto Sans TC', sans-serif", color:'#374151'}}>{count}</div>
+                </button>
+            );
+        };
 
         const TimeActionCard = ({ label, total, onAdd }) => (
-            <div className="aspect-square bg-white neo-border rounded-[1.8rem] flex flex-col items-center justify-around p-3">
+            <div style={{aspectRatio:'1', background:'#f8f9fa', borderRadius:'1.25rem', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'space-around', padding:12, border:'1px solid #f0f0f0'}}>
                 <span className="sans-font text-xs text-[#374151]">{label}</span>
-                <select onChange={(e) => { if(e.target.value) onAdd(e.target.value); e.target.value = ""; }} className="w-full text-[11px] py-1.5 neo-border-thin rounded-full text-center focus:outline-none bg-slate-50 sans-font">
-                    <option value="">+時辰</option>
+                <select onChange={(e) => { if(e.target.value) onAdd(e.target.value); e.target.value = ""; }} className="sans-font" style={{width:'100%', fontSize:11, padding:'6px 8px', borderRadius:99, border:'1px solid #e9ecef', textAlign:'center', background:'white', outline:'none', color:'#374151'}}>
+                    <option value="">+ 時辰</option>
                     {[5,15,30,60].map(m => <option key={m} value={m}>+{m}m</option>)}
                 </select>
-                <span className="text-[10px] sans-font opacity-40">{total} 分鐘</span>
+                <span className="sans-font" style={{fontSize:10, color:'#9ca3af'}}>{total} 分鐘</span>
             </div>
         );
 
@@ -1045,11 +1065,12 @@
         };
 
         const NavBtn = ({ active, onClick, navIcon, label }) => (
-            <button onClick={onClick} className={`flex flex-col items-center p-3 rounded-2xl transition-all ${active ? 'pk-blue text-[#374151] neo-border-thin shadow-md' : 'opacity-30 hover:opacity-50'}`}>
-                <span className={`inline-flex items-center justify-center ${active ? 'text-white' : 'text-[#374151]'}`}>
+            <button onClick={onClick} className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl active-press transition-all" style={{background:'none', border:'none'}}>
+                <span style={{color: active ? '#374151' : '#c9cdd4', display:'inline-flex'}}>
                     {NavIcons[navIcon]}
                 </span>
-                <span className="text-[9px] sans-font mt-1">{label}</span>
+                <span className="sans-font" style={{fontSize:'9px', color: active ? '#374151' : '#c9cdd4'}}>{label}</span>
+                {active && <div style={{width:4, height:4, borderRadius:'50%', background:'#74c0fc', marginTop:'-2px'}} />}
             </button>
         );
 
