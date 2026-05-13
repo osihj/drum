@@ -408,7 +408,6 @@
                     {/* Compact header strip */}
                     <div className="flex items-center justify-between px-1">
                         <div className="flex items-center gap-2">
-                            <Icon name="Trophy" size={20} className="text-[#ffd43b]" />
                             <h2 className="sans-font text-xl text-[#374151]">風雲榜</h2>
                         </div>
                         <p className="text-[10px] opacity-40 sans-font">本月道行 · 等級永久累積</p>
@@ -426,8 +425,8 @@
                         const isMyTeam = team.id === userTeamId;
                         const accentColor = teamAccentColors[i % teamAccentColors.length];
                         return (
-                            <div key={team.id} className={`bg-white rounded-[1.5rem] float-anim overflow-hidden ${isMyTeam ? 'neo-shadow' : ''}`}
-                                style={{border: `0.5px solid #e5e7eb`, borderLeft: `4px solid ${accentColor}`, padding: '16px 18px'}}>
+                            <div key={team.id} className={`bg-white rounded-[1.5rem] overflow-hidden ${isMyTeam ? 'neo-shadow' : ''}`}
+                                style={{border: `0.5px solid #e5e7eb`, borderLeft: `4px solid ${accentColor}`, padding: '16px 18px', animation: 'float 3s ease-in-out infinite'}}>
                                 {/* Team header */}
                                 <div className="flex items-start justify-between mb-3">
                                     <div>
