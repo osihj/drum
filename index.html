@@ -832,10 +832,10 @@
                                             {(() => {
                                                 const STACK_MAX_H = 100;
                                                 const segments = [
-                                                    { field:'practice',     bg:'#fde68a', scale: v => Math.min(v * 0.2,  20) },
-                                                    { field:'fiveMin',      bg:'#bae6fd', scale: v => Math.min(v * 0.2,  20) },
-                                                    { field:'exerciseTime', bg:'#fed7aa', scale: v => Math.min(v * 0.01, 20) },
-                                                    { field:'stretchTime',  bg:'#a7f3d0', scale: v => Math.min(v * 0.01, 20) },
+                                                    { field:'practice',     bg:'rgba(251,191,36,0.45)',  scale: v => Math.min(v * 0.2,  20) },
+                                                    { field:'fiveMin',      bg:'rgba(56,189,248,0.45)',  scale: v => Math.min(v * 0.2,  20) },
+                                                    { field:'exerciseTime', bg:'rgba(251,146,60,0.45)',  scale: v => Math.min(v * 0.01, 20) },
+                                                    { field:'stretchTime',  bg:'rgba(52,211,153,0.45)',  scale: v => Math.min(v * 0.01, 20) },
                                                 ];
                                                 const dayTotals = weekBarDays.map(d => {
                                                     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -867,9 +867,9 @@
                                                                                     width:'100%',
                                                                                     borderRadius:'5px 5px 0 0',
                                                                                     overflow:'hidden',
-                                                                                    borderTop: isToday ? '2px solid #8ce99a' : 'none',
-                                                                                    borderLeft: isToday ? '2px solid #8ce99a' : 'none',
-                                                                                    borderRight: isToday ? '2px solid #8ce99a' : 'none',
+                                                                                    borderTop: isToday ? '2px solid #9ca3af' : 'none',
+                                                                                    borderLeft: isToday ? '2px solid #9ca3af' : 'none',
+                                                                                    borderRight: isToday ? '2px solid #9ca3af' : 'none',
                                                                                     display:'flex',
                                                                                     flexDirection:'column',
                                                                                     height:`${barH}px`
