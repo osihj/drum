@@ -426,7 +426,7 @@
                         const accentColor = teamAccentColors[i % teamAccentColors.length];
                         return (
                             <div key={team.id} className="bg-white rounded-[1.5rem] overflow-hidden"
-                                style={{border: `0.5px solid #e5e7eb`, borderLeft: `4px solid ${accentColor}`, padding: '16px 18px'}}>
+                                style={{border: `0.5px solid #e5e7eb`, borderLeft: `4px solid ${accentColor}`, padding: '16px 18px', boxShadow: `2px 2px 10px 0px ${accentColor}40, 0 1px 3px rgba(0,0,0,0.05)`}}>
                                 {/* Team header */}
                                 <div className="flex items-start justify-between mb-3">
                                     <div>
@@ -435,11 +435,11 @@
                                     </div>
                                     {/* Stats boxes */}
                                     <div className="flex items-stretch gap-2">
-                                        <div className="bg-slate-50 rounded-xl text-center flex flex-col items-center justify-center" style={{padding: '12px 14px', minWidth: '64px'}}>
+                                        <div className="rounded-xl text-center flex flex-col items-center justify-center" style={{padding: '12px 14px', minWidth: '64px', background:'#f0fdf4', border:'1px solid #bbf7d0'}}>
                                             <div className="sans-font text-xl text-[#374151]" style={{lineHeight: '1.2', marginBottom: '4px'}}>{team.total}</div>
                                             <div className="sans-font" style={{fontSize: '10px', color: '#9ca3af', lineHeight: '1.3'}}>總點</div>
                                         </div>
-                                        <div className="bg-slate-50 rounded-xl text-center flex flex-col items-center justify-center" style={{padding: '12px 14px', minWidth: '64px'}}>
+                                        <div className="rounded-xl text-center flex flex-col items-center justify-center" style={{padding: '12px 14px', minWidth: '64px', background:'#f0fdf4', border:'1px solid #bbf7d0'}}>
                                             <div className="sans-font text-xl text-[#374151]" style={{lineHeight: '1.2', marginBottom: '4px'}}>{team.avg}</div>
                                             <div className="sans-font" style={{fontSize: '10px', color: '#9ca3af', lineHeight: '1.3'}}>均值</div>
                                         </div>
@@ -604,17 +604,17 @@
                                     <span className="sans-font text-xs" style={{color:'var(--c-text-sub)'}}>本週功力</span>
                                     <div className="sans-font text-3xl" style={{color:'var(--c-text)'}}>{stats.wEx}<span className="text-sm ml-1" style={{color:'var(--c-muted)'}}>分</span></div>
                                 </div>
-                                <div className="bg-white p-4 r-card card-shadow">
-                                    <div className="flex justify-between items-center mb-3">
+                                <div className="bg-white p-3 r-card card-shadow">
+                                    <div className="flex justify-between items-center mb-2">
                                         <span className="sans-font text-xs" style={{color:'var(--c-text-sub)'}}>練功/週</span>
-                                        <span className="sans-font text-xl" style={{color:'var(--c-accent-text)'}}>{stats.wPrac}次</span>
+                                        <span className="sans-font text-lg" style={{color:'var(--c-accent-text)'}}>{stats.wPrac}次</span>
                                     </div>
                                     <WeekIconsRow days={currentWeekDays} logs={dailyLogs} type="practice" color="pk-yellow" />
                                 </div>
-                                <div className="bg-white p-4 r-card card-shadow">
-                                    <div className="flex justify-between items-center mb-3">
+                                <div className="bg-white p-3 r-card card-shadow">
+                                    <div className="flex justify-between items-center mb-2">
                                         <span className="sans-font text-xs" style={{color:'var(--c-text-sub)'}}>五分鐘 / 週</span>
-                                        <span className="sans-font text-xl" style={{color:'var(--c-primary-text)'}}>{stats.wFive}次</span>
+                                        <span className="sans-font text-lg" style={{color:'var(--c-primary-text)'}}>{stats.wFive}次</span>
                                     </div>
                                     <WeekIconsRow days={currentWeekDays} logs={dailyLogs} type="fiveMin" color="pk-blue" />
                                 </div>
@@ -824,7 +824,7 @@
             };
 
             return (
-                <div className="space-y-4 animate-in slide-in-from-bottom-4">
+                <div className="space-y-4 animate-in slide-in-from-bottom-4" style={{paddingBottom:'2rem'}}>
                     {/* 用戶信息卡片 */}
                     <div className="bg-white r-card card-shadow p-5 float-anim" style={{display:'flex', gap:'1rem', alignItems:'center'}}>
                         {/* 頭像 */}
@@ -854,52 +854,36 @@
                         
                         {/* 第一行 - 3個卡片 */}
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'10px', marginBottom:'10px'}}>
-                            <div style={{background:'#ffffff', border:'2px solid #b197fc', borderRadius:'12px', padding:'12px', textAlign:'center'}}>
-                                <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'6px'}}>修煉時長</div>
-                                <div style={{display:'flex', alignItems:'baseline', gap:'3px', justifyContent:'center'}}>
-                                    <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937'}}>{mStats.totalHours}</span>
-                                    <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>小時</span>
+                            {[
+                                {label:'修煉時長', value:mStats.totalHours, unit:'小時', border:'#b197fc'},
+                                {label:'練功',     value:mStats.mPracCount,  unit:'次',   border:'#ffd43b'},
+                                {label:'五分鐘',   value:mStats.mFiveCount,  unit:'次',   border:'#74c0fc'},
+                            ].map(({label,value,unit,border}) => (
+                                <div key={label} style={{background:'#ffffff', border:`2px solid ${border}`, borderRadius:'12px', padding:'10px 8px 8px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'80px'}}>
+                                    <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'4px'}}>{label}</div>
+                                    <div style={{display:'flex', alignItems:'center', justifyContent:'center', width:'100%', position:'relative'}}>
+                                        <span className="sans-font" style={{fontSize:'26px', fontWeight:'500', color:'#1f2937', lineHeight:1}}>{value}</span>
+                                        <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af', position:'absolute', right:'4px', bottom:'2px'}}>{unit}</span>
+                                    </div>
                                 </div>
-                            </div>
-                            <div style={{background:'#ffffff', border:'2px solid #ffd43b', borderRadius:'12px', padding:'12px', textAlign:'center'}}>
-                                <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'6px'}}>練功</div>
-                                <div style={{display:'flex', alignItems:'baseline', gap:'3px', justifyContent:'center'}}>
-                                    <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937'}}>{mStats.mPracCount}</span>
-                                    <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>次</span>
-                                </div>
-                            </div>
-                            <div style={{background:'#ffffff', border:'2px solid #74c0fc', borderRadius:'12px', padding:'12px', textAlign:'center'}}>
-                                <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'6px'}}>五分鐘</div>
-                                <div style={{display:'flex', alignItems:'baseline', gap:'3px', justifyContent:'center'}}>
-                                    <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937'}}>{mStats.mFiveCount}</span>
-                                    <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>次</span>
-                                </div>
-                            </div>
+                            ))}
                         </div>
 
                         {/* 第二行 - 本月自律、運動、拉筋 */}
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'10px'}}>
-                            <div style={{background:'#ffffff', border:'2px solid #b197fc', borderRadius:'12px', padding:'12px', textAlign:'center'}}>
-                                <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'6px'}}>本月自律</div>
-                                <div style={{display:'flex', alignItems:'baseline', gap:'3px', justifyContent:'center'}}>
-                                    <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937'}}>{mStats.mActiveDays}</span>
-                                    <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>天</span>
+                            {[
+                                {label:'本月自律', value:mStats.mActiveDays,  unit:'天',   border:'#b197fc'},
+                                {label:'運動',     value:mStats.mExMins,      unit:'分鐘', border:'#ff922b'},
+                                {label:'拉筋',     value:mStats.mStretchMins, unit:'分鐘', border:'#ff8787'},
+                            ].map(({label,value,unit,border}) => (
+                                <div key={label} style={{background:'#ffffff', border:`2px solid ${border}`, borderRadius:'12px', padding:'10px 8px 8px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'80px'}}>
+                                    <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'4px'}}>{label}</div>
+                                    <div style={{display:'flex', alignItems:'center', justifyContent:'center', width:'100%', position:'relative'}}>
+                                        <span className="sans-font" style={{fontSize:'26px', fontWeight:'500', color:'#1f2937', lineHeight:1}}>{value}</span>
+                                        <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af', position:'absolute', right:'4px', bottom:'2px'}}>{unit}</span>
+                                    </div>
                                 </div>
-                            </div>
-                            <div style={{background:'#ffffff', border:'2px solid #ff922b', borderRadius:'12px', padding:'12px', textAlign:'center'}}>
-                                <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'6px'}}>運動</div>
-                                <div style={{display:'flex', alignItems:'baseline', gap:'3px', justifyContent:'center'}}>
-                                    <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937'}}>{mStats.mExMins}</span>
-                                    <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>分鐘</span>
-                                </div>
-                            </div>
-                            <div style={{background:'#ffffff', border:'2px solid #ff8787', borderRadius:'12px', padding:'12px', textAlign:'center'}}>
-                                <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'6px'}}>拉筋</div>
-                                <div style={{display:'flex', alignItems:'baseline', gap:'3px', justifyContent:'center'}}>
-                                    <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937'}}>{mStats.mStretchMins}</span>
-                                    <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>分鐘</span>
-                                </div>
-                            </div>
+                            ))}
                         </div>
                     </div>
 
