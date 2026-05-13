@@ -93,14 +93,26 @@
             return Math.round((mActiveDays * 10) + totalHours + (mPracCount * 5));
         };
 
-        const calcLevel = (score) => {
-            let realm = { title: "自律新星", level: 1 };
-            if (score >= 600) realm = { title: "自律仙人", level: 90 };
-            else if (score >= 350) realm = { title: "自律達人", level: 70 };
-            else if (score >= 150) realm = { title: "自律英雄", level: 30 };
-            else if (score >= 50) realm = { title: "自律俠客", level: 10 };
-            let displayLevel = realm.level + Math.floor((score % 100) / 10);
-            if (score >= 600) displayLevel = 90 + Math.min(9, Math.floor((score - 600) / 50));
+        // All-time score for level calculation (never resets)
+        const calcAllTimeScore = (logs) => {
+            let activeDays = 0, exMins = 0, stretchMins = 0, pracCount = 0;
+            Object.entries(logs || {}).forEach(([key, val]) => {
+                const p = val.practice || 0, e = val.exerciseTime || 0, s = val.stretchTime || 0;
+                if ((p + e + s + (val.fiveMin || 0)) > 0) activeDays++;
+                exMins += e; stretchMins += s; pracCount += p;
+            });
+            const totalHours = (exMins + stretchMins) / 60;
+            return Math.round((activeDays * 10) + totalHours + (pracCount * 5));
+        };
+
+        const calcLevel = (allTimeScore) => {
+            let realm = { level: 1 };
+            if (allTimeScore >= 600) realm = { level: 90 };
+            else if (allTimeScore >= 350) realm = { level: 70 };
+            else if (allTimeScore >= 150) realm = { level: 30 };
+            else if (allTimeScore >= 50) realm = { level: 10 };
+            let displayLevel = realm.level + Math.floor((allTimeScore % 100) / 10);
+            if (allTimeScore >= 600) displayLevel = 90 + Math.min(9, Math.floor((allTimeScore - 600) / 50));
             return displayLevel;
         };
 
@@ -298,7 +310,7 @@
                                             const logs = {};
                                             logsSnap.forEach(d => logs[d.id] = d.data());
                                             const score = calcScore(logs);
-                                            const lv = calcLevel(score);
+                                            const lv = calcLevel(calcAllTimeScore(logs));
                                             teams[userData.teamId].members.push({
                                                 uid, name: userData.displayName || userData.email, score, lv
                                             });
@@ -311,8 +323,9 @@
                         const result = Object.values(teams).map(t => {
                             const total = t.members.reduce((s, m) => s + m.score, 0);
                             const avg = t.members.length ? Math.round(total / t.members.length) : 0;
-                            return { ...t, total, avg };
-                        }).sort((a, b) => b.total - a.total);
+                            const avgLv = t.members.length ? Math.round(t.members.reduce((s, m) => s + m.lv, 0) / t.members.length) : 0;
+                            return { ...t, total, avg, avgLv };
+                        }).sort((a, b) => b.avgLv - a.avgLv);
 
                         setLeaderboard(result);
                         setLoading(false);
@@ -320,7 +333,6 @@
                 return () => unsubTeams();
             }, []);
 
-            const medals = ['🥇','🥈','🥉'];
             const teamColors = ['pk-yellow','pk-blue','pk-pink','pk-green','pk-purple','pk-orange'];
 
             return (
@@ -328,7 +340,7 @@
                     <div className="vibrant-card p-6 rounded-[2.5rem] neo-border neo-shadow relative overflow-hidden">
                         <div className="relative z-10">
                             <h2 className="sans-font text-2xl text-[#374151] mb-1">風雲榜</h2>
-                            <p className="text-xs opacity-40 sans-font">本月累積道行競技</p>
+                            <p className="text-xs opacity-40 sans-font">本月道行 · 等級永久累積</p>
                         </div>
                         <Icon name="Trophy" size={90} className="absolute -bottom-4 -right-3 text-[#ffd43b]/20 rotate-12" />
                     </div>
@@ -348,8 +360,8 @@
                             <div key={team.id} className={`bg-white p-5 rounded-[2rem] ${isMyTeam ? 'neo-border neo-shadow' : 'neo-border-thin'}`}>
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-3">
-                                        <div className={`w-11 h-11 ${color} neo-border-thin rounded-2xl flex items-center justify-center text-xl font-black`}>
-                                            {i < 3 ? medals[i] : i + 1}
+                                        <div className={`w-11 h-11 ${color} neo-border-thin rounded-2xl flex items-center justify-center text-xl sans-font font-black`}>
+                                            {i + 1}
                                         </div>
                                         <div>
                                             <p className="sans-font text-lg">{team.name}</p>
@@ -358,33 +370,29 @@
                                     </div>
                                     <div className="text-right">
                                         <div className="sans-font text-2xl text-[#374151]">{team.total}</div>
-                                        <div className="text-[10px] opacity-40 sans-font">總道行</div>
+                                        <div className="text-[10px] opacity-40 sans-font">本月道行</div>
                                     </div>
                                 </div>
 
                                 {/* Stats row */}
                                 <div className="flex gap-3 mb-4">
                                     <div className="flex-1 bg-slate-50 rounded-2xl p-3 text-center">
-                                        <div className="sans-font text-lg">{team.avg}</div>
-                                        <div className="text-[10px] opacity-40 sans-font">人均道行</div>
-                                    </div>
-                                    <div className="flex-1 bg-slate-50 rounded-2xl p-3 text-center">
-                                        <div className="sans-font text-lg">{team.members.length}</div>
-                                        <div className="text-[10px] opacity-40 sans-font">門人數</div>
+                                        <div className="sans-font text-lg">Lv.{team.avgLv}</div>
+                                        <div className="text-[10px] opacity-40 sans-font">陣營均值</div>
                                     </div>
                                 </div>
 
-                                {/* Members */}
+                                {/* Members — sorted by level desc */}
                                 {team.members.length > 0 && (
                                     <div className="space-y-1.5">
-                                        {team.members.sort((a,b) => b.score - a.score).map((m, mi) => (
-                                            <div key={m.uid} className="flex items-center justify-between text-xs px-2 py-1.5 rounded-xl hover:bg-slate-50">
+                                        {team.members.sort((a,b) => b.lv - a.lv).map((m, mi) => (
+                                            <div key={m.uid} className="flex items-center justify-between px-2 py-2 rounded-xl hover:bg-slate-50">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="opacity-30 sans-font w-4">{mi + 1}</span>
-                                                    <span className="sans-font opacity-70 truncate max-w-[120px]">{m.name}</span>
-                                                    <span className="bg-white neo-border-thin px-2 py-0.5 rounded-full sans-font text-[10px] text-[#374151] shadow-sm">Lv.{m.lv}</span>
+                                                    <span className="opacity-30 sans-font text-xs w-4">{mi + 1}</span>
+                                                    <span className="sans-font text-base opacity-80 truncate max-w-[130px]">{m.name}</span>
+                                                    <span className="sans-font text-xs opacity-40">Lv.{m.lv}</span>
                                                 </div>
-                                                <span className="sans-font font-black">{m.score} 點</span>
+                                                <span className="sans-font text-sm font-black">{m.score} 點</span>
                                             </div>
                                         ))}
                                     </div>
@@ -696,23 +704,26 @@
                 const now = new Date();
                 const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
                 let mActiveDays = 0, mExMins = 0, mStretchMins = 0, mPracCount = 0, mFiveCount = 0;
+                // All-time totals for level
+                let atActiveDays = 0, atExMins = 0, atStretchMins = 0, atPracCount = 0;
                 Object.entries(dailyLogs).forEach(([key, val]) => {
+                    const p = val.practice || 0, f = val.fiveMin || 0, e = val.exerciseTime || 0, s = val.stretchTime || 0;
+                    if ((p + f + e + s) > 0) atActiveDays++;
+                    atExMins += e; atStretchMins += s; atPracCount += p;
                     if (key.startsWith(prefix)) {
-                        const p = val.practice || 0, f = val.fiveMin || 0, e = val.exerciseTime || 0, s = val.stretchTime || 0;
                         if ((p + f + e + s) > 0) mActiveDays++;
                         mExMins += e; mStretchMins += s; mPracCount += p; mFiveCount += f;
                     }
                 });
                 const totalMinutes = mExMins + mStretchMins;
                 const totalHoursNum = totalMinutes / 60;
-                const score = (mActiveDays * 10) + totalHoursNum + (mPracCount * 5);
+                const atScore = Math.round((atActiveDays * 10) + (atExMins + atStretchMins) / 60 + (atPracCount * 5));
                 let realm = { title: "自律新星", level: 1, icon: "Sprout", color: "pk-green" };
-                if (score >= 600) realm = { title: "自律仙人", level: 90, icon: "Sun", color: "pk-yellow" };
-                else if (score >= 350) realm = { title: "自律達人", level: 70, icon: "Zap", color: "pk-purple" };
-                else if (score >= 150) realm = { title: "自律英雄", level: 30, icon: "Sword", color: "pk-orange" };
-                else if (score >= 50) realm = { title: "自律俠客", level: 10, icon: "Mountain", color: "pk-blue" };
-                let displayLevel = realm.level + Math.floor((score % 100) / 10);
-                if (score >= 600) displayLevel = 90 + Math.min(9, Math.floor((score - 600) / 50));
+                if (atScore >= 600) realm = { title: "自律仙人", level: 90, icon: "Sun", color: "pk-yellow" };
+                else if (atScore >= 350) realm = { title: "自律達人", level: 70, icon: "Zap", color: "pk-purple" };
+                else if (atScore >= 150) realm = { title: "自律英雄", level: 30, icon: "Sword", color: "pk-orange" };
+                else if (atScore >= 50) realm = { title: "自律俠客", level: 10, icon: "Mountain", color: "pk-blue" };
+                const displayLevel = calcLevel(atScore);
                 return { mActiveDays, totalHours: totalHoursNum.toFixed(1), mPracCount, mFiveCount, mExMins, mStretchMins, realm, displayLevel };
             }, [dailyLogs]);
 
