@@ -34,6 +34,12 @@
             .pk-green { background-color: #8ce99a; }
             .pk-purple { background-color: #b197fc; }
             .pk-orange { background-color: #ff922b; }
+            .pk-border-blue { border-color: #74c0fc !important; background-color: #f0f9ff; }
+            .pk-border-yellow { border-color: #ffd43b !important; background-color: #fffbeb; }
+            .pk-border-pink { border-color: #ff8787 !important; background-color: #fff5f5; }
+            .pk-border-green { border-color: #8ce99a !important; background-color: #f0fdf4; }
+            .pk-border-purple { border-color: #b197fc !important; background-color: #faf5ff; }
+            .pk-border-orange { border-color: #ff922b !important; background-color: #fff7ed; }
             .vibrant-card { background: linear-gradient(135deg, #ffffff 0%, #e7f5ff 100%); }
         }
         body { font-family: 'Noto Sans TC', sans-serif; @apply bg-[#f8fafc] text-[#374151] antialiased; }
@@ -334,6 +340,8 @@
             }, []);
 
             const teamColors = ['pk-yellow','pk-blue','pk-pink','pk-green','pk-purple','pk-orange'];
+            const teamBorderColors = ['pk-border-yellow','pk-border-blue','pk-border-pink','pk-border-green','pk-border-purple','pk-border-orange'];
+            const teamAccentColors = ['#ffd43b','#74c0fc','#ff8787','#8ce99a','#b197fc','#ff922b'];
 
             return (
                 <div className="space-y-5 animate-in fade-in duration-300">
@@ -355,30 +363,29 @@
 
                     {leaderboard.map((team, i) => {
                         const isMyTeam = team.id === userTeamId;
-                        const color = teamColors[i % teamColors.length];
+                        const borderClass = teamBorderColors[i % teamBorderColors.length];
+                        const accentColor = teamAccentColors[i % teamAccentColors.length];
+                        const dotColor = teamColors[i % teamColors.length];
                         return (
-                            <div key={team.id} className={`bg-white p-5 rounded-[2rem] ${isMyTeam ? 'neo-border neo-shadow' : 'neo-border-thin'}`}>
+                            <div key={team.id} className={`p-5 rounded-[2rem] border-[3px] ${borderClass} ${isMyTeam ? 'neo-shadow' : ''}`}>
+                                {/* Team header */}
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-3">
-                                        <div className={`w-11 h-11 ${color} neo-border-thin rounded-2xl flex items-center justify-center text-xl sans-font font-black`}>
-                                            {i + 1}
-                                        </div>
+                                        <div className={`w-3 h-3 rounded-full ${dotColor}`} style={{boxShadow: `0 0 0 3px ${accentColor}44`}}></div>
                                         <div>
                                             <p className="sans-font text-lg">{team.name}</p>
                                             {isMyTeam && <span className="text-[10px] pk-blue px-2 py-0.5 rounded-full sans-font">我的陣營</span>}
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <div className="sans-font text-2xl text-[#374151]">{team.total}</div>
-                                        <div className="text-[10px] opacity-40 sans-font">本月道行</div>
-                                    </div>
-                                </div>
-
-                                {/* Stats row */}
-                                <div className="flex gap-3 mb-4">
-                                    <div className="flex-1 bg-slate-50 rounded-2xl p-3 text-center">
-                                        <div className="sans-font text-lg">Lv.{team.avgLv}</div>
-                                        <div className="text-[10px] opacity-40 sans-font">陣營均值</div>
+                                    <div className="flex items-center gap-4">
+                                        <div className="text-center">
+                                            <div className="text-[10px] opacity-40 sans-font">均值</div>
+                                            <div className="sans-font text-base text-[#374151]">{team.avg} 點</div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-[10px] opacity-40 sans-font">陣營點數</div>
+                                            <div className="sans-font text-2xl text-[#374151]">{team.total}</div>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -386,7 +393,7 @@
                                 {team.members.length > 0 && (
                                     <div className="space-y-1.5">
                                         {team.members.sort((a,b) => b.lv - a.lv).map((m, mi) => (
-                                            <div key={m.uid} className="flex items-center justify-between px-2 py-2 rounded-xl hover:bg-slate-50">
+                                            <div key={m.uid} className="flex items-center justify-between px-2 py-2 rounded-xl hover:bg-white/60">
                                                 <div className="flex items-center gap-2">
                                                     <span className="opacity-30 sans-font text-xs w-4">{mi + 1}</span>
                                                     <span className="sans-font text-base opacity-80 truncate max-w-[130px]">{m.name}</span>
