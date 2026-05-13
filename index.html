@@ -664,33 +664,54 @@
                     <main className="flex-1 pb-24 space-y-4" style={{padding:'var(--sp-page)'}}>
                         {activeTab === 'dashboard' && (
                             <>
+                                {/* 英雄卡：保留原有樣式，道心值改 Lv */}
                                 <div className="vibrant-card p-5 r-card float-anim relative overflow-hidden" style={{boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
                                     <div className="relative z-10">
                                         <h2 className="sans-font text-2xl mb-2" style={{color:'var(--c-text)'}}>今日修煉開始！</h2>
                                         <div className="flex items-center gap-2">
-                                            <span className="pk-green px-2.5 py-0.5 r-badge text-[11px] font-black neo-border-thin" style={{color:'var(--c-text)'}}>道心值</span>
-                                            <p className="font-black text-xs" style={{color:'var(--c-muted)'}}>累積道行：{stats.wActive} 天</p>
+                                            <span className="pk-green px-2.5 py-0.5 r-badge text-[11px] font-black neo-border-thin" style={{color:'var(--c-text)'}}>Lv. {(() => { const logs = dailyLogs; let atA=0,atE=0,atS=0,atP=0; Object.values(logs).forEach(v=>{ const p=v.practice||0,f=v.fiveMin||0,e=v.exerciseTime||0,s=v.stretchTime||0; if((p+f+e+s)>0)atA++; atE+=e;atS+=s;atP+=p; }); return calcLevel(Math.round(atA*10+(atE+atS)/60+atP*5)); })()}</span>
+                                            <p className="font-black text-xs" style={{color:'var(--c-muted)'}}>累積道行：{(() => { let cnt=0; Object.values(dailyLogs).forEach(v=>{ const p=v.practice||0,f=v.fiveMin||0,e=v.exerciseTime||0,s=v.stretchTime||0; if((p+f+e+s)>0)cnt++; }); return cnt; })()} 天</p>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="bg-white p-5 r-card card-shadow flex items-center justify-between">
-                                    <span className="sans-font text-xs" style={{color:'var(--c-text-sub)'}}>本週功力</span>
-                                    <div className="sans-font text-3xl" style={{color:'var(--c-text)'}}>{stats.wEx}<span className="text-sm ml-1" style={{color:'var(--c-muted)'}}>分</span></div>
-                                </div>
-                                <div className="bg-white p-3 r-card card-shadow">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="sans-font text-xs" style={{color:'var(--c-text-sub)'}}>練功/週</span>
-                                        <span className="sans-font text-lg" style={{color:'var(--c-accent-text)'}}>{stats.wPrac}次</span>
-                                    </div>
-                                    <WeekIconsRow days={currentWeekDays} logs={dailyLogs} type="practice" color="pk-yellow" />
-                                </div>
-                                <div className="bg-white p-3 r-card card-shadow">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="sans-font text-xs" style={{color:'var(--c-text-sub)'}}>五分鐘 / 週</span>
-                                        <span className="sans-font text-lg" style={{color:'var(--c-primary-text)'}}>{stats.wFive}次</span>
-                                    </div>
-                                    <WeekIconsRow days={currentWeekDays} logs={dailyLogs} type="fiveMin" color="pk-blue" />
-                                </div>
+
+                                {/* 今日四格：日期 header + stat strip */}
+                                {(() => {
+                                    const now = new Date();
+                                    const weekDays = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+                                    const dateLabel = `${now.getMonth()+1}月${now.getDate()}日`;
+                                    const weekLabel = weekDays[now.getDay()];
+                                    const td = dailyLogs[todayKey] || {};
+                                    const prac = Number(td.practice)||0;
+                                    const five = Number(td.fiveMin)||0;
+                                    const exer = Number(td.exerciseTime)||0;
+                                    const stre = Number(td.stretchTime)||0;
+                                    const cols = [
+                                        { label:'練功', val: prac, unit:'次', color:'#ffd43b' },
+                                        { label:'五分鐘', val: five, unit:'次', color:'#74c0fc' },
+                                        { label:'運動', val: exer, unit:'分', color:'#ff922b' },
+                                        { label:'拉筋', val: stre, unit:'分', color:'#34d399' },
+                                    ];
+                                    return (
+                                        <div className="bg-white r-card" style={{border:'0.5px solid var(--c-border)', overflow:'hidden'}}>
+                                            <div style={{padding:'9px 14px', borderBottom:'0.5px solid var(--c-border)', display:'flex', alignItems:'baseline', gap:'6px'}}>
+                                                <span className="sans-font" style={{fontSize:'13px', fontWeight:'500', color:'var(--c-text)'}}>{dateLabel}</span>
+                                                <span className="sans-font" style={{fontSize:'11px', color:'var(--c-muted)'}}>{weekLabel}</span>
+                                            </div>
+                                            <div style={{display:'flex'}}>
+                                                {cols.map((c, i) => (
+                                                    <div key={c.label} style={{flex:1, padding:'12px 6px', textAlign:'center', borderRight: i<3 ? '0.5px solid var(--c-border)' : 'none'}}>
+                                                        <div style={{width:'6px', height:'6px', borderRadius:'50%', background:c.color, margin:'0 auto 6px'}}></div>
+                                                        <div className="sans-font" style={{fontSize:'20px', fontWeight:'500', color: c.val>0 ? 'var(--c-text)' : 'var(--c-muted)', lineHeight:1}}>{c.val>0 ? c.val : '—'}</div>
+                                                        <div className="sans-font" style={{fontSize:'9px', color:'var(--c-muted)', marginTop:'4px'}}>{c.label}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* CTA */}
                                 <button onClick={() => setIsModalOpen(true)} className="w-full pk-pink p-5 r-card neo-border neo-shadow active-press flex items-center justify-center gap-3 group">
                                     <span className="sans-font text-white text-xl tracking-tighter">立即突破</span>
                                 </button>
