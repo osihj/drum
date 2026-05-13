@@ -712,10 +712,10 @@
                                     const exer = Number(td.exerciseTime)||0;
                                     const stre = Number(td.stretchTime)||0;
                                     const cols = [
-                                        { label:'練功',   val: prac, border:'#ffd43b', bg:'#fffde7', numColor:'#7a5c00', lblColor:'#a07a00' },
-                                        { label:'五分鐘', val: five, border:'#38bdf8', bg:'#e6f6ff', numColor:'#0c5a80', lblColor:'#0e7aaa' },
-                                        { label:'運動',   val: exer, border:'#ff922b', bg:'#fff4eb', numColor:'#7a3c00', lblColor:'#a05200' },
-                                        { label:'拉筋',   val: stre, border:'#34d399', bg:'#eafaf3', numColor:'#0a5c38', lblColor:'#0d7a4e' },
+                                        { label:'練功',   val: prac, border:'#ffd43b' },
+                                        { label:'五分鐘', val: five, border:'#38bdf8' },
+                                        { label:'運動',   val: exer, border:'#ff922b' },
+                                        { label:'拉筋',   val: stre, border:'#34d399' },
                                     ];
                                     return (
                                         <div style={{background:'var(--c-surface)', borderRadius:'16px', padding:'10px 10px 12px', border:'0.5px solid var(--c-border)'}}>
@@ -726,14 +726,14 @@
                                             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:'8px'}}>
                                                 {cols.map(c => (
                                                     <div key={c.label} style={{
-                                                        background: c.bg,
-                                                        border: `1.5px solid ${c.border}`,
+                                                        background:'#fff',
+                                                        border:`1.5px solid ${c.border}`,
                                                         borderRadius:'12px',
                                                         padding:'12px 6px 10px',
                                                         display:'flex', flexDirection:'column', alignItems:'center', gap:'6px'
                                                     }}>
-                                                        <div className="sans-font" style={{fontSize:'24px', fontWeight:'500', lineHeight:1, color: c.val>0 ? c.numColor : '#c0c0c0'}}>{c.val>0 ? c.val : '—'}</div>
-                                                        <div className="sans-font" style={{fontSize:'11px', color: c.val>0 ? c.lblColor : '#c0c0c0'}}>{c.label}</div>
+                                                        <div className="sans-font" style={{fontSize:'24px', fontWeight:'500', lineHeight:1, color: c.val>0 ? 'var(--c-text)' : '#c0c0c0'}}>{c.val>0 ? c.val : '—'}</div>
+                                                        <div className="sans-font" style={{fontSize:'11px', color: c.val>0 ? 'var(--c-muted)' : '#c0c0c0'}}>{c.label}</div>
                                                     </div>
                                                 ))}
                                             </div>
