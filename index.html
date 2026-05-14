@@ -741,6 +741,7 @@
                     .collection('dailyLogs').doc(todayKey).set(updates, { merge: true });
                 window.confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, colors: ['#74c0fc', '#ffd43b', '#ff8787'] });
                 setPendingTaps({});
+                setSelectedDateKey(null);
                 setIsModalOpen(false);
             };
 
@@ -933,7 +934,7 @@
                                 })()}
 
                                 {/* CTA */}
-                                <button onClick={() => { setSelectedDayKey(todayKey); setIsModalOpen(true); }} className="w-full pk-pink p-5 r-card neo-border neo-shadow active-press flex items-center justify-center gap-3 group">
+                                <button onClick={() => { setSelectedDateKey(null); setIsModalOpen(true); }} className="w-full pk-pink p-5 r-card neo-border neo-shadow active-press flex items-center justify-center gap-3 group">
                                     <span className="sans-font text-white text-xl tracking-tighter">立即突破</span>
                                 </button>
                             </>
