@@ -933,7 +933,7 @@
                                 })()}
 
                                 {/* CTA */}
-                                <button onClick={() => setIsModalOpen(true)} className="w-full pk-pink p-5 r-card neo-border neo-shadow active-press flex items-center justify-center gap-3 group">
+                                <button onClick={() => { setSelectedDayKey(todayKey); setIsModalOpen(true); }} className="w-full pk-pink p-5 r-card neo-border neo-shadow active-press flex items-center justify-center gap-3 group">
                                     <span className="sans-font text-white text-xl tracking-tighter">立即突破</span>
                                 </button>
                             </>
