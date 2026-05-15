@@ -1422,15 +1422,15 @@
                         {/* 第一行 - 3個卡片 */}
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'10px', marginBottom:'10px'}}>
                             {[
-                                {label:'修煉時長', value:mStats.totalHours, unit:'小時', border:'#b197fc'},
-                                {label:'練功',     value:mStats.mPracCount,  unit:'次',   border:'#ffd43b'},
-                                {label:'五分鐘',   value:mStats.mFiveCount,  unit:'次',   border:'#38bdf8'},
+                                {label:'修煉時長', value:mStats.totalHours, unit:'時', border:'#b197fc'},
+                                {label:'練功',     value:mStats.mPracCount,  unit:'次', border:'#ffd43b'},
+                                {label:'五分鐘',   value:mStats.mFiveCount,  unit:'次', border:'#38bdf8'},
                             ].map(({label,value,unit,border}) => (
-                                <div key={label} style={{background:'#ffffff', border:`2px solid ${border}`, borderRadius:'12px', padding:'10px 8px 8px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'80px'}}>
-                                    <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'8px'}}>{label}</div>
-                                    <div style={{display:'flex', alignItems:'center', justifyContent:'center', width:'100%', position:'relative'}}>
+                                <div key={label} style={{background:'#ffffff', border:`2px solid ${border}`, borderRadius:'12px', padding:'10px 8px 10px', display:'flex', flexDirection:'column', justifyContent:'space-between', minHeight:'80px'}}>
+                                    <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500'}}>{label}</div>
+                                    <div style={{display:'flex', alignItems:'flex-end', gap:'2px'}}>
                                         <span className="sans-font" style={{fontSize:'26px', fontWeight:'500', color:'#1f2937', lineHeight:1}}>{value}</span>
-                                        <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af', position:'absolute', right:'4px', bottom:'2px'}}>{unit}</span>
+                                        <span className="sans-font" style={{fontSize:'11px', color:'#9ca3af', paddingBottom:'2px'}}>{unit}</span>
                                     </div>
                                 </div>
                             ))}
@@ -1439,15 +1439,15 @@
                         {/* 第二行 - 本月自律、運動、拉筋 */}
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'10px'}}>
                             {[
-                                {label:'本月自律', value:mStats.mActiveDays,  unit:'天',   border:'#e879f9'},
-                                {label:'運動',     value:mStats.mExMins,      unit:'分鐘', border:'#ff922b'},
-                                {label:'拉筋',     value:mStats.mStretchMins, unit:'分鐘', border:'#34d399'},
+                                {label:'本月自律', value:mStats.mActiveDays,                                    unit:'天', border:'#e879f9'},
+                                {label:'運動',     value:(mStats.mExMins/60).toFixed(1),                        unit:'時', border:'#ff922b'},
+                                {label:'拉筋',     value:(mStats.mStretchMins/60).toFixed(1),                   unit:'時', border:'#34d399'},
                             ].map(({label,value,unit,border}) => (
-                                <div key={label} style={{background:'#ffffff', border:`2px solid ${border}`, borderRadius:'12px', padding:'10px 8px 8px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'80px'}}>
-                                    <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'8px'}}>{label}</div>
-                                    <div style={{display:'flex', alignItems:'center', justifyContent:'center', width:'100%', position:'relative'}}>
+                                <div key={label} style={{background:'#ffffff', border:`2px solid ${border}`, borderRadius:'12px', padding:'10px 8px 10px', display:'flex', flexDirection:'column', justifyContent:'space-between', minHeight:'80px'}}>
+                                    <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500'}}>{label}</div>
+                                    <div style={{display:'flex', alignItems:'flex-end', gap:'2px'}}>
                                         <span className="sans-font" style={{fontSize:'26px', fontWeight:'500', color:'#1f2937', lineHeight:1}}>{value}</span>
-                                        <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af', position:'absolute', right:'4px', bottom:'2px'}}>{unit}</span>
+                                        <span className="sans-font" style={{fontSize:'11px', color:'#9ca3af', paddingBottom:'2px'}}>{unit}</span>
                                     </div>
                                 </div>
                             ))}
