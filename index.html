@@ -1203,14 +1203,13 @@
                                         {actual} / {goal} {m.unit}
                                     </span>
                                 </div>
-                                <div style={{display:'flex', justifyContent:'space-between', marginTop:'5px'}}>
-                                    <span className="sans-font" style={{fontSize:'12px', color:'var(--c-muted)'}}>週目標 {goal} {m.unit}</span>
-                                    {!isWeekDone && (
-                                        <span className="sans-font" style={{fontSize:'12px', color:'#1d4ed8'}}>
+                                {!isWeekDone && (
+                                    <div style={{display:'flex', justifyContent:'flex-end', marginTop:'5px'}}>
+                                        <span className="sans-font" style={{fontSize:'12px', color:'#9ca3af'}}>
                                             尚欠 {goal - actual} {m.unit}
                                         </span>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                             </>
                         )}
                     </div>
