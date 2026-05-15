@@ -1426,12 +1426,10 @@
                                 {label:'練功',     value:mStats.mPracCount,  unit:'次', border:'#ffd43b'},
                                 {label:'五分鐘',   value:mStats.mFiveCount,  unit:'次', border:'#38bdf8'},
                             ].map(({label,value,unit,border}) => (
-                                <div key={label} style={{background:'#ffffff', border:`2px solid ${border}`, borderRadius:'12px', padding:'12px 8px 10px', display:'flex', flexDirection:'column', alignItems:'center', minHeight:'80px'}}>
+                                <div key={label} style={{background:'#ffffff', border:`2px solid ${border}`, borderRadius:'12px', padding:'12px 8px 10px', display:'flex', flexDirection:'column', alignItems:'center', minHeight:'80px', position:'relative'}}>
                                     <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'8px'}}>{label}</div>
-                                    <div style={{position:'relative', display:'inline-flex', alignItems:'flex-end'}}>
-                                        <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937', lineHeight:1}}>{value}</span>
-                                        <span className="sans-font" style={{fontSize:'11px', color:'#9ca3af', paddingBottom:'2px', marginLeft:'2px'}}>{unit}</span>
-                                    </div>
+                                    <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937', lineHeight:1}}>{value}</span>
+                                    <span className="sans-font" style={{fontSize:'11px', color:'#9ca3af', position:'absolute', bottom:'8px', right:'10px'}}>{unit}</span>
                                 </div>
                             ))}
                         </div>
@@ -1443,12 +1441,10 @@
                                 {label:'運動',     value:(mStats.mExMins/60).toFixed(1),                  unit:'時', border:'#ff922b'},
                                 {label:'拉筋',     value:(mStats.mStretchMins/60).toFixed(1),             unit:'時', border:'#34d399'},
                             ].map(({label,value,unit,border}) => (
-                                <div key={label} style={{background:'#ffffff', border:`2px solid ${border}`, borderRadius:'12px', padding:'12px 8px 10px', display:'flex', flexDirection:'column', alignItems:'center', minHeight:'80px'}}>
+                                <div key={label} style={{background:'#ffffff', border:`2px solid ${border}`, borderRadius:'12px', padding:'12px 8px 10px', display:'flex', flexDirection:'column', alignItems:'center', minHeight:'80px', position:'relative'}}>
                                     <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'8px'}}>{label}</div>
-                                    <div style={{position:'relative', display:'inline-flex', alignItems:'flex-end'}}>
-                                        <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937', lineHeight:1}}>{value}</span>
-                                        <span className="sans-font" style={{fontSize:'11px', color:'#9ca3af', paddingBottom:'2px', marginLeft:'2px'}}>{unit}</span>
-                                    </div>
+                                    <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937', lineHeight:1}}>{value}</span>
+                                    <span className="sans-font" style={{fontSize:'11px', color:'#9ca3af', position:'absolute', bottom:'8px', right:'10px'}}>{unit}</span>
                                 </div>
                             ))}
                         </div>
