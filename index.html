@@ -1077,6 +1077,17 @@
                 return totals;
             }, [dailyLogs]);
 
+            // 今日實際值
+            const todayActuals = useMemo(() => {
+                const data = dailyLogs[formatDateKey(new Date())] || {};
+                return {
+                    practice: Number(data.practice) || 0,
+                    fiveMin: Number(data.fiveMin) || 0,
+                    exerciseTime: Number(data.exerciseTime) || 0,
+                    stretchTime: Number(data.stretchTime) || 0,
+                };
+            }, [dailyLogs]);
+
             const setItems = MILESTONE_KEYS.filter(m => goals[m.key]);
             const doneItems = setItems.filter(m => weekActuals[m.field] >= goals[m.key]);
             const inProgressItems = setItems.filter(m => weekActuals[m.field] < goals[m.key]);
@@ -1087,14 +1098,16 @@
                 const goal = goals[m.key] || 0;
                 const daily = dailyGoals[m.key] || 0;
                 const pct = goal > 0 ? Math.min(100, Math.round(actual / goal * 100)) : 0;
-                const isDone = actual >= goal && goal > 0;
+                const isWeekDone = actual >= goal && goal > 0;
+                const todayVal = todayActuals[m.field];
+                const isTodayDone = daily > 0 && todayVal >= daily;
                 const opts = DAILY_OPTIONS[m.key];
                 const isCustomShown = showCustom[m.key];
 
                 return (
                     <div key={m.key} style={{
                         background: '#fff', borderRadius: '14px', padding: '14px 16px', marginBottom: '8px',
-                        border: isUnset ? '0.5px dashed var(--c-border-strong)' : isDone ? '0.5px solid #bbf7d0' : '0.5px solid var(--c-border)'
+                        border: isUnset ? '0.5px dashed var(--c-border-strong)' : isWeekDone ? '0.5px solid #bbf7d0' : '0.5px solid var(--c-border)'
                     }}>
                         {/* 標題行 */}
                         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'10px'}}>
@@ -1103,9 +1116,33 @@
                                 <span className="sans-font" style={{fontSize:'15px', fontWeight:'500', color:'var(--c-text)'}}>{m.label}</span>
                                 {!isUnset && <span className="sans-font" style={{fontSize:'12px', color:'var(--c-muted)'}}>每天 {daily} {m.unit}</span>}
                             </div>
-                            {isDone && (
-                                <span className="sans-font" style={{fontSize:'12px', padding:'2px 9px', borderRadius:'99px', fontWeight:'500',
-                                    background:'#f0fdf4', color:'#166534', border:'0.5px solid #bbf7d0'}}>達標</span>
+                            {/* 右側：今日狀態（版型A）+ 週達標 */}
+                            {!isUnset && (
+                                <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
+                                    {isTodayDone ? (
+                                        <>
+                                            <div style={{width:'20px', height:'20px', borderRadius:'50%', background:'#dcfce7',
+                                                display:'flex', alignItems:'center', justifyContent:'center'}}>
+                                                <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                                                    <path d="M2 6l3 3 5-5" stroke="#16a34a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                                                </svg>
+                                            </div>
+                                            <span className="sans-font" style={{fontSize:'11px', color:'#16a34a', fontWeight:'500'}}>今日完成</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div style={{width:'20px', height:'20px', borderRadius:'50%',
+                                                background:'var(--c-surface)', border:'1.5px solid var(--c-border-strong)'}}></div>
+                                            <span className="sans-font" style={{fontSize:'11px', color:'var(--c-muted)'}}>
+                                                今日 {todayVal} / {daily}
+                                            </span>
+                                        </>
+                                    )}
+                                    {isWeekDone && (
+                                        <span className="sans-font" style={{fontSize:'12px', padding:'2px 9px', borderRadius:'99px', fontWeight:'500',
+                                            background:'#f0fdf4', color:'#166534', border:'0.5px solid #bbf7d0', marginLeft:'4px'}}>達標</span>
+                                    )}
+                                </div>
                             )}
                         </div>
 
@@ -1128,7 +1165,6 @@
                                         </button>
                                     );
                                 })}
-                                {/* 自訂 */}
                                 {isCustomShown ? (
                                     <input
                                         ref={el => customRefs.current[m.key] = el}
@@ -1156,7 +1192,7 @@
                             </div>
                         )}
 
-                        {/* 已設定時：只顯示進度條，不顯示膠囊選項 */}
+                        {/* 已設定時：顯示進度條 */}
                         {!isUnset && (
                             <>
                                 <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
@@ -1169,7 +1205,7 @@
                                 </div>
                                 <div style={{display:'flex', justifyContent:'space-between', marginTop:'5px'}}>
                                     <span className="sans-font" style={{fontSize:'12px', color:'var(--c-muted)'}}>週目標 {goal} {m.unit}</span>
-                                    {!isDone && (
+                                    {!isWeekDone && (
                                         <span className="sans-font" style={{fontSize:'12px', color:'#1d4ed8'}}>
                                             尚欠 {goal - actual} {m.unit}
                                         </span>
