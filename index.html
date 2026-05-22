@@ -1451,8 +1451,8 @@
                                 </div>
                                 {/* 迷你月曆格 — 含活動小點 */}
                                 <div className="grid grid-cols-7 gap-1 mb-2">
-                                    {['日','一','二','三','四','五','六'].map(w => (
-                                        <div key={w} className="text-center sans-font" style={{fontSize:'9px', color:'var(--c-muted)', padding:'2px 0'}}>{w}</div>
+                                    {['日','一','二','三','四','五','六'].map((w, wi) => (
+                                        <div key={w} className="text-center sans-font" style={{fontSize:'9px', color: wi===0||wi===6 ? 'var(--c-danger)' : 'var(--c-muted)', padding:'2px 0', fontWeight: wi===0||wi===6 ? '600' : '400'}}>{w}</div>
                                     ))}
                                     {monthData.map((date, i) => {
                                         if (!date) return <div key={i} />;
@@ -1527,12 +1527,21 @@
                                                     <div className="flex gap-3 p-4"
                                                         onClick={() => hasExtra && setExpandedActivityId(isExpanded ? null : activity.id)}
                                                         style={{cursor: hasExtra ? 'pointer' : 'default'}}>
-                                                        {/* 日期區塊 */}
-                                                        <div className="flex-shrink-0 text-center" style={{width:'52px', padding:'8px 6px', background:'var(--c-primary-bg)', borderRadius:'var(--r-btn)', border:'1px solid var(--c-primary)'}}>
-                                                            <div className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)', marginBottom:'2px'}}>{month}/{day}</div>
-                                                            <div className="sans-font" style={{fontSize:'20px', color:'var(--c-primary-text)', fontWeight:'700', lineHeight:'1'}}>{day}</div>
-                                                            <div className="sans-font" style={{fontSize:'10px', color:'var(--c-primary-text)', marginTop:'2px'}}>週{weekDayLabel}</div>
-                                                        </div>
+                                                        {/* 日期區塊：假日紅底，平日藍底 */}
+                                                        {(() => {
+                                                            const actDate = new Date(activity.date + 'T00:00:00');
+                                                            const isWknd = actDate.getDay() === 0 || actDate.getDay() === 6;
+                                                            const bg  = isWknd ? 'var(--c-danger-bg)'    : 'var(--c-primary-bg)';
+                                                            const bdr = isWknd ? '1px solid var(--c-danger)' : '1px solid var(--c-primary)';
+                                                            const clr = isWknd ? 'var(--c-danger-text)'  : 'var(--c-primary-text)';
+                                                            return (
+                                                                <div className="flex-shrink-0 text-center" style={{width:'52px', padding:'8px 6px', background:bg, borderRadius:'var(--r-btn)', border:bdr}}>
+                                                                    <div className="sans-font" style={{fontSize:'10px', color:clr, marginBottom:'2px', opacity:0.7}}>{month}/{day}</div>
+                                                                    <div className="sans-font" style={{fontSize:'20px', color:clr, fontWeight:'700', lineHeight:'1'}}>{day}</div>
+                                                                    <div className="sans-font" style={{fontSize:'10px', color:clr, marginTop:'2px'}}>週{weekDayLabel}</div>
+                                                                </div>
+                                                            );
+                                                        })()}
                                                         
                                                         {/* 活動詳情 */}
                                                         <div className="flex-1 min-w-0">
@@ -1613,15 +1622,48 @@
                                 <button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1))} className="w-8 h-8 bg-slate-50 r-btn flex items-center justify-center active-press" style={{border:'1px solid var(--c-border)'}}><Icon name="ChevronRight" size={16} /></button>
                             </div>
                             <div className="grid grid-cols-7 gap-1.5">
-                                {['日','一','二','三','四','五','六'].map(w => <div key={w} className="text-center text-[10px] sans-font" style={{color:'var(--c-muted)'}}>{w}</div>)}
+                                {['日','一','二','三','四','五','六'].map(w => (
+                                    <div key={w} className="text-center text-[10px] sans-font" style={{color:'var(--c-muted)'}}>{w}</div>
+                                ))}
                                 {monthData.map((date, i) => {
                                     if (!date) return <div key={i} />;
                                     const key = formatDateKey(date);
                                     const hasLog = dailyLogs[key] && Object.values(dailyLogs[key]).some(v => v > 0);
                                     const isToday = key === formatDateKey(new Date());
-                                    // 活動：找出這天有幾個活動
                                     const dayActivities = activities.filter(a => a.date === key);
                                     const hasEvent = dayActivities.length > 0;
+                                    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+
+                                    // 決定背景色
+                                    let bg = 'transparent';
+                                    let outline = 'none';
+                                    let fgColor = 'var(--c-text)';
+                                    if (isToday) {
+                                        bg = 'var(--c-primary-bg)';
+                                        outline = '2px solid var(--c-primary)';
+                                        fgColor = 'var(--c-primary-text)';
+                                    } else if (hasEvent && isWeekend) {
+                                        bg = 'var(--c-danger-bg)';
+                                        fgColor = 'var(--c-danger-text)';
+                                    } else if (hasEvent) {
+                                        bg = 'var(--c-primary-bg)';
+                                        fgColor = 'var(--c-primary-text)';
+                                    } else if (hasLog) {
+                                        bg = 'rgba(0,0,0,0.04)';
+                                        fgColor = 'var(--c-text)';
+                                    }
+
+                                    // 笑臉 SVG（線框，同原始程式碼風格）
+                                    const SmileSvg = ({color}) => (
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                            stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                            <circle cx="12" cy="12" r="10"/>
+                                            <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                                            <line x1="9" y1="9" x2="9.01" y2="9"/>
+                                            <line x1="15" y1="9" x2="15.01" y2="9"/>
+                                        </svg>
+                                    );
+
                                     return (
                                         <div key={i}
                                             onClick={() => {
@@ -1631,28 +1673,30 @@
                                                     setViewDate(new Date(date.getFullYear(), date.getMonth(), date.getDate()));
                                                 }
                                             }}
-                                            className={`aspect-square flex flex-col items-center justify-center r-btn text-sm sans-font relative ${isToday ? 'pk-blue' : hasLog ? 'bg-slate-100' : ''}`}
+                                            className="aspect-square flex flex-col items-center justify-center r-btn sans-font relative"
                                             style={{
-                                                color: isToday ? 'var(--c-primary-text)' : 'var(--c-text)',
+                                                background: bg,
+                                                outline: outline,
+                                                outlineOffset: '-2px',
                                                 cursor: hasEvent ? 'pointer' : 'default',
                                                 position: 'relative',
-                                                paddingBottom: hasEvent ? '2px' : undefined,
                                             }}>
-                                            {hasLog && !isToday ? <Icon name="Smile" size={14} style={{color:'var(--c-danger)'}} /> : date.getDate()}
-                                            {/* 活動小點：疊在日期下方 */}
+                                            {/* 內容：有打卡顯示笑臉，否則顯示數字 */}
+                                            {hasLog
+                                                ? <SmileSvg color={hasEvent ? fgColor : 'var(--c-muted)'} />
+                                                : <span style={{fontSize:'12px', fontWeight:'500', color: fgColor}}>{date.getDate()}</span>
+                                            }
+                                            {/* 活動小點 */}
                                             {hasEvent && (
                                                 <div style={{
-                                                    position: 'absolute',
-                                                    bottom: '3px',
-                                                    left: '50%',
-                                                    transform: 'translateX(-50%)',
-                                                    display: 'flex',
-                                                    gap: '2px',
+                                                    position: 'absolute', bottom: '3px',
+                                                    left: '50%', transform: 'translateX(-50%)',
+                                                    display: 'flex', gap: '2px',
                                                 }}>
                                                     {dayActivities.slice(0, 3).map((_, di) => (
                                                         <div key={di} style={{
                                                             width: '4px', height: '4px', borderRadius: '50%',
-                                                            background: isToday ? 'rgba(255,255,255,0.9)' : 'var(--c-primary)',
+                                                            background: 'rgba(255,255,255,0.85)',
                                                         }} />
                                                     ))}
                                                 </div>
@@ -1660,6 +1704,19 @@
                                         </div>
                                     );
                                 })}
+                            </div>
+                            {/* 圖例：只有活動、打卡 */}
+                            <div style={{display:'flex', gap:'14px', alignItems:'center', paddingTop:'10px', marginTop:'10px', borderTop:'1px solid var(--c-border)'}}>
+                                <div style={{display:'flex', alignItems:'center', gap:'5px'}}>
+                                    <div style={{width:'12px', height:'12px', borderRadius:'3px', background:'var(--c-primary-bg)', border:'1px solid var(--c-primary)'}} />
+                                    <span className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)'}}>活動</span>
+                                </div>
+                                <div style={{display:'flex', alignItems:'center', gap:'5px'}}>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--c-muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>
+                                    </svg>
+                                    <span className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)'}}>打卡</span>
+                                </div>
                             </div>
                         </div>
                     ) : (
@@ -1682,7 +1739,7 @@
                                             boxShadow: isToday ? '0 0 0 2px rgba(116,192,252,0.3)' : 'none'}}>
                                         <div className="flex flex-col">
                                             <span className="sans-font text-xs" style={{color:'var(--c-text)'}}>{date.getMonth() + 1}/{date.getDate()}</span>
-                                            <span className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>{['日','一','二','三','四','五','六'][date.getDay()]}</span>
+                                            <span className="text-[10px] sans-font" style={{color: date.getDay()===0||date.getDay()===6 ? 'var(--c-danger)' : 'var(--c-muted)', fontWeight: date.getDay()===0||date.getDay()===6 ? '600' : '400'}}>{['日','一','二','三','四','五','六'][date.getDay()]}</span>
                                         </div>
                                         <div className="flex gap-1.5 items-center flex-wrap justify-end" style={{maxWidth:'70%'}}>
                                             {data.practice > 0 && <span className="pk-yellow px-2 py-0.5 r-badge text-[9px] sans-font" style={{color:'var(--c-accent-text)'}}>練功 {data.practice}</span>}
