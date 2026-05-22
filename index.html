@@ -671,35 +671,27 @@
             const [thisWeekEvents, setThisWeekEvents] = useState([]);
             
             useEffect(() => {
-                const unsub = activityDB.collection('sessions').onSnapshot(snapshot => {
-                    const now = new Date();
-                    const todayKey = formatDateKey(now);
-                    // 取本週日~六的日期範圍
-                    const sunday = new Date(now);
-                    sunday.setDate(now.getDate() - now.getDay());
-                    sunday.setHours(0,0,0,0);
-                    const saturday = new Date(sunday);
-                    saturday.setDate(sunday.getDate() + 6);
-                    
-                    const events = [];
-                    snapshot.forEach(doc => {
-                        const data = doc.data();
-                        let dateStr = '';
-                        if (data.date && typeof data.date.toDate === 'function') {
-                            const d = data.date.toDate();
-                            dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                        } else if (typeof data.date === 'string') {
-                            dateStr = data.date;
-                        }
-                        if (!dateStr) return;
-                        const d = new Date(dateStr + 'T00:00:00');
-                        if (d >= sunday && d <= saturday) {
-                            events.push({ id: doc.id, name: data.name || '活動', date: dateStr, timeStart: data.timeStart || '', courseType: data.courseType || '' });
-                        }
+                // 讀取管理員共用行事曆路徑（adminData/sharedCalendar）
+                const unsub = activityDB.collection('adminData').doc('sharedCalendar')
+                    .onSnapshot(snap => {
+                        const now = new Date();
+                        const sunday = new Date(now);
+                        sunday.setDate(now.getDate() - now.getDay());
+                        sunday.setHours(0,0,0,0);
+                        const saturday = new Date(sunday);
+                        saturday.setDate(sunday.getDate() + 6);
+
+                        const allSessions = (snap.exists && snap.data() && snap.data().sessions) ? snap.data().sessions : [];
+                        const events = allSessions
+                            .filter(s => {
+                                if (!s.date) return false;
+                                const d = new Date(s.date + 'T00:00:00');
+                                return d >= sunday && d <= saturday;
+                            })
+                            .map(s => ({ id: s.id, name: s.name || '活動', date: s.date, timeStart: s.timeStart || '', courseType: s.courseType || '' }));
+                        events.sort((a,b) => a.date.localeCompare(b.date));
+                        setThisWeekEvents(events);
                     });
-                    events.sort((a,b) => a.date.localeCompare(b.date));
-                    setThisWeekEvents(events);
-                });
                 return () => unsub();
             }, []);
             
@@ -1352,96 +1344,39 @@
             const [selectedEventDate, setSelectedEventDate] = useState(null); // 點擊月曆跳活動用
             const [expandedActivityId, setExpandedActivityId] = useState(null); // 三角形下拉
             
-            // 加載活動資料 - 使用字符串日期格式
+            // 加載活動資料 - 從管理員共用行事曆路徑即時監聽
             useEffect(() => {
-                const loadActivities = async () => {
-                    try {
-                        setLoadingActivities(true);
-                        const snapshot = await activityDB.collection('sessions').get();
-                        const sessions = [];
-                        
-                        snapshot.forEach(doc => {
-                            const data = doc.data();
-                            
-                            // 解析日期 - 支持多種格式
-                            let dateStr = '';
-                            
-                            // 方法1: 檢查是否為 Firestore Timestamp
-                            if (data.date && typeof data.date.toDate === 'function') {
-                                const d = data.date.toDate();
-                                dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                            }
-                            // 方法2: 檢查是否為 Date 對象
-                            else if (data.date instanceof Date) {
-                                const d = data.date;
-                                dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                            }
-                            // 方法3: 檢查是否為字符串
-                            else if (typeof data.date === 'string') {
-                                dateStr = data.date;
-                            }
-                            
-                            // 驗證日期格式
-                            if (dateStr && /^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
-                                sessions.push({
-                                    id: doc.id,
-                                    name: data.name || '未命名活動',
-                                    date: dateStr,
-                                    timeStart: data.timeStart || '',
-                                    timeEnd: data.timeEnd || '',
-                                    courseType: data.courseType || '神鼓陣',
-                                    helper: data.helper || '',
-                                    note: data.note || '',
-                                });
-                            }
-                        });
-                        
-                        setActivities(sessions);
-                        console.log('✅ 活動加載成功:', sessions.length, '個活動', sessions);
-                    } catch (err) {
-                        console.error('❌ 活動加載失敗:', err);
-                    } finally {
-                        setLoadingActivities(false);
-                    }
+                setLoadingActivities(true);
+
+                // 解析 sharedCalendar 文件中的 sessions 陣列
+                const parseSharedSessions = (data) => {
+                    if (!data || !Array.isArray(data.sessions)) return [];
+                    return data.sessions
+                        .filter(s => s.date && /^\d{4}-\d{2}-\d{2}/.test(s.date))
+                        .map(s => ({
+                            id:         s.id         || '',
+                            name:       s.name       || '未命名活動',
+                            date:       s.date,
+                            timeStart:  s.timeStart  || '',
+                            timeEnd:    s.timeEnd    || '',
+                            courseType: s.courseType || '神鼓陣',
+                            helper:     s.helper     || '',
+                            note:       s.note       || '',
+                        }));
                 };
-                
-                // 初始加載
-                loadActivities();
-                
-                // 即時監聽更新
-                const unsubscribe = activityDB.collection('sessions')
-                    .onSnapshot(snapshot => {
-                        const sessions = [];
-                        snapshot.forEach(doc => {
-                            const data = doc.data();
-                            let dateStr = '';
-                            
-                            if (data.date && typeof data.date.toDate === 'function') {
-                                const d = data.date.toDate();
-                                dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                            } else if (data.date instanceof Date) {
-                                const d = data.date;
-                                dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                            } else if (typeof data.date === 'string') {
-                                dateStr = data.date;
-                            }
-                            
-                            if (dateStr && /^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
-                                sessions.push({
-                                    id: doc.id,
-                                    name: data.name || '未命名活動',
-                                    date: dateStr,
-                                    timeStart: data.timeStart || '',
-                                    timeEnd: data.timeEnd || '',
-                                    courseType: data.courseType || '神鼓陣',
-                                    helper: data.helper || '',
-                                    note: data.note || '',
-                                });
-                            }
-                        });
+
+                // 即時監聽 adminData/sharedCalendar（管理端每次儲存時同步寫入）
+                const unsubscribe = activityDB.collection('adminData').doc('sharedCalendar')
+                    .onSnapshot(snap => {
+                        const sessions = snap.exists ? parseSharedSessions(snap.data()) : [];
                         setActivities(sessions);
+                        setLoadingActivities(false);
+                        console.log('✅ 活動同步成功:', sessions.length, '個活動');
+                    }, err => {
+                        console.error('❌ 活動監聽失敗:', err);
+                        setLoadingActivities(false);
                     });
-                
+
                 return () => unsubscribe();
             }, []);
             
