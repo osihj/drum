@@ -667,33 +667,39 @@
         };
 
         // ─── Upcoming Events Banner (本週活動提醒) ─────────────────────
-        const UpcomingEventsBanner = ({ onViewCalendar }) => {
+        const UpcomingEventsBanner = ({ onViewCalendar, activities = [] }) => {
             const [thisWeekEvents, setThisWeekEvents] = useState([]);
             
+            // ✅ 改為本地篩選，不監聽 Firestore（全局監聽已在 App 處理）
             useEffect(() => {
-                const unsub = activityDB.doc('adminData/sharedCalendar').onSnapshot(snap => {
-                    const now = new Date();
-                    const sunday = new Date(now);
-                    sunday.setDate(now.getDate() - now.getDay());
-                    sunday.setHours(0,0,0,0);
-                    const saturday = new Date(sunday);
-                    saturday.setDate(sunday.getDate() + 6);
+                console.log('📋 [UpcomingEventsBanner] 篩選本週活動，收到', activities.length, '個活動');
+                
+                const now = new Date();
+                const sunday = new Date(now);
+                sunday.setDate(now.getDate() - now.getDay());
+                sunday.setHours(0,0,0,0);
+                const saturday = new Date(sunday);
+                saturday.setDate(sunday.getDate() + 6);
 
-                    const raw = snap.exists ? (snap.data().sessions || []) : [];
-                    const events = [];
-                    raw.forEach(data => {
-                        const dateStr = typeof data.date === 'string' ? data.date : '';
-                        if (!dateStr) return;
+                const events = activities
+                    .filter(data => {
+                        const dateStr = data.date;
+                        if (!dateStr) return false;
                         const d = new Date(dateStr + 'T00:00:00');
-                        if (d >= sunday && d <= saturday) {
-                            events.push({ id: data.id, name: data.name || '活動', date: dateStr, timeStart: data.timeStart || '', courseType: data.courseType || '' });
-                        }
-                    });
-                    events.sort((a,b) => a.date.localeCompare(b.date));
-                    setThisWeekEvents(events);
-                });
-                return () => unsub();
-            }, []);
+                        return d >= sunday && d <= saturday;
+                    })
+                    .map(data => ({
+                        id: data.id,
+                        name: data.name || '活動',
+                        date: data.date,
+                        timeStart: data.timeStart || '',
+                        courseType: data.courseType || ''
+                    }))
+                    .sort((a,b) => a.date.localeCompare(b.date));
+                
+                setThisWeekEvents(events);
+                console.log('   篩選後:', events.length, '個本週活動');
+            }, [activities]);  // 只依賴傳入的 activities
             
             if (thisWeekEvents.length === 0) return null;
             
@@ -741,6 +747,11 @@
             const [pendingTaps, setPendingTaps] = useState({});
             const [dailyLogs, setDailyLogs] = useState({});
             const [selectedDateKey, setSelectedDateKey] = useState(null);
+            
+            // 🎯 全局活動數據監聽（解決多個監聽器衝突問題）
+            const [globalActivities, setGlobalActivities] = useState([]);
+            const [activitiesLoaded, setActivitiesLoaded] = useState(false);
+            
             const todayKey = useMemo(() => formatDateKey(new Date()), []);
             const currentWeekDays = useMemo(() => getWeekDays(new Date()), []);
 
@@ -751,6 +762,78 @@
                     setAuthReady(true);
                 });
             }, []);
+            
+            // 🎯 全局活動監聽器 - 只初始化一次，供所有子組件使用
+            useEffect(() => {
+                console.log('🎯 [App] 初始化全局活動監聽器（只初始化一次）');
+                
+                const unsubscribe = activityDB.doc('adminData/sharedCalendar')
+                    .onSnapshot(
+                        snap => {
+                            console.log('📡 [App] sharedCalendar 更新');
+                            
+                            if (!snap.exists) {
+                                console.warn('⚠️  [App] sharedCalendar 文件不存在');
+                                setGlobalActivities([]);
+                                setActivitiesLoaded(true);
+                                return;
+                            }
+                            
+                            const data = snap.data();
+                            const raw = data?.sessions || [];
+                            
+                            console.log('   - 原始 Sessions 數量:', raw.length);
+                            
+                            if (!Array.isArray(raw)) {
+                                console.error('❌ [App] sessions 不是陣列！', typeof raw);
+                                setGlobalActivities([]);
+                                setActivitiesLoaded(true);
+                                return;
+                            }
+                            
+                            // 進行資料篩選和轉換
+                            const processed = raw
+                                .filter(s => {
+                                    const hasValidDate = s.date && /^\d{4}-\d{2}-\d{2}/.test(s.date);
+                                    if (!hasValidDate) {
+                                        console.warn('⚠️  [App] 跳過無效日期:', s.name, s.date);
+                                    }
+                                    return hasValidDate;
+                                })
+                                .map(s => ({
+                                    id: s.id,
+                                    name: s.name || '未命名活動',
+                                    date: s.date,
+                                    timeStart: s.timeStart || '',
+                                    timeEnd: s.timeEnd || '',
+                                    courseType: s.courseType || '神鼓陣',
+                                    helper: s.helper || '',
+                                    note: s.note || '',
+                                }));
+                            
+                            setGlobalActivities(processed);
+                            setActivitiesLoaded(true);
+                            console.log(`✅ [App] 全局活動已更新: ${processed.length} 個`);
+                            if (processed.length > 0) {
+                                console.log('   前 3 個活動:', processed.slice(0, 3));
+                            }
+                        },
+                        err => {
+                            console.error('❌ [App] 全局監聽失敗:', err.message);
+                            console.error('   - 錯誤代碼:', err.code);
+                            setGlobalActivities([]);
+                            setActivitiesLoaded(true);
+                        }
+                    );
+                
+                console.log('✓ 全局監聽器已啟動');
+                
+                // 重點：只在組件卸載時取消監聽
+                return () => {
+                    console.log('🔌 [App] 卸載全局監聽器');
+                    unsubscribe();
+                };
+            }, []);  // 空依賴陣列，確保只初始化一次
 
             // Load user profile (team info)
             useEffect(() => {
@@ -1024,10 +1107,10 @@
                                 </button>
                                 
                                 {/* 本週活動提醒條 */}
-                                <UpcomingEventsBanner onViewCalendar={() => setActiveTab('calendar')} />
+                                <UpcomingEventsBanner onViewCalendar={() => setActiveTab('calendar')} activities={globalActivities} />
                             </>
                         )}
-                        {activeTab === 'calendar' && <CalendarView dailyLogs={dailyLogs} />}
+                        {activeTab === 'calendar' && <CalendarView dailyLogs={dailyLogs} activities={globalActivities} />}
                         {activeTab === 'milestone' && <MilestoneView dailyLogs={dailyLogs} user={user} />}
                         {activeTab === 'profile' && <ProfileView dailyLogs={dailyLogs} isAdmin={isAdmin} user={user} userProfile={userProfile} />}
                         {activeTab === 'leaderboard' && <LeaderboardView currentUser={user} userTeamId={userProfile?.teamId} />}
@@ -1335,104 +1418,15 @@
             );
         };
 
-        const CalendarView = ({ dailyLogs }) => {
+        const CalendarView = ({ dailyLogs, activities = [] }) => {
             const [viewMode, setViewMode] = useState('week');
             const [viewDate, setViewDate] = useState(new Date());
             const [showEventList, setShowEventList] = useState(false);
-            const [activities, setActivities] = useState([]);
-            const [loadingActivities, setLoadingActivities] = useState(false);
             const [selectedEventDate, setSelectedEventDate] = useState(null); // 點擊月曆跳活動用
             const [expandedActivityId, setExpandedActivityId] = useState(null); // 三角形下拉
             
-            // 加載活動資料 - 僅使用 onSnapshot 即時監聽（避免 get() 與 snapshot 衝突導致舊資料覆蓋）
-            useEffect(() => {
-                setLoadingActivities(true);
-                console.log('📅 [CalendarView] 初始化行事曆同步...');
-                console.log('   - activityDB 狀態:', activityDB ? '✓ 已初始化' : '✗ 未初始化');
-                
-                const parseDate = (data) => {
-                    if (data.date && typeof data.date.toDate === 'function') {
-                        const d = data.date.toDate();
-                        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                    } else if (data.date instanceof Date) {
-                        const d = data.date;
-                        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                    } else if (typeof data.date === 'string') {
-                        return data.date;
-                    }
-                    return '';
-                };
-                
-                const unsubscribe = activityDB.doc('adminData/sharedCalendar')
-                    .onSnapshot(snap => {
-                        console.log('📡 [CalendarView] 監聽器觸發');
-                        console.log('   - 文件存在:', snap.exists ? '✓' : '✗');
-                        
-                        if (!snap.exists) {
-                            console.warn('⚠️  [CalendarView] sharedCalendar 文件不存在！');
-                            console.warn('   解決方案: 在 index10.html 中保存一次活動來初始化資料');
-                            setActivities([]);
-                            setLoadingActivities(false);
-                            return;
-                        }
-                        
-                        const data = snap.data();
-                        console.log('   - 完整數據結構:', data);
-                        
-                        const raw = data?.sessions || [];
-                        console.log('   - Sessions 陣列長度:', raw.length);
-                        
-                        if (!Array.isArray(raw)) {
-                            console.error('❌ [CalendarView] sessions 不是陣列！', typeof raw);
-                            setActivities([]);
-                            setLoadingActivities(false);
-                            return;
-                        }
-                        
-                        if (raw.length === 0) {
-                            console.warn('⚠️  [CalendarView] sessions 陣列為空');
-                            setActivities([]);
-                            setLoadingActivities(false);
-                            return;
-                        }
-                        
-                        const sessions = raw
-                            .filter(s => {
-                                const hasValidDate = s.date && /^\d{4}-\d{2}-\d{2}/.test(s.date);
-                                if (!hasValidDate) console.warn('⚠️  [CalendarView] 跳過無效日期:', s.name, s.date);
-                                return hasValidDate;
-                            })
-                            .map(s => ({
-                                id: s.id,
-                                name: s.name || '未命名活動',
-                                date: s.date,
-                                timeStart: s.timeStart || '',
-                                timeEnd: s.timeEnd || '',
-                                courseType: s.courseType || '神鼓陣',
-                                helper: s.helper || '',
-                                note: s.note || '',
-                            }));
-                        
-                        setActivities(sessions);
-                        setLoadingActivities(false);
-                        console.log(`✅ [CalendarView] 活動同步成功: ${sessions.length} 個活動`);
-                        if (sessions.length > 0) {
-                            console.log('   前 3 個活動:', sessions.slice(0, 3));
-                        }
-                    }, err => {
-                        console.error('❌ [CalendarView] 活動監聽失敗');
-                        console.error('   - 錯誤代碼:', err.code);
-                        console.error('   - 錯誤信息:', err.message);
-                        console.error('   - 完整錯誤:', err);
-                        setActivities([]);
-                        setLoadingActivities(false);
-                    });
-                
-                return () => {
-                    console.log('🔌 [CalendarView] 取消行事曆監聽');
-                    unsubscribe();
-                };
-            }, []);
+            // ✅ 改為直接使用傳入的 activities，不監聽 Firestore
+            console.log('📅 [CalendarView] 初始化，收到', activities.length, '個活動');
             
             // 獲取指定月份的活動
             const monthActivities = useMemo(() => {
