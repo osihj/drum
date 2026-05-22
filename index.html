@@ -1350,6 +1350,7 @@
             const [activities, setActivities] = useState([]);
             const [loadingActivities, setLoadingActivities] = useState(false);
             const [selectedEventDate, setSelectedEventDate] = useState(null); // 點擊月曆跳活動用
+            const [expandedActivityId, setExpandedActivityId] = useState(null); // 三角形下拉
             
             // 加載活動資料 - 使用字符串日期格式
             useEffect(() => {
@@ -1388,7 +1389,9 @@
                                     date: dateStr,
                                     timeStart: data.timeStart || '',
                                     timeEnd: data.timeEnd || '',
-                                    courseType: data.courseType || '神鼓陣'
+                                    courseType: data.courseType || '神鼓陣',
+                                    helper: data.helper || '',
+                                    note: data.note || '',
                                 });
                             }
                         });
@@ -1430,7 +1433,9 @@
                                     date: dateStr,
                                     timeStart: data.timeStart || '',
                                     timeEnd: data.timeEnd || '',
-                                    courseType: data.courseType || '神鼓陣'
+                                    courseType: data.courseType || '神鼓陣',
+                                    helper: data.helper || '',
+                                    note: data.note || '',
                                 });
                             }
                         });
@@ -1557,9 +1562,14 @@
                                             const [year, month, day] = activity.date.split('-');
                                             const dateObj = new Date(activity.date + 'T00:00:00');
                                             const weekDayLabel = ['日','一','二','三','四','五','六'][dateObj.getDay()];
+                                            const isExpanded = expandedActivityId === activity.id;
+                                            const hasExtra = (activity.helper && activity.helper.trim()) || (activity.note && activity.note.trim());
                                             return (
-                                                <div key={activity.id} className="bg-white p-4 r-card card-shadow">
-                                                    <div className="flex gap-4">
+                                                <div key={activity.id} className="bg-white r-card card-shadow" style={{overflow:'hidden'}}>
+                                                    {/* 主列：點整列切換展開 */}
+                                                    <div className="flex gap-3 p-4"
+                                                        onClick={() => hasExtra && setExpandedActivityId(isExpanded ? null : activity.id)}
+                                                        style={{cursor: hasExtra ? 'pointer' : 'default'}}>
                                                         {/* 日期區塊 */}
                                                         <div className="flex-shrink-0 text-center" style={{width:'52px', padding:'8px 6px', background:'var(--c-primary-bg)', borderRadius:'var(--r-btn)', border:'1px solid var(--c-primary)'}}>
                                                             <div className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)', marginBottom:'2px'}}>{month}/{day}</div>
@@ -1572,14 +1582,44 @@
                                                             <h3 className="sans-font text-sm" style={{color:'var(--c-text)', fontWeight:'700', marginBottom:'4px'}}>{activity.name}</h3>
                                                             {(activity.timeStart || activity.timeEnd) && (
                                                                 <p className="text-xs sans-font" style={{color:'var(--c-text-sub)', marginBottom:'4px'}}>
-                                                                    ⏰ {activity.timeStart}{activity.timeEnd ? ' – ' + activity.timeEnd : ''}
+                                                                    {activity.timeStart}{activity.timeEnd ? ' – ' + activity.timeEnd : ''}
                                                                 </p>
                                                             )}
                                                             {activity.courseType && (
                                                                 <span className="inline-block text-xs sans-font r-badge" style={{background:'var(--c-accent-bg)', color:'var(--c-accent-text)', padding:'2px 8px', border:'1px solid var(--c-accent)20'}}>{activity.courseType}</span>
                                                             )}
                                                         </div>
+
+                                                        {/* 三角形按鈕 */}
+                                                        {hasExtra && (
+                                                            <div className="flex-shrink-0 flex items-center" style={{paddingLeft:'4px'}}>
+                                                                <span style={{
+                                                                    fontSize:'10px', color:'var(--c-muted)',
+                                                                    display:'inline-block',
+                                                                    transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                                                                    transition:'transform 200ms',
+                                                                }}>▼</span>
+                                                            </div>
+                                                        )}
                                                     </div>
+
+                                                    {/* 下拉展開：值班小幫手 + 備註 */}
+                                                    {isExpanded && (
+                                                        <div style={{borderTop:'1px solid var(--c-border)', padding:'10px 16px 12px', background:'var(--c-surface)', display:'flex', flexDirection:'column', gap:'6px'}}>
+                                                            <div style={{display:'flex', gap:'8px', alignItems:'flex-start'}}>
+                                                                <span className="sans-font" style={{fontSize:'11px', color:'var(--c-muted)', minWidth:'68px', flexShrink:0}}>值班小幫手</span>
+                                                                <span className="sans-font" style={{fontSize:'12px', color: activity.helper && activity.helper.trim() ? 'var(--c-text)' : 'var(--c-muted)'}}>
+                                                                    {activity.helper && activity.helper.trim() ? activity.helper : '未填寫'}
+                                                                </span>
+                                                            </div>
+                                                            <div style={{display:'flex', gap:'8px', alignItems:'flex-start'}}>
+                                                                <span className="sans-font" style={{fontSize:'11px', color:'var(--c-muted)', minWidth:'68px', flexShrink:0}}>備註</span>
+                                                                <span className="sans-font" style={{fontSize:'12px', color: activity.note && activity.note.trim() ? 'var(--c-text)' : 'var(--c-muted)'}}>
+                                                                    {activity.note && activity.note.trim() ? activity.note : '無備註'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         })}
