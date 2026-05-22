@@ -767,60 +767,34 @@
             useEffect(() => {
                 console.log('🎯 [App] 初始化全局活動監聽器（只初始化一次）');
                 
-                const unsubscribe = activityDB.doc('adminData/sharedCalendar')
+                // 改為監聽 sessions collection（每筆活動是獨立 document，與活動行事曆同步）
+                const unsubscribe = activityDB.collection('sessions')
                     .onSnapshot(
-                        snap => {
-                            console.log('📡 [App] sharedCalendar 更新');
-                            
-                            if (!snap.exists) {
-                                console.warn('⚠️  [App] sharedCalendar 文件不存在');
-                                setGlobalActivities([]);
-                                setActivitiesLoaded(true);
-                                return;
-                            }
-                            
-                            const data = snap.data();
-                            const raw = data?.sessions || [];
-                            
-                            console.log('   - 原始 Sessions 數量:', raw.length);
-                            
-                            if (!Array.isArray(raw)) {
-                                console.error('❌ [App] sessions 不是陣列！', typeof raw);
-                                setGlobalActivities([]);
-                                setActivitiesLoaded(true);
-                                return;
-                            }
-                            
-                            // 進行資料篩選和轉換
-                            const processed = raw
-                                .filter(s => {
-                                    const hasValidDate = s.date && /^\d{4}-\d{2}-\d{2}/.test(s.date);
-                                    if (!hasValidDate) {
-                                        console.warn('⚠️  [App] 跳過無效日期:', s.name, s.date);
-                                    }
-                                    return hasValidDate;
-                                })
-                                .map(s => ({
-                                    id: s.id,
-                                    name: s.name || '未命名活動',
-                                    date: s.date,
-                                    timeStart: s.timeStart || '',
-                                    timeEnd: s.timeEnd || '',
+                        snapshot => {
+                            const processed = [];
+                            const seen = new Set();
+                            snapshot.forEach(doc => {
+                                if (seen.has(doc.id)) return;
+                                seen.add(doc.id);
+                                const s = doc.data();
+                                if (!s.date || !/^\d{4}-\d{2}-\d{2}/.test(s.date)) return;
+                                processed.push({
+                                    id:         doc.id,
+                                    name:       s.name       || '未命名活動',
+                                    date:       s.date,
+                                    timeStart:  s.timeStart  || '',
+                                    timeEnd:    s.timeEnd    || '',
                                     courseType: s.courseType || '神鼓陣',
-                                    helper: s.helper || '',
-                                    note: s.note || '',
-                                }));
-                            
+                                    helper:     s.helper     || '',
+                                    note:       s.note       || '',
+                                });
+                            });
+                            processed.sort((a, b) => a.date.localeCompare(b.date));
                             setGlobalActivities(processed);
                             setActivitiesLoaded(true);
-                            console.log(`✅ [App] 全局活動已更新: ${processed.length} 個`);
-                            if (processed.length > 0) {
-                                console.log('   前 3 個活動:', processed.slice(0, 3));
-                            }
                         },
                         err => {
-                            console.error('❌ [App] 全局監聽失敗:', err.message);
-                            console.error('   - 錯誤代碼:', err.code);
+                            console.error('❌ [App] sessions 監聽失敗:', err.message);
                             setGlobalActivities([]);
                             setActivitiesLoaded(true);
                         }
@@ -1110,7 +1084,7 @@
                                 <UpcomingEventsBanner onViewCalendar={() => setActiveTab('calendar')} activities={globalActivities} />
                             </>
                         )}
-                        {activeTab === 'calendar' && <CalendarView dailyLogs={dailyLogs} activities={globalActivities} />}
+                        {activeTab === 'calendar' && <CalendarView dailyLogs={dailyLogs} activities={globalActivities} activitiesLoaded={activitiesLoaded} />}
                         {activeTab === 'milestone' && <MilestoneView dailyLogs={dailyLogs} user={user} />}
                         {activeTab === 'profile' && <ProfileView dailyLogs={dailyLogs} isAdmin={isAdmin} user={user} userProfile={userProfile} />}
                         {activeTab === 'leaderboard' && <LeaderboardView currentUser={user} userTeamId={userProfile?.teamId} />}
@@ -1418,7 +1392,7 @@
             );
         };
 
-        const CalendarView = ({ dailyLogs, activities = [] }) => {
+        const CalendarView = ({ dailyLogs, activities = [], activitiesLoaded = false }) => {
             const [viewMode, setViewMode] = useState('week');
             const [viewDate, setViewDate] = useState(new Date());
             const [showEventList, setShowEventList] = useState(false);
