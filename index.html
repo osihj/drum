@@ -1530,7 +1530,7 @@
                                 </div>
                             </div>
                             
-                            {loadingActivities ? (
+                            {!activitiesLoaded ? (
                                 <div className="bg-white p-8 r-card card-shadow flex flex-col items-center justify-center">
                                     <Icon name="Loader" size={24} style={{color:'var(--c-primary)', animation:'spin 1s linear infinite'}} />
                                     <p className="sans-font text-xs mt-2" style={{color:'var(--c-muted)'}}>載入活動中...</p>
