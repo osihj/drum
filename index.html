@@ -1283,17 +1283,35 @@
                         const sessions = [];
                         snapshot.forEach(doc => {
                             const data = doc.data();
-                            sessions.push({
-                                id: doc.id,
-                                name: data.name,
-                                date: data.date,
-                                timeStart: data.timeStart,
-                                timeEnd: data.timeEnd,
-                                courseType: data.courseType || '神鼓陣'
-                            });
+                            // 支持多種日期格式
+                            let dateStr = data.date;
+                            if (typeof dateStr !== 'string') {
+                                // 如果是 Timestamp 對象
+                                if (data.date && typeof data.date.toDate === 'function') {
+                                    const d = data.date.toDate();
+                                    dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                                } else if (data.date instanceof Date) {
+                                    const d = data.date;
+                                    dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                                }
+                            }
+                            
+                            // 驗證日期格式
+                            if (dateStr && /^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+                                sessions.push({
+                                    id: doc.id,
+                                    name: data.name,
+                                    date: dateStr,
+                                    timeStart: data.timeStart,
+                                    timeEnd: data.timeEnd,
+                                    courseType: data.courseType || '神鼓陣'
+                                });
+                                console.log('✓ 加載活動:', data.name, '日期:', dateStr);
+                            }
                         });
                         setActivities(sessions);
                         activityData.sessions = sessions;
+                        console.log('✓ 共加載', sessions.length, '個活動');
                     } catch (err) {
                         console.error('載入活動失敗:', err);
                     } finally {
@@ -1310,14 +1328,30 @@
                         const sessions = [];
                         snapshot.forEach(doc => {
                             const data = doc.data();
-                            sessions.push({
-                                id: doc.id,
-                                name: data.name,
-                                date: data.date,
-                                timeStart: data.timeStart,
-                                timeEnd: data.timeEnd,
-                                courseType: data.courseType || '神鼓陣'
-                            });
+                            // 支持多種日期格式
+                            let dateStr = data.date;
+                            if (typeof dateStr !== 'string') {
+                                // 如果是 Timestamp 對象
+                                if (data.date && typeof data.date.toDate === 'function') {
+                                    const d = data.date.toDate();
+                                    dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                                } else if (data.date instanceof Date) {
+                                    const d = data.date;
+                                    dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                                }
+                            }
+                            
+                            // 驗證日期格式
+                            if (dateStr && /^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+                                sessions.push({
+                                    id: doc.id,
+                                    name: data.name,
+                                    date: dateStr,
+                                    timeStart: data.timeStart,
+                                    timeEnd: data.timeEnd,
+                                    courseType: data.courseType || '神鼓陣'
+                                });
+                            }
                         });
                         setActivities(sessions);
                         activityData.sessions = sessions;
@@ -1329,11 +1363,19 @@
             // 獲取指定月份的活動
             const monthActivities = useMemo(() => {
                 const year = viewDate.getFullYear();
-                const month = viewDate.getMonth();
-                return activities.filter(a => {
-                    const d = new Date(a.date);
-                    return d.getFullYear() === year && d.getMonth() === month;
+                const month = viewDate.getMonth() + 1; // getMonth() 是 0-11，所以要 +1
+                const filtered = activities.filter(a => {
+                    // 日期格式應該是 YYYY-MM-DD
+                    if (!a.date) return false;
+                    
+                    // 直接字符串比對年月
+                    const yearMonth = `${year}-${String(month).padStart(2, '0')}`;
+                    const isMatch = a.date.startsWith(yearMonth);
+                    
+                    return isMatch;
                 });
+                
+                return filtered;
             }, [activities, viewDate]);
             
             const monthData = useMemo(() => {
@@ -1368,7 +1410,7 @@
                         <div className="bg-white p-5 r-card card-shadow">
                             <div className="flex justify-between items-center mb-4">
                                 <button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1))} className="w-8 h-8 bg-slate-50 r-btn flex items-center justify-center active-press" style={{border:'1px solid var(--c-border)'}}><Icon name="ChevronLeft" size={16} /></button>
-                                <h2 className="sans-font text-base" style={{color:'var(--c-text)'}}>{viewDate.getFullYear()} / {viewDate.getMonth() + 1} 本月活動清單</h2>
+                                <h2 className="sans-font text-base" style={{color:'var(--c-text)'}}>{viewDate.getFullYear()} / {viewDate.getMonth() + 1} 本月活動清單 ({monthActivities.length})</h2>
                                 <button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1))} className="w-8 h-8 bg-slate-50 r-btn flex items-center justify-center active-press" style={{border:'1px solid var(--c-border)'}}><Icon name="ChevronRight" size={16} /></button>
                             </div>
                             {loadingActivities ? (
@@ -1378,15 +1420,25 @@
                             ) : monthActivities.length > 0 ? (
                                 <div className="space-y-3">
                                     {monthActivities.sort((a, b) => new Date(a.date) - new Date(b.date)).map(activity => {
-                                        const d = new Date(activity.date);
-                                        const dateStr = `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+                                        // 安全地解析 YYYY-MM-DD 格式的日期
+                                        let displayDate = activity.date;
+                                        try {
+                                            // 如果是 YYYY-MM-DD 格式，解析它
+                                            if (/^\d{4}-\d{2}-\d{2}/.test(activity.date)) {
+                                                const [y, m, day] = activity.date.split('-');
+                                                displayDate = `${y}/${m}/${day}`;
+                                            }
+                                        } catch (e) {
+                                            console.log('日期轉換出錯:', activity.date, e);
+                                        }
+                                        
                                         return (
                                             <div key={activity.id} className="bg-slate-50 p-4 r-card" style={{borderLeft:'4px solid var(--c-primary)', borderTopLeftRadius:'10px', borderBottomLeftRadius:'10px'}}>
                                                 <div className="flex justify-between items-start">
                                                     <div className="flex-1">
                                                         <h3 className="sans-font text-sm" style={{color:'var(--c-text)', marginBottom:'6px', fontWeight:'700'}}>{activity.name}</h3>
                                                         <div className="text-xs sans-font space-y-1" style={{color:'var(--c-text-sub)'}}>
-                                                            <div>📅 {dateStr}</div>
+                                                            <div>📅 {displayDate}</div>
                                                             {activity.timeStart && <div>⏰ {activity.timeStart}{activity.timeEnd ? ' – ' + activity.timeEnd : ''}</div>}
                                                         </div>
                                                         {activity.courseType && (
