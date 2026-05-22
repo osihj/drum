@@ -1274,46 +1274,52 @@
             const [activities, setActivities] = useState([]);
             const [loadingActivities, setLoadingActivities] = useState(false);
             
-            // 加載活動資料
+            // 加載活動資料 - 使用字符串日期格式
             useEffect(() => {
                 const loadActivities = async () => {
                     try {
                         setLoadingActivities(true);
                         const snapshot = await activityDB.collection('sessions').get();
                         const sessions = [];
+                        
                         snapshot.forEach(doc => {
                             const data = doc.data();
-                            // 支持多種日期格式
-                            let dateStr = data.date;
-                            if (typeof dateStr !== 'string') {
-                                // 如果是 Timestamp 對象
-                                if (data.date && typeof data.date.toDate === 'function') {
-                                    const d = data.date.toDate();
-                                    dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                                } else if (data.date instanceof Date) {
-                                    const d = data.date;
-                                    dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                                }
+                            
+                            // 解析日期 - 支持多種格式
+                            let dateStr = '';
+                            
+                            // 方法1: 檢查是否為 Firestore Timestamp
+                            if (data.date && typeof data.date.toDate === 'function') {
+                                const d = data.date.toDate();
+                                dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                            }
+                            // 方法2: 檢查是否為 Date 對象
+                            else if (data.date instanceof Date) {
+                                const d = data.date;
+                                dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                            }
+                            // 方法3: 檢查是否為字符串
+                            else if (typeof data.date === 'string') {
+                                dateStr = data.date;
                             }
                             
                             // 驗證日期格式
                             if (dateStr && /^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
                                 sessions.push({
                                     id: doc.id,
-                                    name: data.name,
+                                    name: data.name || '未命名活動',
                                     date: dateStr,
-                                    timeStart: data.timeStart,
-                                    timeEnd: data.timeEnd,
+                                    timeStart: data.timeStart || '',
+                                    timeEnd: data.timeEnd || '',
                                     courseType: data.courseType || '神鼓陣'
                                 });
-                                console.log('✓ 加載活動:', data.name, '日期:', dateStr);
                             }
                         });
+                        
                         setActivities(sessions);
-                        activityData.sessions = sessions;
-                        console.log('✓ 共加載', sessions.length, '個活動');
+                        console.log('✅ 活動加載成功:', sessions.length, '個活動', sessions);
                     } catch (err) {
-                        console.error('載入活動失敗:', err);
+                        console.error('❌ 活動加載失敗:', err);
                     } finally {
                         setLoadingActivities(false);
                     }
@@ -1322,60 +1328,49 @@
                 // 初始加載
                 loadActivities();
                 
-                // 監聽即時更新
+                // 即時監聽更新
                 const unsubscribe = activityDB.collection('sessions')
                     .onSnapshot(snapshot => {
                         const sessions = [];
                         snapshot.forEach(doc => {
                             const data = doc.data();
-                            // 支持多種日期格式
-                            let dateStr = data.date;
-                            if (typeof dateStr !== 'string') {
-                                // 如果是 Timestamp 對象
-                                if (data.date && typeof data.date.toDate === 'function') {
-                                    const d = data.date.toDate();
-                                    dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                                } else if (data.date instanceof Date) {
-                                    const d = data.date;
-                                    dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                                }
+                            let dateStr = '';
+                            
+                            if (data.date && typeof data.date.toDate === 'function') {
+                                const d = data.date.toDate();
+                                dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                            } else if (data.date instanceof Date) {
+                                const d = data.date;
+                                dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                            } else if (typeof data.date === 'string') {
+                                dateStr = data.date;
                             }
                             
-                            // 驗證日期格式
                             if (dateStr && /^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
                                 sessions.push({
                                     id: doc.id,
-                                    name: data.name,
+                                    name: data.name || '未命名活動',
                                     date: dateStr,
-                                    timeStart: data.timeStart,
-                                    timeEnd: data.timeEnd,
+                                    timeStart: data.timeStart || '',
+                                    timeEnd: data.timeEnd || '',
                                     courseType: data.courseType || '神鼓陣'
                                 });
                             }
                         });
                         setActivities(sessions);
-                        activityData.sessions = sessions;
                     });
                 
-                return unsubscribe;
+                return () => unsubscribe();
             }, []);
             
             // 獲取指定月份的活動
             const monthActivities = useMemo(() => {
                 const year = viewDate.getFullYear();
-                const month = viewDate.getMonth() + 1; // getMonth() 是 0-11，所以要 +1
+                const month = String(viewDate.getMonth() + 1).padStart(2, '0');
                 const filtered = activities.filter(a => {
-                    // 日期格式應該是 YYYY-MM-DD
-                    if (!a.date) return false;
-                    
-                    // 直接字符串比對年月
-                    const yearMonth = `${year}-${String(month).padStart(2, '0')}`;
-                    const isMatch = a.date.startsWith(yearMonth);
-                    
-                    return isMatch;
+                    return a.date && a.date.substring(0, 7) === `${year}-${month}`;
                 });
-                
-                return filtered;
+                return filtered.sort((a, b) => a.date.localeCompare(b.date));
             }, [activities, viewDate]);
             
             const monthData = useMemo(() => {
@@ -1406,43 +1401,45 @@
                     </div>
                     
                     {showEventList ? (
-                        // 活動清單視圖
-                        <div className="bg-white p-5 r-card card-shadow">
-                            <div className="flex justify-between items-center mb-4">
-                                <button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1))} className="w-8 h-8 bg-slate-50 r-btn flex items-center justify-center active-press" style={{border:'1px solid var(--c-border)'}}><Icon name="ChevronLeft" size={16} /></button>
-                                <h2 className="sans-font text-base" style={{color:'var(--c-text)'}}>{viewDate.getFullYear()} / {viewDate.getMonth() + 1} 本月活動清單 ({monthActivities.length})</h2>
-                                <button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1))} className="w-8 h-8 bg-slate-50 r-btn flex items-center justify-center active-press" style={{border:'1px solid var(--c-border)'}}><Icon name="ChevronRight" size={16} /></button>
+                        // 活動清單視圖 - 自律打卡風格
+                        <div className="space-y-4 animate-in fade-in duration-300">
+                            <div className="bg-white p-5 r-card card-shadow">
+                                <div className="flex justify-between items-center mb-4">
+                                    <button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1))} className="w-8 h-8 bg-slate-50 r-btn flex items-center justify-center active-press" style={{border:'1px solid var(--c-border)'}}><Icon name="ChevronLeft" size={16} /></button>
+                                    <h2 className="sans-font" style={{color:'var(--c-text)', fontSize:'16px', fontWeight:'700'}}>{viewDate.getFullYear()} / {String(viewDate.getMonth() + 1).padStart(2, '0')} 本月活動</h2>
+                                    <button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1))} className="w-8 h-8 bg-slate-50 r-btn flex items-center justify-center active-press" style={{border:'1px solid var(--c-border)'}}><Icon name="ChevronRight" size={16} /></button>
+                                </div>
+                                <p className="sans-font text-xs" style={{color:'var(--c-muted)', marginBottom:'12px'}}>共 {monthActivities.length} 場活動</p>
                             </div>
+                            
                             {loadingActivities ? (
-                                <div className="text-center text-xs sans-font" style={{color:'var(--c-muted)', padding:'20px'}}>
-                                    <p>⏳ 載入活動中...</p>
+                                <div className="bg-white p-8 r-card card-shadow flex flex-col items-center justify-center">
+                                    <Icon name="Loader" size={24} style={{color:'var(--c-primary)', animation:'spin 1s linear infinite'}} />
+                                    <p className="sans-font text-xs mt-2" style={{color:'var(--c-muted)'}}>載入活動中...</p>
                                 </div>
                             ) : monthActivities.length > 0 ? (
-                                <div className="space-y-3">
-                                    {monthActivities.sort((a, b) => new Date(a.date) - new Date(b.date)).map(activity => {
-                                        // 安全地解析 YYYY-MM-DD 格式的日期
-                                        let displayDate = activity.date;
-                                        try {
-                                            // 如果是 YYYY-MM-DD 格式，解析它
-                                            if (/^\d{4}-\d{2}-\d{2}/.test(activity.date)) {
-                                                const [y, m, day] = activity.date.split('-');
-                                                displayDate = `${y}/${m}/${day}`;
-                                            }
-                                        } catch (e) {
-                                            console.log('日期轉換出錯:', activity.date, e);
-                                        }
-                                        
+                                <div className="space-y-2">
+                                    {monthActivities.map(activity => {
+                                        const [year, month, day] = activity.date.split('-');
                                         return (
-                                            <div key={activity.id} className="bg-slate-50 p-4 r-card" style={{borderLeft:'4px solid var(--c-primary)', borderTopLeftRadius:'10px', borderBottomLeftRadius:'10px'}}>
-                                                <div className="flex justify-between items-start">
-                                                    <div className="flex-1">
-                                                        <h3 className="sans-font text-sm" style={{color:'var(--c-text)', marginBottom:'6px', fontWeight:'700'}}>{activity.name}</h3>
-                                                        <div className="text-xs sans-font space-y-1" style={{color:'var(--c-text-sub)'}}>
-                                                            <div>📅 {displayDate}</div>
-                                                            {activity.timeStart && <div>⏰ {activity.timeStart}{activity.timeEnd ? ' – ' + activity.timeEnd : ''}</div>}
-                                                        </div>
+                                            <div key={activity.id} className="bg-white p-4 r-card card-shadow">
+                                                <div className="flex gap-4">
+                                                    {/* 日期區塊 */}
+                                                    <div className="flex-shrink-0 text-center" style={{width:'50px', padding:'8px', background:'var(--c-primary-bg)', borderRadius:'var(--r-btn)'}}>
+                                                        <div className="sans-font text-xs" style={{color:'var(--c-muted)', marginBottom:'2px'}}>{month}/{day}</div>
+                                                        <div className="sans-font text-base" style={{color:'var(--c-primary-text)', fontWeight:'700'}}>{day}</div>
+                                                    </div>
+                                                    
+                                                    {/* 活動詳情 */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <h3 className="sans-font text-sm" style={{color:'var(--c-text)', fontWeight:'700', marginBottom:'4px'}}>{activity.name}</h3>
+                                                        {(activity.timeStart || activity.timeEnd) && (
+                                                            <p className="text-xs sans-font" style={{color:'var(--c-text-sub)', marginBottom:'4px'}}>
+                                                                ⏰ {activity.timeStart}{activity.timeEnd ? ' – ' + activity.timeEnd : ''}
+                                                            </p>
+                                                        )}
                                                         {activity.courseType && (
-                                                            <span className="inline-block text-xs sans-font r-badge mt-2" style={{background:'var(--c-primary-bg)', color:'var(--c-primary-text)', padding:'2px 8px'}}>{activity.courseType}</span>
+                                                            <span className="inline-block text-xs sans-font r-badge" style={{background:'var(--c-accent-bg)', color:'var(--c-accent-text)', padding:'2px 6px'}}>{activity.courseType}</span>
                                                         )}
                                                     </div>
                                                 </div>
@@ -1451,9 +1448,11 @@
                                     })}
                                 </div>
                             ) : (
-                                <div className="text-center text-xs sans-font" style={{color:'var(--c-muted)', padding:'20px'}}>
-                                    <p>📅 本月暫無活動排定</p>
-                                    <p style={{fontSize:'11px', marginTop:'8px'}}>活動資訊將自動同步</p>
+                                <div className="bg-white p-8 r-card card-shadow flex flex-col items-center justify-center">
+                                    <Icon name="Calendar" size={28} style={{color:'var(--c-muted)', marginBottom:'8px'}} />
+                                    <p className="sans-font text-xs" style={{color:'var(--c-muted)', textAlign:'center'}}>
+                                        {activities.length === 0 ? '暫無活動排定' : '本月無活動'}
+                                    </p>
                                 </div>
                             )}
                         </div>
