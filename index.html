@@ -671,30 +671,22 @@
             const [thisWeekEvents, setThisWeekEvents] = useState([]);
             
             useEffect(() => {
-                const unsub = activityDB.collection('sessions').onSnapshot(snapshot => {
+                const unsub = activityDB.doc('adminData/sharedCalendar').onSnapshot(snap => {
                     const now = new Date();
-                    const todayKey = formatDateKey(now);
-                    // 取本週日~六的日期範圍
                     const sunday = new Date(now);
                     sunday.setDate(now.getDate() - now.getDay());
                     sunday.setHours(0,0,0,0);
                     const saturday = new Date(sunday);
                     saturday.setDate(sunday.getDate() + 6);
-                    
+
+                    const raw = snap.exists ? (snap.data().sessions || []) : [];
                     const events = [];
-                    snapshot.forEach(doc => {
-                        const data = doc.data();
-                        let dateStr = '';
-                        if (data.date && typeof data.date.toDate === 'function') {
-                            const d = data.date.toDate();
-                            dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                        } else if (typeof data.date === 'string') {
-                            dateStr = data.date;
-                        }
+                    raw.forEach(data => {
+                        const dateStr = typeof data.date === 'string' ? data.date : '';
                         if (!dateStr) return;
                         const d = new Date(dateStr + 'T00:00:00');
                         if (d >= sunday && d <= saturday) {
-                            events.push({ id: doc.id, name: data.name || '活動', date: dateStr, timeStart: data.timeStart || '', courseType: data.courseType || '' });
+                            events.push({ id: data.id, name: data.name || '活動', date: dateStr, timeStart: data.timeStart || '', courseType: data.courseType || '' });
                         }
                     });
                     events.sort((a,b) => a.date.localeCompare(b.date));
@@ -1369,25 +1361,21 @@
                     return '';
                 };
                 
-                const unsubscribe = activityDB.collection('sessions')
-                    .onSnapshot(snapshot => {
-                        const sessions = [];
-                        snapshot.forEach(doc => {
-                            const data = doc.data();
-                            const dateStr = parseDate(data);
-                            if (dateStr && /^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
-                                sessions.push({
-                                    id: doc.id,
-                                    name: data.name || '未命名活動',
-                                    date: dateStr,
-                                    timeStart: data.timeStart || '',
-                                    timeEnd: data.timeEnd || '',
-                                    courseType: data.courseType || '神鼓陣',
-                                    helper: data.helper || '',
-                                    note: data.note || '',
-                                });
-                            }
-                        });
+                const unsubscribe = activityDB.doc('adminData/sharedCalendar')
+                    .onSnapshot(snap => {
+                        const raw = snap.exists ? (snap.data().sessions || []) : [];
+                        const sessions = raw
+                            .filter(s => s.date && /^\d{4}-\d{2}-\d{2}/.test(s.date))
+                            .map(s => ({
+                                id: s.id,
+                                name: s.name || '未命名活動',
+                                date: s.date,
+                                timeStart: s.timeStart || '',
+                                timeEnd: s.timeEnd || '',
+                                courseType: s.courseType || '神鼓陣',
+                                helper: s.helper || '',
+                                note: s.note || '',
+                            }));
                         setActivities(sessions);
                         setLoadingActivities(false);
                         console.log('✅ 活動同步成功:', sessions.length, '個活動');
