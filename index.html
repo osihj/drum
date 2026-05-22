@@ -1358,83 +1358,43 @@ DB.sessions.forEach(s => { if (!s.courseType) s.courseType = '神鼓陣'; });
 
 function saveDB() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
-  // 同步 sessions 到 Firestore，讓自律打卡可以讀取
-  syncSessionsToFirestore();
 }
 
-// ── Firestore 同步：將本地 sessions 寫入 hererollcall/sessions ──────
-async function syncSessionsToFirestore() {
-  const db = window.firebaseDB;
-  if (!db || !window.isAdminUser) return; // 只有管理員才能寫入
+// == 把單一 session 寫入 Firestore ===================================
+async function firestoreUpsertSession(s) {
   try {
-    const { collection, doc, setDoc, deleteDoc, getDocs } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-    const col = collection(db, 'sessions');
-
-    // 取得現有 Firestore sessions
-    const snapshot = await getDocs(col);
-    const firestoreIds = new Set();
-    snapshot.forEach(d => firestoreIds.add(d.id));
-
-    // 本地 sessions 寫入/更新
-    const localIds = new Set();
-    for (const s of DB.sessions) {
-      localIds.add(s.id);
-      await setDoc(doc(col, s.id), {
-        name:       s.name || '',
-        date:       s.date || '',
-        timeStart:  s.timeStart || '',
-        timeEnd:    s.timeEnd || '',
-        courseType: s.courseType || '神鼓陣',
-        color:      s.color || '#2c5234',
-        helper:     s.helper || '',
-        note:       s.note || '',
-      });
-    }
-
-    // 刪除 Firestore 上已被本地刪除的 sessions
-    for (const fid of firestoreIds) {
-      if (!localIds.has(fid)) {
-        await deleteDoc(doc(col, fid));
-      }
-    }
-    console.log('✅ Sessions 已同步到 Firestore');
-  } catch (err) {
-    console.warn('⚠️ Firestore 同步失敗（離線模式）:', err.message);
-  }
-}
-
-// ── 初次載入時從 Firestore 讀取 sessions（若本地為空）────────────────
-async function loadSessionsFromFirestore() {
-  const db = window.firebaseDB;
-  if (!db) return;
-  try {
-    const { collection, getDocs } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-    const snapshot = await getDocs(collection(db, 'sessions'));
-    if (snapshot.empty) return;
-
-    const firestoreSessions = [];
-    snapshot.forEach(d => {
-      const data = d.data();
-      if (data.date) firestoreSessions.push({ id: d.id, ...data });
+    const { doc, setDoc, collection } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    const db = window.firebaseDB;
+    if (!db) return;
+    await setDoc(doc(collection(db, 'sessions'), s.id), {
+      name:       s.name       || '',
+      date:       s.date       || '',
+      timeStart:  s.timeStart  || '',
+      timeEnd:    s.timeEnd    || '',
+      courseType: s.courseType || '',
+      color:      s.color      || '#2c5234',
+      helper:     s.helper     || '',
+      note:       s.note       || '',
     });
+  } catch(e) { console.warn('Firestore upsert 失敗:', e.message); }
+}
 
-    // 以 Firestore 為主，合併到本地（避免覆蓋本地已有的較新資料）
-    const localIds = new Set(DB.sessions.map(s => s.id));
-    let changed = false;
-    for (const fs of firestoreSessions) {
-      if (!localIds.has(fs.id)) {
-        DB.sessions.push(fs);
-        changed = true;
-      }
-    }
-    if (changed) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
-      renderSessions();
-      console.log('✅ 從 Firestore 載入了新的 sessions');
-    }
-  } catch (err) {
-    console.warn('⚠️ 從 Firestore 讀取 sessions 失敗:', err.message);
+// == 從 Firestore 刪除單一 session ====================================
+async function firestoreDeleteSession(id) {
+  try {
+    const { doc, deleteDoc, collection } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    const db = window.firebaseDB;
+    if (!db) return;
+    await deleteDoc(doc(collection(db, 'sessions'), id));
+  } catch(e) { console.warn('Firestore delete 失敗:', e.message); }
+}
+
+// == 登入後：把 localStorage 既有 sessions 全數推送到 Firestore =======
+async function pushAllSessionsToFirestore() {
+  for (const s of DB.sessions) {
+    await firestoreUpsertSession(s);
   }
+  console.log('已推送 ' + DB.sessions.length + ' 筆活動到 Firestore');
 }
 
 // 簡易 XSS 防護
@@ -2088,13 +2048,14 @@ function saveSession() {
         note:   document.getElementById('s-note').value.trim()
       };
       saveDB(); closeModal('modal-session');
+      firestoreUpsertSession(DB.sessions[idx]); // 同步到 Firestore
       currentSessionYear  = new Date(date).getFullYear();
       currentSessionMonth = new Date(date).getMonth() + 1;
       renderSessions();
       showToast('活動已更新');
     }
   } else {
-    DB.sessions.push({
+    const newSession = {
       id: 's_' + Date.now(),
       name, date,
       timeStart: document.getElementById('s-time-start').value,
@@ -2102,8 +2063,10 @@ function saveSession() {
       courseType, color,
       helper: document.getElementById('s-helper').value.trim(),
       note:   document.getElementById('s-note').value.trim()
-    });
+    };
+    DB.sessions.push(newSession);
     saveDB(); closeModal('modal-session');
+    firestoreUpsertSession(newSession); // 同步到 Firestore
     currentSessionYear  = new Date(date).getFullYear();
     currentSessionMonth = new Date(date).getMonth() + 1;
     renderSessions();
@@ -2117,8 +2080,10 @@ function duplicateSession(id) {
   const d = new Date(target.date);
   d.setDate(d.getDate() + 7);
   const nextDate = d.toISOString().split('T')[0];
-  DB.sessions.push({ id: 's_' + Date.now() + '_' + Math.random().toString(36).substr(2,3), name: target.name, date: nextDate, timeStart: target.timeStart, timeEnd: target.timeEnd, courseType: target.courseType || '神鼓陣' });
+  const dupSession = { id: 's_' + Date.now() + '_' + Math.random().toString(36).substr(2,3), name: target.name, date: nextDate, timeStart: target.timeStart, timeEnd: target.timeEnd, courseType: target.courseType || '神鼓陣', color: target.color || '#2c5234', helper: target.helper || '', note: target.note || '' };
+  DB.sessions.push(dupSession);
   saveDB();
+  firestoreUpsertSession(dupSession); // 同步到 Firestore
   currentSessionYear  = d.getFullYear();
   currentSessionMonth = d.getMonth() + 1;
   renderSessions();
@@ -2132,6 +2097,7 @@ function deleteSession(id) {
     DB.sessions = DB.sessions.filter(x => x.id !== id);
     delete DB.records[id];
     saveDB(); renderSessions(); showToast('活動已刪除');
+    firestoreDeleteSession(id); // 同步刪除 Firestore
   }, '刪除活動');
 }
 
@@ -3049,14 +3015,14 @@ onAuthStateChanged(auth, (user) => {
   // 同步到本地權限系統
   window.isAdminUser = isAdmin;
 
-  // 登入後：先從 Firestore 讀取（非管理員也能讀），再同步本地→Firestore（管理員）
-  setTimeout(async () => {
-    await loadSessionsFromFirestore();
-    if (isAdmin) {
-      // 管理員：把現有 localStorage sessions 全數同步到 Firestore
-      await syncSessionsToFirestore();
-    }
-  }, 500);
+  // 管理員登入後：把 localStorage 既有活動全部推送到 Firestore
+  if (isAdmin) {
+    setTimeout(() => {
+      if (typeof pushAllSessionsToFirestore === 'function') {
+        pushAllSessionsToFirestore();
+      }
+    }, 800);
+  }
 
   if (!isAdmin) {
 
