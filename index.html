@@ -767,19 +767,20 @@
             useEffect(() => {
                 console.log('🎯 [App] 初始化全局活動監聽器（只初始化一次）');
                 
-                // 改為監聽 sessions collection（每筆活動是獨立 document，與活動行事曆同步）
-                const unsubscribe = activityDB.collection('sessions')
+                // 監聽 adminData/sharedCalendar（活動行事曆寫入此路徑）
+                const unsubscribe = activityDB.doc('adminData/sharedCalendar')
                     .onSnapshot(
-                        snapshot => {
-                            const processed = [];
-                            const seen = new Set();
-                            snapshot.forEach(doc => {
-                                if (seen.has(doc.id)) return;
-                                seen.add(doc.id);
-                                const s = doc.data();
-                                if (!s.date || !/^\d{4}-\d{2}-\d{2}/.test(s.date)) return;
-                                processed.push({
-                                    id:         doc.id,
+                        snap => {
+                            if (!snap.exists) {
+                                setGlobalActivities([]);
+                                setActivitiesLoaded(true);
+                                return;
+                            }
+                            const raw = snap.data()?.sessions || [];
+                            const processed = raw
+                                .filter(s => s.date && /^\d{4}-\d{2}-\d{2}/.test(s.date))
+                                .map(s => ({
+                                    id:         s.id,
                                     name:       s.name       || '未命名活動',
                                     date:       s.date,
                                     timeStart:  s.timeStart  || '',
@@ -787,14 +788,13 @@
                                     courseType: s.courseType || '神鼓陣',
                                     helper:     s.helper     || '',
                                     note:       s.note       || '',
-                                });
-                            });
-                            processed.sort((a, b) => a.date.localeCompare(b.date));
+                                }))
+                                .sort((a, b) => a.date.localeCompare(b.date));
                             setGlobalActivities(processed);
                             setActivitiesLoaded(true);
                         },
                         err => {
-                            console.error('❌ [App] sessions 監聽失敗:', err.message);
+                            console.error('❌ [App] sharedCalendar 監聽失敗:', err.message);
                             setGlobalActivities([]);
                             setActivitiesLoaded(true);
                         }
