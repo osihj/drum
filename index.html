@@ -1347,6 +1347,8 @@
             // 加載活動資料 - 僅使用 onSnapshot 即時監聽（避免 get() 與 snapshot 衝突導致舊資料覆蓋）
             useEffect(() => {
                 setLoadingActivities(true);
+                console.log('📅 [CalendarView] 初始化行事曆同步...');
+                console.log('   - activityDB 狀態:', activityDB ? '✓ 已初始化' : '✗ 未初始化');
                 
                 const parseDate = (data) => {
                     if (data.date && typeof data.date.toDate === 'function') {
@@ -1363,9 +1365,43 @@
                 
                 const unsubscribe = activityDB.doc('adminData/sharedCalendar')
                     .onSnapshot(snap => {
-                        const raw = snap.exists ? (snap.data().sessions || []) : [];
+                        console.log('📡 [CalendarView] 監聽器觸發');
+                        console.log('   - 文件存在:', snap.exists ? '✓' : '✗');
+                        
+                        if (!snap.exists) {
+                            console.warn('⚠️  [CalendarView] sharedCalendar 文件不存在！');
+                            console.warn('   解決方案: 在 index10.html 中保存一次活動來初始化資料');
+                            setActivities([]);
+                            setLoadingActivities(false);
+                            return;
+                        }
+                        
+                        const data = snap.data();
+                        console.log('   - 完整數據結構:', data);
+                        
+                        const raw = data?.sessions || [];
+                        console.log('   - Sessions 陣列長度:', raw.length);
+                        
+                        if (!Array.isArray(raw)) {
+                            console.error('❌ [CalendarView] sessions 不是陣列！', typeof raw);
+                            setActivities([]);
+                            setLoadingActivities(false);
+                            return;
+                        }
+                        
+                        if (raw.length === 0) {
+                            console.warn('⚠️  [CalendarView] sessions 陣列為空');
+                            setActivities([]);
+                            setLoadingActivities(false);
+                            return;
+                        }
+                        
                         const sessions = raw
-                            .filter(s => s.date && /^\d{4}-\d{2}-\d{2}/.test(s.date))
+                            .filter(s => {
+                                const hasValidDate = s.date && /^\d{4}-\d{2}-\d{2}/.test(s.date);
+                                if (!hasValidDate) console.warn('⚠️  [CalendarView] 跳過無效日期:', s.name, s.date);
+                                return hasValidDate;
+                            })
                             .map(s => ({
                                 id: s.id,
                                 name: s.name || '未命名活動',
@@ -1376,15 +1412,26 @@
                                 helper: s.helper || '',
                                 note: s.note || '',
                             }));
+                        
                         setActivities(sessions);
                         setLoadingActivities(false);
-                        console.log('✅ 活動同步成功:', sessions.length, '個活動');
+                        console.log(`✅ [CalendarView] 活動同步成功: ${sessions.length} 個活動`);
+                        if (sessions.length > 0) {
+                            console.log('   前 3 個活動:', sessions.slice(0, 3));
+                        }
                     }, err => {
-                        console.error('❌ 活動監聽失敗:', err);
+                        console.error('❌ [CalendarView] 活動監聽失敗');
+                        console.error('   - 錯誤代碼:', err.code);
+                        console.error('   - 錯誤信息:', err.message);
+                        console.error('   - 完整錯誤:', err);
+                        setActivities([]);
                         setLoadingActivities(false);
                     });
                 
-                return () => unsubscribe();
+                return () => {
+                    console.log('🔌 [CalendarView] 取消行事曆監聽');
+                    unsubscribe();
+                };
             }, []);
             
             // 獲取指定月份的活動
