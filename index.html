@@ -743,6 +743,7 @@
             const [authReady, setAuthReady] = useState(false);
             const [userProfile, setUserProfile] = useState(null);
             const [activeTab, setActiveTab] = useState('dashboard');
+            const [calendarInitMode, setCalendarInitMode] = useState('week');
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [pendingTaps, setPendingTaps] = useState({});
             const [dailyLogs, setDailyLogs] = useState({});
@@ -1081,10 +1082,10 @@
                                 </button>
                                 
                                 {/* 本週活動提醒條 */}
-                                <UpcomingEventsBanner onViewCalendar={() => setActiveTab('calendar')} activities={globalActivities} />
+                                <UpcomingEventsBanner onViewCalendar={() => { setCalendarInitMode('month'); setActiveTab('calendar'); }} activities={globalActivities} />
                             </>
                         )}
-                        {activeTab === 'calendar' && <CalendarView dailyLogs={dailyLogs} activities={globalActivities} activitiesLoaded={activitiesLoaded} />}
+                        {activeTab === 'calendar' && <CalendarView dailyLogs={dailyLogs} activities={globalActivities} activitiesLoaded={activitiesLoaded} initialViewMode={calendarInitMode} onMounted={() => setCalendarInitMode('week')} />}
                         {activeTab === 'milestone' && <MilestoneView dailyLogs={dailyLogs} user={user} />}
                         {activeTab === 'profile' && <ProfileView dailyLogs={dailyLogs} isAdmin={isAdmin} user={user} userProfile={userProfile} />}
                         {activeTab === 'leaderboard' && <LeaderboardView currentUser={user} userTeamId={userProfile?.teamId} />}
@@ -1392,8 +1393,9 @@
             );
         };
 
-        const CalendarView = ({ dailyLogs, activities = [], activitiesLoaded = false }) => {
-            const [viewMode, setViewMode] = useState('week');
+        const CalendarView = ({ dailyLogs, activities = [], activitiesLoaded = false, initialViewMode = 'week', onMounted }) => {
+            const [viewMode, setViewMode] = useState(initialViewMode);
+            useEffect(() => { if (onMounted) onMounted(); }, []);
             const [viewDate, setViewDate] = useState(new Date());
             const [selectedEventDate, setSelectedEventDate] = useState(null); // 點擊月曆跳活動用
             const [expandedActivityId, setExpandedActivityId] = useState(null); // 三角形下拉
@@ -1655,10 +1657,16 @@
                                 const hasActivity = totalEx > 0 || data.practice > 0 || data.fiveMin > 0;
                                 const isToday = key === formatDateKey(new Date());
                                 const dayActivities = activities.filter(a => a.date === key);
+                                const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                                const hasEvent = dayActivities.length > 0;
+                                let rowBorder = '1px solid var(--c-border)';
+                                if (isToday) rowBorder = '2px solid #16a34a';
+                                else if (hasEvent && isWeekend) rowBorder = '1.5px solid var(--c-danger)';
+                                else if (hasEvent) rowBorder = '1.5px solid var(--c-primary)';
+                                else if (hasActivity) rowBorder = '1px solid var(--c-success)';
                                 return (
                                     <div key={key} className={`bg-white p-3.5 r-card flex items-center justify-between`}
-                                        style={{border: hasActivity ? '1px solid var(--c-success)' : '1px solid var(--c-border)', opacity: hasActivity || isToday || dayActivities.length > 0 ? 1 : 0.55,
-                                            boxShadow: isToday ? '0 0 0 2px rgba(116,192,252,0.3)' : 'none'}}>
+                                        style={{border: rowBorder, opacity: hasActivity || isToday || dayActivities.length > 0 ? 1 : 0.55}}>
                                         <div className="flex flex-col">
                                             <span className="sans-font text-xs" style={{color:'var(--c-text)'}}>{date.getMonth() + 1}/{date.getDate()}</span>
                                             <span className="text-[10px] sans-font" style={{color: date.getDay()===0||date.getDay()===6 ? 'var(--c-danger)' : 'var(--c-muted)', fontWeight: date.getDay()===0||date.getDay()===6 ? '600' : '400'}}>{['日','一','二','三','四','五','六'][date.getDay()]}</span>
@@ -1670,10 +1678,18 @@
                                             {dayActivities.map((ev, ei) => (
                                                 <span key={ei} className="px-2 py-0.5 r-badge text-[9px] sans-font"
                                                     style={{background:'var(--c-primary-bg)', color:'var(--c-primary-text)', border:'1px solid var(--c-primary)'}}>
-                                                    📅 {ev.name}
+                                                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'3px',flexShrink:0}}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>{ev.name}
                                                 </span>
                                             ))}
-                                            {hasActivity && <Icon name="Smile" size={15} style={{color:'var(--c-accent-text)'}} />}
+                                            {hasActivity && (
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                                                    stroke="var(--c-accent-text)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                                    <circle cx="12" cy="12" r="10"/>
+                                                    <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                                                    <line x1="9" y1="9" x2="9.01" y2="9"/>
+                                                    <line x1="15" y1="9" x2="15.01" y2="9"/>
+                                                </svg>
+                                            )}
                                         </div>
                                     </div>
                                 );
