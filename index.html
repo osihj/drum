@@ -1288,10 +1288,13 @@
                             <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
                                 <div style={{width:'8px', height:'8px', borderRadius:'50%', background:m.color}}></div>
                                 <span className="sans-font" style={{fontSize:'15px', fontWeight:'500', color:'var(--c-text)'}}>{m.label}</span>
-                                {!isUnset && <span className="sans-font" style={{fontSize:'12px', color:'var(--c-muted)'}}>每天 {daily} {m.unit}</span>}
                                 {!isUnset && (
-                                    <span className="sans-font" style={{fontSize:'9px', color:'var(--c-muted)', background:'var(--c-surface)', border:'0.5px solid var(--c-border-strong)', padding:'1px 6px', borderRadius:'99px'}}>
-                                        🔒 本週鎖定
+                                    <span className="sans-font" style={{display:'inline-flex', alignItems:'center', gap:'3px', fontSize:'12px', color:'var(--c-muted)'}}>
+                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                        </svg>
+                                        每天 {daily} {m.unit}
                                     </span>
                                 )}
                             </div>
@@ -1400,9 +1403,8 @@
                     {/* Header */}
                     {(() => {
                         const weekDays = getWeekDays(new Date());
-                        const satDate = weekDays[6]; // 週六
-                        const deadlineStr = `${satDate.getMonth()+1}/${satDate.getDate()} 23:59 截止`;
-                        const sunDate = weekDays[0]; // 週日起點
+                        const satDate = weekDays[6];
+                        const sunDate = weekDays[0];
                         const weekRangeStr = `${sunDate.getMonth()+1}/${sunDate.getDate()} – ${satDate.getMonth()+1}/${satDate.getDate()}`;
                         return (
                     <div className="vibrant-card p-5 r-card float-anim relative overflow-hidden" style={{boxShadow:'0 1px 4px rgba(0,0,0,0.06)', marginBottom:'16px'}}>
@@ -1411,9 +1413,6 @@
                             <p className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>立目標、勤精進</p>
                             <span className="text-[10px] sans-font" style={{background:'var(--c-primary-bg)', color:'var(--c-primary-text)', padding:'1px 8px', borderRadius:'99px', border:'1px solid var(--c-primary)'}}>
                                 本週 {weekRangeStr}
-                            </span>
-                            <span className="text-[10px] sans-font" style={{background:'var(--c-accent-bg)', color:'var(--c-accent-text)', padding:'1px 8px', borderRadius:'99px', border:'1px solid var(--c-accent)'}}>
-                                {deadlineStr}
                             </span>
                         </div>
                     </div>
