@@ -871,12 +871,23 @@
             }, []);
 
             // Load user profile (team info)
+            // 收到更新後，若有 teamId 則自動查詢 teams 取最新 teamName，防止直接改 Firebase 時名稱不同步
             useEffect(() => {
                 if (!user) return;
                 const unsub = db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
-                    .onSnapshot(snap => {
-                        if (snap.exists) setUserProfile(snap.data());
-                        else setUserProfile(null);
+                    .onSnapshot(async snap => {
+                        if (!snap.exists) { setUserProfile(null); return; }
+                        const data = snap.data();
+                        if (data.teamId) {
+                            try {
+                                const teamSnap = await db.collection('artifacts').doc(appId)
+                                    .collection('teams').doc(data.teamId).get();
+                                if (teamSnap.exists) {
+                                    data.teamName = teamSnap.data().name || data.teamName;
+                                }
+                            } catch (e) { /* 查不到就用原本的 teamName */ }
+                        }
+                        setUserProfile(data);
                     });
                 return () => unsub();
             }, [user]);
