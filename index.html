@@ -137,20 +137,36 @@
             apiKey: "AIzaSyAdCP5BvvIhcjYt2_Re80JKKDKqfbgjtvk",
             authDomain: "drum-8d969.firebaseapp.com",
             projectId: "drum-8d969",
-            storageBucket: "drum-8d969.appspot.com",
-            messagingSenderId: "305532210099",
-            appId: "1:305532210099:web:7bdffc74bb1c6d4b987d76",
-            measurementId: "G-F3XLHXB5BM"
+            storageBucket: "drum-8d969.firebasestorage.app",
+            messagingSenderId: "28100257204",
+            appId: "1:28100257204:web:2d787ad57171b2d820fee1",
+            measurementId: "G-NLXPNWL0RS"
         };
-
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
+        
+        // 活動行事曆 Firebase 配置
+        const activityFirebaseConfig = {
+            apiKey: "AIzaSyBXWiESc_oenlb-WF9wzsd4oFDampID9V8",
+            authDomain: "hererollcall.firebaseapp.com",
+            projectId: "hererollcall",
+            storageBucket: "hererollcall.firebasestorage.app",
+            messagingSenderId: "190944484790",
+            appId: "1:190944484790:web:3763a635f76e46adbcb517",
+            measurementId: "G-ENN8H5W8YQ"
+        };
+        
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
+        const db = firebase.firestore();
+        const appId = "discipline-app-v15";
+        const ADMIN_EMAIL = "hsinglinstar@gmail.com";
+        
+        // 初始化活動行事曆 Firebase（使用次應用）
+        const activityApp = firebase.initializeApp(activityFirebaseConfig, "activity");
+        const activityDB = firebase.firestore(activityApp);
+        
+        // 活動資料存儲
+        const activityData = { sessions: [] };
 
-        const appId = "main";
-        const ADMIN_EMAIL = "admin@drumming.group";
-
-        // ── Utilities ──
         const formatDateKey = (date) => {
             const y = date.getFullYear();
             const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -158,228 +174,651 @@
             return `${y}-${m}-${d}`;
         };
 
-        const getWeekDays = (date) => {
-            const d = new Date(date);
-            const day = d.getDay();
-            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-            const start = new Date(d.setDate(diff));
-            return Array.from({length:7}, (_,i) => { const dd = new Date(start); dd.setDate(start.getDate()+i); return dd; });
+        const getWeekDays = (baseDate = new Date()) => {
+            const start = new Date(baseDate);
+            const day = start.getDay();
+            const diff = start.getDate() - day;
+            start.setDate(diff);
+            start.setHours(0,0,0,0);
+            return Array.from({ length: 7 }, (_, i) => {
+                const d = new Date(start);
+                d.setDate(start.getDate() + i);
+                return d;
+            });
         };
 
-        // ... [Include all component code from original, skipping Firebase setup] ...
-        // This is a placeholder - in production, copy all component definitions from the original file
-
-        const Icon = ({ name, size = 24, style = {}, className = '' }) => {
-            const icons = {
-                ChevronLeft: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"></polyline></svg>,
-                ChevronRight: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"></polyline></svg>,
-                X: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>,
-                Smile: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>,
-            };
-            return <span className={className} style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:size,height:size,...style}}>{icons[name]}</span>;
+        const calcScore = (logs) => {
+            const now = new Date();
+            const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            let mActiveDays = 0, mExMins = 0, mStretchMins = 0, mPracCount = 0;
+            Object.entries(logs || {}).forEach(([key, val]) => {
+                if (key.startsWith(prefix)) {
+                    const p = val.practice || 0, e = val.exerciseTime || 0, s = val.stretchTime || 0;
+                    if ((p + e + s + (val.fiveMin || 0)) > 0) mActiveDays++;
+                    mExMins += e; mStretchMins += s; mPracCount += p;
+                }
+            });
+            const totalHours = (mExMins + mStretchMins) / 60;
+            return Math.round((mActiveDays * 10) + totalHours + (mPracCount * 5));
         };
 
-        // ───────────────────────────────────────────────────────────────────────
-        // NEW: Unified Calendar Component
-        // 特點：
-        // 1. 移除「修煉記錄」「本月活動」的分頁切換
-        // 2. 同時展示活動框色（平日藍/假日紅）+ 打卡笑臉（在數字下方）
-        // 3. 下方 Detail Panel 顯示該日的活動和打卡信息
-        // ───────────────────────────────────────────────────────────────────────
-        const UnifiedCalendarView = ({ dailyLogs, activities, activitiesLoaded }) => {
-            const [viewDate, setViewDate] = useState(new Date());
-            const [selectedDateKey, setSelectedDateKey] = useState(null);
+        // All-time score for level calculation (never resets)
+        const calcAllTimeScore = (logs) => {
+            let activeDays = 0, exMins = 0, stretchMins = 0, pracCount = 0;
+            Object.entries(logs || {}).forEach(([key, val]) => {
+                const p = val.practice || 0, e = val.exerciseTime || 0, s = val.stretchTime || 0;
+                if ((p + e + s + (val.fiveMin || 0)) > 0) activeDays++;
+                exMins += e; stretchMins += s; pracCount += p;
+            });
+            const totalHours = (exMins + stretchMins) / 60;
+            return Math.round((activeDays * 10) + totalHours + (pracCount * 5));
+        };
 
-            const monthData = useMemo(() => {
-                const year = viewDate.getFullYear();
-                const month = viewDate.getMonth();
-                const firstDay = new Date(year, month, 1).getDay();
-                const daysInMonth = new Date(year, month + 1, 0).getDate();
-                const grid = [];
-                for (let i = 0; i < firstDay; i++) grid.push(null);
-                for (let d = 1; d <= daysInMonth; d++) grid.push(new Date(year, month, d));
-                return grid;
-            }, [viewDate]);
+        const calcLevel = (allTimeScore) => {
+            let realm = { level: 1 };
+            if (allTimeScore >= 600) realm = { level: 90 };
+            else if (allTimeScore >= 350) realm = { level: 70 };
+            else if (allTimeScore >= 150) realm = { level: 30 };
+            else if (allTimeScore >= 50) realm = { level: 10 };
+            let displayLevel = realm.level + Math.floor((allTimeScore % 100) / 10);
+            if (allTimeScore >= 600) displayLevel = 90 + Math.min(9, Math.floor((allTimeScore - 600) / 50));
+            return displayLevel;
+        };
 
-            // 獲取指定月份的活動
-            const monthActivities = useMemo(() => {
-                const year = viewDate.getFullYear();
-                const month = String(viewDate.getMonth() + 1).padStart(2, '0');
-                return activities.filter(a => a.date && a.date.substring(0, 7) === `${year}-${month}`);
-            }, [activities, viewDate]);
+        const Icon = ({ name, size = 24, className = "", strokeWidth = 3 }) => {
+            const ref = useRef(null);
+            useEffect(() => {
+                if (window.lucide && ref.current) {
+                    ref.current.innerHTML = '';
+                    const icon = window.lucide.icons[name];
+                    if (icon) {
+                        const el = window.lucide.createElement(icon);
+                        el.setAttribute('width', size);
+                        el.setAttribute('height', size);
+                        el.setAttribute('stroke-width', strokeWidth);
+                        ref.current.appendChild(el);
+                    }
+                }
+            }, [name, size, strokeWidth]);
+            return <span ref={ref} className={`inline-flex items-center justify-center ${className}`}></span>;
+        };
 
-            const prevMonth = () => {
-                setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1));
-                setSelectedDateKey(null);
+        // ─── Login Screen ──────────────────────────────────────────────
+        const LoginScreen = ({ onLogin }) => {
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState('');
+
+            const handleGoogleLogin = async () => {
+                setLoading(true);
+                setError('');
+                const provider = new firebase.auth.GoogleAuthProvider();
+                try {
+                    await auth.signInWithPopup(provider);
+                } catch (popupError) {
+                    // popup blocked, fallback to redirect
+                    if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/popup-closed-by-user') {
+                        try {
+                            await auth.signInWithRedirect(provider);
+                        } catch (e) {
+                            setError('登入失敗，請再試一次');
+                            setLoading(false);
+                        }
+                    } else {
+                        setError('登入失敗：' + popupError.message);
+                        setLoading(false);
+                    }
+                }
             };
 
-            const nextMonth = () => {
-                setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1));
-                setSelectedDateKey(null);
-            };
-
-            // 取得某日的活動和打卡信息
-            const getDateInfo = (dateStr) => {
-                const log = dailyLogs[dateStr] || {};
-                const dayActivities = activities.filter(a => a.date === dateStr);
-                const hasCheckin = log.practice > 0 || log.fiveMin > 0 || log.exerciseTime > 0 || log.stretchTime > 0;
-                return { log, dayActivities, hasCheckin };
-            };
+            useEffect(() => {
+                auth.getRedirectResult().then(result => {
+                    if (result?.user) setLoading(false);
+                }).catch(() => setLoading(false));
+            }, []);
 
             return (
-                <div className="space-y-4 animate-in fade-in duration-300">
-                    {/* 月份導航 */}
-                    <div className="bg-white p-5 r-card card-shadow">
-                        <div className="flex justify-between items-center mb-4">
-                            <button onClick={prevMonth} className="w-8 h-8 bg-slate-50 r-btn flex items-center justify-center active-press" style={{border:'1px solid var(--c-border)'}}><Icon name="ChevronLeft" size={16} /></button>
-                            <h2 className="sans-font" style={{color:'var(--c-text)', fontSize:'16px', fontWeight:'700'}}>{viewDate.getFullYear()} / {String(viewDate.getMonth() + 1).padStart(2, '0')}</h2>
-                            <button onClick={nextMonth} className="w-8 h-8 bg-slate-50 r-btn flex items-center justify-center active-press" style={{border:'1px solid var(--c-border)'}}><Icon name="ChevronRight" size={16} /></button>
+                <div className="max-w-md mx-auto min-h-screen flex flex-col items-center justify-center p-8 gap-10">
+                    <div className="text-center space-y-3">
+                        <div className="w-20 h-20 pk-blue neo-border r-card flex items-center justify-center mx-auto neo-shadow float-anim">
+                            <Icon name="Star" size={40} className="text-white" />
                         </div>
-
-                        {/* 月曆格 - 統一樣式 */}
-                        <div className="grid grid-cols-7 gap-1.5">
-                            {/* 週日期標頭 */}
-                            {['日','一','二','三','四','五','六'].map((w, wi) => (
-                                <div key={w} className="text-center sans-font text-xs p-1" style={{color: wi===0||wi===6 ? 'var(--c-danger)' : 'var(--c-muted)', fontWeight: wi===0||wi===6 ? '700' : '500'}}>
-                                    {w}
-                                </div>
-                            ))}
-
-                            {/* 日期單元格 */}
-                            {monthData.map((date, i) => {
-                                if (!date) return <div key={i} className="aspect-square"></div>;
-
-                                const dateStr = formatDateKey(date);
-                                const { log, dayActivities, hasCheckin } = getDateInfo(dateStr);
-                                const isToday = dateStr === formatDateKey(new Date());
-                                const isSelected = selectedDateKey === dateStr;
-                                const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                                
-                                // 樣式邏輯：
-                                // 有活動 → 平日藍框、假日紅框
-                                // 有打卡 → 下方顯示笑臉
-                                const hasActivity = dayActivities.length > 0;
-                                const borderColor = hasActivity ? (isWeekend ? 'var(--c-danger)' : 'var(--c-primary)') : 'var(--c-border)';
-                                const bgColor = hasActivity ? (isWeekend ? 'var(--c-danger-bg)' : 'var(--c-primary-bg)') : (isToday ? 'rgba(116, 192, 252, 0.1)' : 'white');
-
-                                return (
-                                    <button key={i}
-                                        onClick={() => setSelectedDateKey(isSelected ? null : dateStr)}
-                                        className="aspect-square flex flex-col items-center justify-center r-badge relative transition-all"
-                                        style={{
-                                            background: bgColor,
-                                            border: `1px solid ${borderColor}`,
-                                            cursor: 'pointer',
-                                            opacity: hasActivity || hasCheckin || isToday ? 1 : 0.5,
-                                        }}>
-                                        {/* 日期數字 */}
-                                        <span className="sans-font text-xs" style={{color:'var(--c-text)', fontWeight:'700'}}>
-                                            {date.getDate()}
-                                        </span>
-                                        
-                                        {/* 打卡笑臉圖標 - 使用 SVG Smile icon */}
-                                        {hasCheckin && (
-                                            <Icon name="Smile" size={14} style={{color:'var(--c-accent-text)', marginTop:'2px'}} />
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </div>
-
-                        {/* 圖例 */}
-                        <div style={{display:'flex', gap:'16px', alignItems:'center', paddingTop:'12px', marginTop:'12px', borderTop:'1px solid var(--c-border)'}}>
-                            <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
-                                <div style={{width:'14px', height:'14px', borderRadius:'3px', background:'var(--c-primary-bg)', border:'1.5px solid var(--c-primary)'}} />
-                                <span className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)'}}>活動</span>
-                            </div>
-                            <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
-                                <span style={{fontSize:'12px'}}>😊</span>
-                                <span className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)'}}>打卡</span>
-                            </div>
-                        </div>
+                        <h1 className="sans-font text-4xl tracking-tighter" style={{color:'var(--c-text)'}}>自律動起來</h1>
+                        <p className="text-sm sans-font" style={{color:'var(--c-muted)'}}>知行合一 · 同道齊歡</p>
                     </div>
 
-                    {/* Detail Panel - 選中日期的詳情 */}
-                    {selectedDateKey && (() => {
-                        const { log, dayActivities } = getDateInfo(selectedDateKey);
-                        const date = new Date(selectedDateKey);
-                        const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-
-                        return (
-                            <div className="bg-white p-5 r-card card-shadow space-y-3">
-                                <div className="flex items-center justify-between pb-3" style={{borderBottom:'1px solid var(--c-border)'}}>
-                                    <div>
-                                        <span className="sans-font text-lg" style={{color:'var(--c-text)'}}>{selectedDateKey}</span>
-                                        <span className="sans-font text-xs ml-2" style={{color:'var(--c-muted)'}}>{['日','一','二','三','四','五','六'][date.getDay()]}</span>
-                                    </div>
-                                    <button onClick={() => setSelectedDateKey(null)} style={{color:'var(--c-muted)',cursor:'pointer'}}><Icon name="X" size={16} /></button>
-                                </div>
-
-                                {/* 活動信息 */}
-                                {dayActivities.length > 0 ? (
-                                    <div className="space-y-2">
-                                        <p className="sans-font text-xs" style={{color:'var(--c-text)', fontWeight:'600'}}>有 {dayActivities.length} 場活動</p>
-                                        {dayActivities.map((act, ai) => (
-                                            <div key={ai} className="p-2.5 r-btn" style={{background: isWeekend ? 'var(--c-danger-bg)' : 'var(--c-primary-bg)', border: `1px solid ${isWeekend ? 'var(--c-danger)' : 'var(--c-primary)'}`}}>
-                                                <p className="sans-font text-xs" style={{color:'var(--c-text)', fontWeight:'600'}}>{act.name}</p>
-                                                {act.time && <p className="text-[10px]" style={{color:'var(--c-muted)'}}>{act.time}</p>}
-                                                {act.location && <p className="text-[10px]" style={{color:'var(--c-muted)'}}>{act.location}</p>}
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-xs" style={{color:'var(--c-muted)'}}>此日無活動</p>
-                                )}
-
-                                {/* 打卡記錄 */}
-                                {(log.practice > 0 || log.fiveMin > 0 || log.exerciseTime > 0 || log.stretchTime > 0) ? (
-                                    <div className="pt-2 space-y-1" style={{borderTop:'1px solid var(--c-border)'}}>
-                                        <p className="sans-font text-xs" style={{color:'var(--c-text)', fontWeight:'600'}}>打卡記錄</p>
-                                        {log.practice > 0 && <p className="text-[10px]" style={{color:'var(--c-accent-text)'}}>🟨 練功 {log.practice} 次</p>}
-                                        {log.fiveMin > 0 && <p className="text-[10px]" style={{color:'var(--c-primary-text)'}}>🟦 五分鐘 {log.fiveMin} 次</p>}
-                                        {log.exerciseTime > 0 && <p className="text-[10px]" style={{color:'var(--c-danger-text)'}}>🟥 運動 {log.exerciseTime} 分</p>}
-                                        {log.stretchTime > 0 && <p className="text-[10px]" style={{color:'var(--c-success)'}}>🟩 拉筋 {log.stretchTime} 分</p>}
-                                    </div>
-                                ) : (
-                                    <p className="text-xs" style={{color:'var(--c-muted)'}}>此日未打卡</p>
-                                )}
-                            </div>
-                        );
-                    })()}
+                    <div className="w-full bg-white p-6 r-card card-shadow space-y-4">
+                        <p className="sans-font text-center text-xs tracking-widest" style={{color:'var(--c-text-sub)'}}>以 Google 帳號登入，加入陣營</p>
+                        <button
+                            onClick={handleGoogleLogin}
+                            disabled={loading}
+                            className="w-full flex items-center justify-center gap-3 bg-white r-btn py-3.5 active-press hover:bg-slate-50 transition-colors neo-border neo-shadow-sm"
+                        >
+                            <svg width="22" height="22" viewBox="0 0 48 48">
+                                <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
+                                <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+                                <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
+                                <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+                            </svg>
+                            <span className="sans-font text-base" style={{color:'var(--c-text)'}}>{loading ? '登入中...' : '使用 Google 登入'}</span>
+                        </button>
+                        {error && <p className="text-center text-xs sans-font" style={{color:'var(--c-danger-text)'}}>{error}</p>}
+                    </div>
                 </div>
             );
         };
 
-        // ────────────────────────────────────────────────────────
-        // 簡化的 App 結構（只呈現新的統一月曆）
-        // ────────────────────────────────────────────────────────
-        const App = () => {
-            const [authReady, setAuthReady] = useState(false);
-            const [user, setUser] = useState(null);
-            const [dailyLogs, setDailyLogs] = useState({});
-            const [globalActivities, setGlobalActivities] = useState([]);
-            const [activitiesLoaded, setActivitiesLoaded] = useState(false);
+        // ─── Team Selection Screen ──────────────────────────────────────
+        const TeamSelectScreen = ({ user, onJoinTeam, existingName }) => {
+            const [teams, setTeams] = useState([]);
+            const [newTeamName, setNewTeamName] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [creating, setCreating] = useState(false);
+            // 若 Firestore 已有 displayName（舊用戶），直接跳到陣營選擇
+            const [step, setStep] = useState(existingName ? 'team' : 'name');
+            const [customName, setCustomName] = useState(existingName || '');
+            const nameInputRef = React.useRef(null);
 
-            // Auth state listener
             useEffect(() => {
-                const unsub = auth.onAuthStateChanged(u => {
-                    setUser(u);
-                    setAuthReady(true);
-                });
-                return () => unsub();
-            }, []);
+                if (step === 'name' && nameInputRef.current) nameInputRef.current.focus();
+            }, [step]);
 
-            // Load activities globally
             useEffect(() => {
-                const unsub = db.collection('artifacts').doc(appId).collection('activities')
+                const unsub = db.collection('artifacts').doc(appId).collection('teams')
                     .onSnapshot(snap => {
-                        const acts = [];
-                        snap.forEach(doc => acts.push(doc.data()));
-                        setGlobalActivities(acts);
-                        setActivitiesLoaded(true);
+                        const list = [];
+                        snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+                        setTeams(list);
                     });
                 return () => unsub();
             }, []);
+
+            const confirmName = () => {
+                if (customName.trim()) setStep('team');
+            };
+
+            const joinTeam = async (teamId, teamName) => {
+                setLoading(true);
+                await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).set({
+                    teamId, teamName,
+                    displayName: customName.trim() || user.displayName || user.email,
+                    email: user.email,
+                    photoURL: user.photoURL || '',
+                }, { merge: true });
+                onJoinTeam(teamId, teamName);
+            };
+
+            const createTeam = async () => {
+                const name = newTeamName.trim();
+                if (!name) return;
+                setCreating(true);
+                const ref = db.collection('artifacts').doc(appId).collection('teams').doc();
+                await ref.set({ name, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                await joinTeam(ref.id, name);
+            };
+
+            // ── Step 1: 名號設定 ──
+            if (step === 'name') return (
+                <div className="max-w-md mx-auto min-h-screen flex flex-col items-center justify-center p-6 gap-8">
+                    {/* 頭像 */}
+                    <div style={{position:'relative'}}>
+                        {user.photoURL ? (
+                            <img src={user.photoURL} alt="avatar"
+                                style={{width:'80px', height:'80px', borderRadius:'50%', objectFit:'cover', border:'2px solid #e9ecef'}} />
+                        ) : (
+                            <div style={{width:'80px', height:'80px', borderRadius:'50%', background:'#e9ecef', display:'flex', alignItems:'center', justifyContent:'center'}}>
+                                <Icon name="User" size={36} style={{color:'#9ca3af'}} />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 歡迎文字 */}
+                    <div style={{textAlign:'center'}}>
+                        <p className="sans-font" style={{fontSize:'12px', color:'#9ca3af', letterSpacing:'0.08em', marginBottom:'8px'}}>歡迎加入自律動起來</p>
+                        <h2 className="sans-font" style={{fontSize:'26px', fontWeight:'500', color:'#374151', lineHeight:1.2}}>閣下，請賜名號</h2>
+                    </div>
+
+                    {/* 名號輸入 */}
+                    <div style={{width:'100%'}}>
+                        <div style={{background:'#fff', border:'1.5px solid #e9ecef', borderRadius:'14px', padding:'16px 18px', marginBottom:'12px'}}>
+                            <p className="sans-font" style={{fontSize:'11px', color:'#9ca3af', marginBottom:'8px'}}>閣下：</p>
+                            <input
+                                ref={nameInputRef}
+                                type="text"
+                                value={customName}
+                                onChange={e => setCustomName(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && confirmName()}
+                                placeholder="請輸入您的名號..."
+                                className="sans-font"
+                                style={{
+                                    width:'100%', border:'none', outline:'none',
+                                    fontSize:'20px', color:'#374151',
+                                    background:'transparent',
+                                    fontFamily:"'Noto Sans TC', sans-serif"
+                                }}
+                            />
+                        </div>
+                        <button
+                            onClick={confirmName}
+                            disabled={!customName.trim()}
+                            className="w-full sans-font active-press"
+                            style={{
+                                background: customName.trim() ? '#374151' : '#e9ecef',
+                                color: customName.trim() ? '#fff' : '#9ca3af',
+                                border:'none', borderRadius:'12px',
+                                padding:'16px', fontSize:'16px', fontWeight:'500',
+                                transition:'all 0.2s', cursor: customName.trim() ? 'pointer' : 'default'
+                            }}>
+                            確認名號，前往選擇陣營
+                        </button>
+                    </div>
+                </div>
+            );
+
+            // ── Step 2: 選擇陣營 ──
+            return (
+                <div className="max-w-md mx-auto min-h-screen flex flex-col p-6 gap-6">
+                    <div className="text-center pt-10 pb-4">
+                        <div className="w-16 h-16 pk-purple neo-border r-card flex items-center justify-center mx-auto mb-3 neo-shadow">
+                            <Icon name="Users" size={32} className="text-white" />
+                        </div>
+                        <h2 className="sans-font text-3xl tracking-tighter" style={{color:'var(--c-text)'}}>選擇陣營</h2>
+                        <p className="text-xs sans-font mt-1" style={{color:'var(--c-muted)'}}>
+                            <span style={{color:'#374151', fontWeight:'500'}}>{customName}</span>，加入或創建你的修煉門派
+                        </p>
+                    </div>
+
+                    {/* Existing teams */}
+                    <div className="space-y-3">
+                        {teams.length === 0 && (
+                            <p className="text-center text-xs opacity-30 sans-font py-4">還沒有門派，成為第一個創立者！</p>
+                        )}
+                        {teams.map(t => (
+                            <button key={t.id} onClick={() => joinTeam(t.id, t.name)}
+                                className="w-full bg-white p-4 r-card card-shadow flex items-center justify-between active-press hover:bg-slate-50">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 pk-yellow neo-border-thin r-btn flex items-center justify-center">
+                                        <Icon name="Sword" size={16} className="text-[#374151]" />
+                                    </div>
+                                    <span className="sans-font text-base" style={{color:'var(--c-text)'}}>{t.name}</span>
+                                </div>
+                                <Icon name="ChevronRight" size={18} style={{color:'var(--c-muted)'}} />
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Create new team */}
+                    <div className="bg-white p-5 r-card card-shadow space-y-3">
+                        <p className="sans-font text-xs tracking-widest" style={{color:'var(--c-muted)'}}>創建新門派</p>
+                        <input
+                            type="text"
+                            value={newTeamName}
+                            onChange={e => setNewTeamName(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && createTeam()}
+                            placeholder="輸入門派名稱..."
+                            className="w-full px-4 py-2.5 text-sm sans-font focus:outline-none bg-slate-50 neo-border-thin r-btn"
+                            style={{border:'1px solid var(--c-border-strong)'}}
+                        />
+                        <button onClick={createTeam} disabled={creating || !newTeamName.trim()}
+                            className="w-full pk-green py-3 r-btn neo-border sans-font text-base active-press disabled:opacity-30 neo-shadow-sm">
+                            {creating ? '創立中...' : '創立門派'}
+                        </button>
+                    </div>
+
+                    {/* 返回修改名號 */}
+                    <button onClick={() => setStep('name')} className="sans-font text-center w-full"
+                        style={{fontSize:'12px', color:'#9ca3af', background:'none', border:'none', padding:'4px'}}>
+                        ← 修改名號
+                    </button>
+                </div>
+            );
+        };
+
+        // ─── Leaderboard View ───────────────────────────────────────────
+        const LeaderboardView = ({ currentUser, userTeamId }) => {
+            const [leaderboard, setLeaderboard] = useState([]);
+            const [allMembers, setAllMembers] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [lbTab, setLbTab] = useState('teams'); // 'teams' | 'members'
+
+            // calc active days this month from logs
+            const calcActiveDays = (logs) => {
+                const now = new Date();
+                const prefix = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+                return Object.entries(logs).filter(([k,v]) =>
+                    k.startsWith(prefix) && ((v.practice||0)+(v.fiveMin||0)+(v.exerciseTime||0)+(v.stretchTime||0)) > 0
+                ).length;
+            };
+
+            useEffect(() => {
+                const unsubTeams = db.collection('artifacts').doc(appId).collection('teams')
+                    .onSnapshot(async teamSnap => {
+                        const teams = {};
+                        teamSnap.forEach(doc => { teams[doc.id] = { id: doc.id, name: doc.data().name, members: [] }; });
+
+                        const usersSnap = await db.collection('artifacts').doc(appId).collection('users').get();
+                        const userPromises = [];
+                        const membersFlat = [];
+
+                        usersSnap.forEach(userDoc => {
+                            const userData = userDoc.data();
+                            if (userData.teamId && teams[userData.teamId]) {
+                                const uid = userDoc.id;
+                                userPromises.push(
+                                    db.collection('artifacts').doc(appId).collection('users').doc(uid)
+                                        .collection('dailyLogs').get()
+                                        .then(logsSnap => {
+                                            const logs = {};
+                                            logsSnap.forEach(d => logs[d.id] = d.data());
+                                            const score = calcScore(logs);
+                                            const lv = calcLevel(calcAllTimeScore(logs));
+                                            const activeDays = calcActiveDays(logs);
+                                            const member = {
+                                                uid,
+                                                name: userData.displayName || userData.email,
+                                                teamId: userData.teamId,
+                                                teamName: teams[userData.teamId]?.name || '',
+                                                score, lv, activeDays
+                                            };
+                                            teams[userData.teamId].members.push(member);
+                                            membersFlat.push(member);
+                                        })
+                                );
+                            }
+                        });
+                        await Promise.all(userPromises);
+
+                        const result = Object.values(teams).map(t => {
+                            const total = t.members.reduce((s, m) => s + m.score, 0);
+                            const avg = t.members.length ? Math.round(total / t.members.length) : 0;
+                            const avgLv = t.members.length ? Math.round(t.members.reduce((s, m) => s + m.lv, 0) / t.members.length) : 0;
+                            return { ...t, total, avg, avgLv };
+                        }).sort((a, b) => b.avgLv - a.avgLv);
+
+                        setLeaderboard(result);
+                        setAllMembers(membersFlat.sort((a, b) => b.lv - a.lv));
+                        setLoading(false);
+                    });
+                return () => unsubTeams();
+            }, []);
+
+            const teamAccentColors = ['#ffd43b','#74c0fc','#ff8787','#8ce99a','#b197fc','#ff922b'];
+
+
+
+            return (
+                <div className="space-y-4 animate-in fade-in duration-300" style={{paddingBottom:'2rem'}}>
+                    {/* Header */}
+                    <div className="vibrant-card p-5 r-card float-anim relative overflow-hidden" style={{boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
+                        <div className="relative z-10">
+                            <h2 className="sans-font text-2xl mb-1" style={{color:'var(--c-text)'}}>風雲榜</h2>
+                            <p className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>陣營同心，共修道行</p>
+                        </div>
+                    </div>
+
+                    {/* Tab switcher */}
+                    <div className="flex bg-white r-card" style={{border:'1px solid var(--c-border)', padding:'3px'}}>
+                        <button onClick={() => setLbTab('teams')}
+                            className={`flex-1 sans-font text-xs r-btn transition-all ${lbTab==='teams' ? 'pk-blue' : ''}`}
+                            style={{color: lbTab==='teams' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>
+                            陣營
+                        </button>
+                        <button onClick={() => setLbTab('members')}
+                            className={`flex-1 sans-font text-xs r-btn transition-all ${lbTab==='members' ? 'pk-blue' : ''}`}
+                            style={{color: lbTab==='members' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>
+                            成員
+                        </button>
+                    </div>
+
+                    {loading && <div className="text-center py-12 opacity-30 sans-font text-sm">載入中...</div>}
+
+                    {/* ── 門派排名 tab ── */}
+                    {!loading && lbTab === 'teams' && (
+                        <div className="space-y-3">
+                            {leaderboard.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有門派資料</div>}
+                            {leaderboard.map((team, i) => {
+                                const isMyTeam = team.id === userTeamId;
+                                const accentColor = teamAccentColors[i % teamAccentColors.length];
+                                const visibleMembers = team.members
+                                    .sort((a,b) => b.lv - a.lv);
+                                return (
+                                    <div key={team.id} className="bg-white rounded-[1.5rem] overflow-hidden"
+                                        style={{border:`1.5px solid ${accentColor}`, padding:'16px 18px'}}>
+                                        {/* Team header */}
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div className="flex items-center gap-2">
+                                                <div>
+                                                    <p className="sans-font text-base" style={{color:'#374151'}}>{team.name}</p>
+                                                </div>
+                                                {isMyTeam && <span className="text-[10px] pk-blue px-2 py-0.5 rounded-full sans-font ml-1" style={{color:'var(--c-primary-text)'}}>我的陣營</span>}
+                                            </div>
+                                            <div className="flex items-stretch gap-2">
+                                                <div className="rounded-xl text-center flex flex-col items-center justify-center" style={{padding:'10px 12px', minWidth:'58px', background:`${accentColor}18`, border:`1px solid ${accentColor}60`}}>
+                                                    <div className="sans-font text-lg" style={{lineHeight:'1.2', color:'#374151'}}>{team.total}</div>
+                                                    <div className="sans-font" style={{fontSize:'9px', color:'#9ca3af'}}>總點</div>
+                                                </div>
+                                                <div className="rounded-xl text-center flex flex-col items-center justify-center" style={{padding:'10px 12px', minWidth:'58px', background:`${accentColor}18`, border:`1px solid ${accentColor}60`}}>
+                                                    <div className="sans-font text-lg" style={{lineHeight:'1.2', color:'#374151'}}>{team.avg}</div>
+                                                    <div className="sans-font" style={{fontSize:'9px', color:'#9ca3af'}}>均值</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {/* Members mini list — hide self */}
+                                        {visibleMembers.length > 0 && (
+                                            <div style={{borderTop:'0.5px solid #f3f4f6', paddingTop:'8px'}}>
+                                                {visibleMembers.map((m, mi) => (
+                                                    <div key={m.uid} className="flex items-center justify-between" style={{padding:'5px 4px'}}>
+                                                        <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                                                            <span className="sans-font" style={{fontSize:'11px', color:'#d1d5db', width:'14px'}}>{mi+1}</span>
+                                                            <span className="sans-font text-sm" style={{color:'#374151'}}>{m.name}</span>
+                                                            <span className="sans-font" style={{fontSize:'11px', color:'#9ca3af'}}>Lv.{m.lv}</span>
+                                                        </div>
+                                                        <span className="sans-font text-xs" style={{color:'#6b7280'}}>{m.score} 點</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* ── 門派成員 tab ── */}
+                    {!loading && lbTab === 'members' && (
+                        <div className="space-y-2">
+                            {allMembers.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有成員資料</div>}
+                            {allMembers.map((m, i) => {
+                                const isMe = m.uid === currentUser?.uid;
+                                // find team color
+                                const teamIdx = leaderboard.findIndex(t => t.id === m.teamId);
+                                const accentColor = teamAccentColors[teamIdx >= 0 ? teamIdx % teamAccentColors.length : 0];
+                                return (
+                                    <div key={m.uid} className="bg-white r-card flex items-center gap-3"
+                                        style={{padding:'12px 16px', border: isMe ? '1.5px solid var(--c-primary)' : '1px solid var(--c-border)',
+                                            boxShadow: isMe ? '0 0 0 3px rgba(116,192,252,0.15)' : '0 1px 3px rgba(0,0,0,0.04)'}}>
+                                        {/* Name + team badge */}
+                                        <div style={{flex:1, minWidth:0}}>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="sans-font text-sm" style={{color:'#1f2937'}}>{m.name}</span>
+                                                <span className="sans-font" style={{fontSize:'9px', padding:'1px 7px', borderRadius:'99px', background:`${accentColor}28`, color: accentColor === '#ffd43b' ? '#6b4f00' : '#374151', border:`1px solid ${accentColor}60`}}>
+                                                    {m.teamName}
+                                                </span>
+                                            </div>
+                                            {/* Progress bar: active days / 30 */}
+                                            <div style={{marginTop:'5px', display:'flex', alignItems:'center', gap:'6px'}}>
+                                                <div style={{flex:1, height:'4px', background:'#f3f4f6', borderRadius:'2px', overflow:'hidden'}}>
+                                                    <div style={{height:'100%', width:`${Math.min(100, Math.round(m.activeDays/30*100))}%`, background: accentColor, borderRadius:'2px'}}></div>
+                                                </div>
+                                                <span className="sans-font" style={{fontSize:'9px', color:'#9ca3af', flexShrink:0}}>活躍 {m.activeDays} 天</span>
+                                            </div>
+                                        </div>
+                                        {/* Level + score */}
+                                        <div style={{textAlign:'right', flexShrink:0}}>
+                                            <div className="sans-font" style={{fontSize:'15px', fontWeight:'500', color:'#1f2937'}}>Lv.{m.lv}</div>
+                                            <div className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>{m.score} 點</div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // ─── Upcoming Events Banner (本週活動提醒) ─────────────────────
+        const UpcomingEventsBanner = ({ onViewCalendar, activities = [] }) => {
+            const [thisWeekEvents, setThisWeekEvents] = useState([]);
+            
+            // ✅ 改為本地篩選，不監聽 Firestore（全局監聽已在 App 處理）
+            useEffect(() => {
+                console.log('📋 [UpcomingEventsBanner] 篩選本週活動，收到', activities.length, '個活動');
+                
+                const now = new Date();
+                const sunday = new Date(now);
+                sunday.setDate(now.getDate() - now.getDay());
+                sunday.setHours(0,0,0,0);
+                const saturday = new Date(sunday);
+                saturday.setDate(sunday.getDate() + 6);
+
+                const events = activities
+                    .filter(data => {
+                        const dateStr = data.date;
+                        if (!dateStr) return false;
+                        const d = new Date(dateStr + 'T00:00:00');
+                        return d >= sunday && d <= saturday;
+                    })
+                    .map(data => ({
+                        id: data.id,
+                        name: data.name || '活動',
+                        date: data.date,
+                        timeStart: data.timeStart || '',
+                        courseType: data.courseType || ''
+                    }))
+                    .sort((a,b) => a.date.localeCompare(b.date));
+                
+                setThisWeekEvents(events);
+                console.log('   篩選後:', events.length, '個本週活動');
+            }, [activities]);  // 只依賴傳入的 activities
+            
+            if (thisWeekEvents.length === 0) return null;
+            
+            const todayKey = formatDateKey(new Date());
+            const weekDayNames = ['日','一','二','三','四','五','六'];
+            
+            return (
+                <div className="r-card card-shadow" style={{background:'var(--c-primary-bg)', border:'1px solid var(--c-primary)', padding:'12px 16px', marginBottom:'4px'}}>
+                    <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px'}}>
+                        <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
+                            <div style={{width:'6px', height:'6px', borderRadius:'50%', background:'var(--c-primary)', animation:'float 2s ease-in-out infinite'}} />
+                            <span className="sans-font" style={{fontSize:'11px', fontWeight:'500', color:'var(--c-primary-text)'}}>本週活動</span>
+                        </div>
+                        <button onClick={onViewCalendar} className="sans-font active-press" style={{fontSize:'10px', color:'var(--c-primary-text)', background:'var(--c-primary)', padding:'3px 10px', borderRadius:'99px', border:'none', cursor:'pointer'}}>
+                            查看行事曆
+                        </button>
+                    </div>
+                    <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
+                        {thisWeekEvents.map(ev => {
+                            const isToday = ev.date === todayKey;
+                            const dateObj = new Date(ev.date + 'T00:00:00');
+                            const weekDay = weekDayNames[dateObj.getDay()];
+                            const mm = ev.date.slice(5,7), dd = ev.date.slice(8,10);
+                            return (
+                                <div key={ev.id} style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                                    <span className="sans-font" style={{fontSize:'11px', fontWeight:'500', color: isToday ? 'var(--c-primary-text)' : 'var(--c-muted)', minWidth:'40px'}}>{mm}/{dd} {weekDay}</span>
+                                    <span className="sans-font" style={{fontSize:'12px', color:'var(--c-text)', flex:1}}>{ev.name}</span>
+                                    {ev.timeStart && <span className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)'}}>{ev.timeStart}</span>}
+                                    {isToday && <span className="sans-font" style={{fontSize:'9px', background:'var(--c-primary)', color:'white', padding:'1px 6px', borderRadius:'99px'}}>今天</span>}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        };
+
+        // ─── Main App ──────────────────────────────────────────────────
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [authReady, setAuthReady] = useState(false);
+            const [userProfile, setUserProfile] = useState(null);
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [isModalOpen, setIsModalOpen] = useState(false);
+            const [pendingTaps, setPendingTaps] = useState({});
+            const [dailyLogs, setDailyLogs] = useState({});
+            const [selectedDateKey, setSelectedDateKey] = useState(null);
+            
+            // 🎯 全局活動數據監聽（解決多個監聽器衝突問題）
+            const [globalActivities, setGlobalActivities] = useState([]);
+            const [activitiesLoaded, setActivitiesLoaded] = useState(false);
+            
+            const todayKey = useMemo(() => formatDateKey(new Date()), []);
+            const currentWeekDays = useMemo(() => getWeekDays(new Date()), []);
+
+            // Auth state
+            useEffect(() => {
+                return auth.onAuthStateChanged(u => {
+                    setUser(u);
+                    setAuthReady(true);
+                });
+            }, []);
+            
+            // 🎯 全局活動監聽器 - 只初始化一次，供所有子組件使用
+            useEffect(() => {
+                console.log('🎯 [App] 初始化全局活動監聽器（只初始化一次）');
+                
+                // 監聽 adminData/sharedCalendar（活動行事曆寫入此路徑）
+                const unsubscribe = activityDB.doc('adminData/sharedCalendar')
+                    .onSnapshot(
+                        snap => {
+                            if (!snap.exists) {
+                                setGlobalActivities([]);
+                                setActivitiesLoaded(true);
+                                return;
+                            }
+                            const raw = snap.data()?.sessions || [];
+                            const processed = raw
+                                .filter(s => s.date && /^\d{4}-\d{2}-\d{2}/.test(s.date))
+                                .map(s => ({
+                                    id:         s.id,
+                                    name:       s.name       || '未命名活動',
+                                    date:       s.date,
+                                    timeStart:  s.timeStart  || '',
+                                    timeEnd:    s.timeEnd    || '',
+                                    courseType: s.courseType || '神鼓陣',
+                                    helper:     s.helper     || '',
+                                    note:       s.note       || '',
+                                }))
+                                .sort((a, b) => a.date.localeCompare(b.date));
+                            setGlobalActivities(processed);
+                            setActivitiesLoaded(true);
+                        },
+                        err => {
+                            console.error('❌ [App] sharedCalendar 監聽失敗:', err.message);
+                            setGlobalActivities([]);
+                            setActivitiesLoaded(true);
+                        }
+                    );
+                
+                console.log('✓ 全局監聽器已啟動');
+                
+                // 重點：只在組件卸載時取消監聽
+                return () => {
+                    console.log('🔌 [App] 卸載全局監聽器');
+                    unsubscribe();
+                };
+            }, []);  // 空依賴陣列，確保只初始化一次
+
+            // Load user profile (team info)
+            useEffect(() => {
+                if (!user) return;
+                const unsub = db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
+                    .onSnapshot(snap => {
+                        if (snap.exists) setUserProfile(snap.data());
+                        else setUserProfile(null);
+                    });
+                return () => unsub();
+            }, [user]);
 
             // Load daily logs
             useEffect(() => {
@@ -393,25 +832,1542 @@
                 return () => unsub();
             }, [user]);
 
-            if (!authReady) return <div className="flex items-center justify-center min-h-screen"><p className="text-xs" style={{color:'var(--c-muted)'}}>載入中...</p></div>;
-            if (!user) return <div className="flex items-center justify-center min-h-screen"><p className="text-sm sans-font">請登入</p></div>;
+            const handleJoinTeam = (teamId, teamName) => {
+                setUserProfile(prev => ({ ...prev, teamId, teamName }));
+            };
 
+            const isAdmin = user?.email?.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase().trim();
+
+            const stats = useMemo(() => {
+                const startOfWeek = currentWeekDays[0];
+                let wEx = 0, wPrac = 0, wFive = 0, wActive = 0;
+                Object.entries(dailyLogs).forEach(([dateStr, data]) => {
+                    const date = new Date(dateStr);
+                    if (date >= startOfWeek) {
+                        const p = Number(data.practice) || 0;
+                        const f = Number(data.fiveMin) || 0;
+                        const e = Number(data.exerciseTime) || 0;
+                        const s = Number(data.stretchTime) || 0;
+                        wPrac += p; wFive += f; wEx += (e + s);
+                        if ((p + f + e + s) > 0) wActive++;
+                    }
+                });
+                return { wEx, wPrac, wFive, wActive };
+            }, [dailyLogs, currentWeekDays]);
+
+            const handleTap = (type, payload) => {
+                const field = type === 'simple' ? payload : payload.key;
+                const inc = type === 'simple' ? 1 : Number(payload.mins);
+                setPendingTaps(prev => {
+                    if (type === 'simple' && prev[field]) {
+                        const n = {...prev}; delete n[field]; return n;
+                    }
+                    return { ...prev, [field]: (prev[field] || 0) + inc };
+                });
+            };
+
+            const handleCancel = (field) => {
+                setPendingTaps(prev => { const n = {...prev}; delete n[field]; return n; });
+            };
+
+            const handleCommit = async () => {
+                if (!user || Object.keys(pendingTaps).length === 0) {
+                    setIsModalOpen(false);
+                    return;
+                }
+                const updates = {};
+                Object.entries(pendingTaps).forEach(([field, val]) => {
+                    updates[field] = firebase.firestore.FieldValue.increment(val);
+                });
+                await db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
+                    .collection('dailyLogs').doc(todayKey).set(updates, { merge: true });
+                window.confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, colors: ['#74c0fc', '#ffd43b', '#ff8787'] });
+                setPendingTaps({});
+                setSelectedDateKey(null);
+                setIsModalOpen(false);
+            };
+
+            const handleAccumulate = handleTap;
+
+            const handleClearToday = async () => {
+                if (!user) return;
+                if (window.confirm("確定要清除今日的所有紀錄嗎？")) {
+                    await db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
+                        .collection('dailyLogs').doc(todayKey).delete();
+                }
+            };
+
+            const handleSignOut = async () => {
+                if (window.confirm("確定要登出嗎？")) {
+                    await auth.signOut();
+                    setUserProfile(null);
+                }
+            };
+
+            // ── Render gates ──────────────────────
+            if (!authReady) return (
+                <div className="max-w-md mx-auto min-h-screen flex items-center justify-center">
+                    <div className="text-center opacity-30 sans-font text-sm">載入中...</div>
+                </div>
+            );
+            if (!user) return <LoginScreen />;
+            if (!userProfile?.teamId) return <TeamSelectScreen user={user} onJoinTeam={handleJoinTeam} existingName={userProfile?.displayName || ''} />;
+
+            // ── Main UI ───────────────────────────
             return (
                 <div className="max-w-md mx-auto min-h-screen relative flex flex-col">
-                    <header className="bg-white sticky top-0 px-5 py-4 flex justify-center z-30 relative" style={{borderBottom:'1px solid var(--c-border)'}}>
+                    <header className="bg-white sticky top-0 px-5 py-4 flex justify-center items-center z-30 relative" style={{borderBottom:'1px solid var(--c-border)'}}>
                         <div className="flex items-center space-x-3 justify-center">
                             <div className="w-2 h-2 rounded-full pk-blue"></div>
                             <span className="sans-font text-xl tracking-tighter" style={{color:'var(--c-text)'}}>自律動起來</span>
                             <div className="w-2 h-2 rounded-full pk-blue"></div>
                         </div>
+                        <div className="absolute right-5 flex items-center gap-2">
+                            {isAdmin && <span className="text-[9px] px-2 py-0.5 rounded-full sans-font" style={{background:'var(--c-text)',color:'#fff'}}>管理員</span>}
+                            <button onClick={handleSignOut} className="w-8 h-8 bg-slate-100 neo-border-thin rounded-full flex items-center justify-center active-press">
+                                <Icon name="LogOut" size={13} />
+                            </button>
+                        </div>
                     </header>
 
-                    <main className="flex-1 space-y-4" style={{padding:'var(--sp-page)'}}>
-                        <UnifiedCalendarView dailyLogs={dailyLogs} activities={globalActivities} activitiesLoaded={activitiesLoaded} />
+                    <main className="flex-1 space-y-4" style={{padding:'var(--sp-page)', paddingBottom:'calc(96px + env(safe-area-inset-bottom, 0px))'}}>
+                        {activeTab === 'dashboard' && (
+                            <>
+                                {/* 英雄卡：保留原有樣式，道心值改 Lv */}
+                                <div className="vibrant-card p-5 r-card float-anim relative overflow-hidden" style={{boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
+                                    <div className="relative z-10">
+                                        <h2 className="sans-font text-2xl mb-2" style={{color:'var(--c-text)'}}>今日修煉開始！</h2>
+                                        <div className="flex items-center gap-2">
+                                            <span className="pk-green px-2.5 py-0.5 r-badge text-[11px] font-black neo-border-thin" style={{color:'var(--c-text)'}}>Lv. {(() => { const logs = dailyLogs; let atA=0,atE=0,atS=0,atP=0; Object.values(logs).forEach(v=>{ const p=v.practice||0,f=v.fiveMin||0,e=v.exerciseTime||0,s=v.stretchTime||0; if((p+f+e+s)>0)atA++; atE+=e;atS+=s;atP+=p; }); return calcLevel(Math.round(atA*10+(atE+atS)/60+atP*5)); })()}</span>
+                                            <p className="font-black text-xs" style={{color:'var(--c-muted)'}}>累積道行：{(() => { let cnt=0; Object.values(dailyLogs).forEach(v=>{ const p=v.practice||0,f=v.fiveMin||0,e=v.exerciseTime||0,s=v.stretchTime||0; if((p+f+e+s)>0)cnt++; }); return cnt; })()} 天</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 今日四格：日期 header + stat strip */}
+                                {(() => {
+                                    const now = new Date();
+                                    const weekDays = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+                                    
+                                    // 如果有選擇的日期，則顯示該日期，否則顯示今天
+                                    let displayDate = new Date();
+                                    let displayKey = todayKey;
+                                    if (selectedDateKey) {
+                                        const [y, m, d] = selectedDateKey.split('-').map(Number);
+                                        displayDate = new Date(y, m - 1, d);
+                                        displayKey = selectedDateKey;
+                                    }
+                                    
+                                    const dateLabel = `${displayDate.getMonth()+1}月${displayDate.getDate()}日`;
+                                    const weekLabel = weekDays[displayDate.getDay()];
+                                    const td = dailyLogs[displayKey] || {};
+                                    const prac = Number(td.practice)||0;
+                                    const five = Number(td.fiveMin)||0;
+                                    const exer = Number(td.exerciseTime)||0;
+                                    const stre = Number(td.stretchTime)||0;
+                                    const cols = [
+                                        { label:'練功',   val: prac, border:'#ffd43b' },
+                                        { label:'五分鐘', val: five, border:'#38bdf8' },
+                                        { label:'運動',   val: exer, border:'#ff922b' },
+                                        { label:'拉筋',   val: stre, border:'#34d399' },
+                                    ];
+
+                                    // 本週日～六 7 天
+                                    const todayIdx = now.getDay(); // 0=日
+                                    const weekBarDays = Array.from({length:7}, (_, i) => {
+                                        const d = new Date(now);
+                                        d.setDate(now.getDate() - todayIdx + i);
+                                        return d;
+                                    });
+                                    const barLabels = ['日','一','二','三','四','五','六'];
+
+                                    // 每天活躍量（practice + fiveMin + exerciseTime/10 + stretchTime/10，換算成相對分數）
+                                    const BAR_MAX_H = 56;
+
+                                    return (
+                                        <div style={{background:'var(--c-surface)', borderRadius:'16px', padding:'10px 10px 12px', border:'0.5px solid var(--c-border)'}}>
+                                            {/* 日期列 */}
+                                            <div style={{padding:'0 4px 8px', display:'flex', alignItems:'baseline', gap:'6px'}}>
+                                                <span className="sans-font" style={{fontSize:'13px', fontWeight:'500', color:'var(--c-text)'}}>{dateLabel}</span>
+                                                <span className="sans-font" style={{fontSize:'11px', color:'var(--c-muted)'}}>{weekLabel}</span>
+                                            </div>
+                                            {/* 四格 */}
+                                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:'8px', marginBottom:'10px'}}>
+                                                {cols.map(c => (
+                                                    <div key={c.label} style={{
+                                                        background:'#fff',
+                                                        border:`1.5px solid ${c.border}`,
+                                                        borderRadius:'12px',
+                                                        padding:'12px 6px 10px',
+                                                        display:'flex', flexDirection:'column', alignItems:'center', gap:'6px'
+                                                    }}>
+                                                        <div className="sans-font" style={{fontSize:'24px', fontWeight:'500', lineHeight:1, color: c.val>0 ? 'var(--c-text)' : '#c0c0c0'}}>{c.val>0 ? c.val : '—'}</div>
+                                                        <div className="sans-font" style={{fontSize:'11px', color: c.val>0 ? 'var(--c-muted)' : '#c0c0c0'}}>{c.label}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            {/* 本週堆疊條圖 */}
+                                            {(() => {
+                                                const STACK_MAX_H = 100;
+                                                const segments = [
+                                                    { field:'practice',     bg:'rgba(251,191,36,0.45)',  scale: v => Math.min(v * 0.2,  20) },
+                                                    { field:'fiveMin',      bg:'rgba(56,189,248,0.45)',  scale: v => Math.min(v * 0.2,  20) },
+                                                    { field:'exerciseTime', bg:'rgba(251,146,60,0.45)',  scale: v => Math.min(v * 0.01, 20) },
+                                                    { field:'stretchTime',  bg:'rgba(52,211,153,0.45)',  scale: v => Math.min(v * 0.01, 20) },
+                                                ];
+                                                const dayTotals = weekBarDays.map(d => {
+                                                    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                                                    const log = dailyLogs[key] || {};
+                                                    return segments.map(s => s.scale(Number(log[s.field])||0));
+                                                });
+                                                const maxTotal = Math.max(...dayTotals.map(segs => segs.reduce((a,b)=>a+b,0)), 1);
+                                                return (
+                                                    <div style={{borderTop:'0.5px solid var(--c-border)', paddingTop:'12px'}}>
+                                                        <div style={{marginBottom:'10px'}}>
+                                                            <span className="sans-font" style={{fontSize:'11px', color:'var(--c-muted)'}}>本週活躍量</span>
+                                                        </div>
+                                                        <div style={{display:'flex', alignItems:'flex-end', gap:'5px', height:`${STACK_MAX_H + 22}px`}}>
+                                                            {weekBarDays.map((d, i) => {
+                                                                const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                                                                const isToday = i === todayIdx;
+                                                                const isSelected = selectedDateKey === dateStr;
+                                                                const segs = dayTotals[i];
+                                                                const total = segs.reduce((a,b)=>a+b,0);
+                                                                const barH = total > 0 ? Math.max(8, Math.round(total / maxTotal * STACK_MAX_H)) : 0;
+                                                                const isEmpty = total === 0;
+                                                                // 各 segment 的實際 px 高度，等比縮放到 barH
+                                                                const segPx = segs.map(v => total > 0 ? Math.round(v / total * barH) : 0);
+                                                                return (
+                                                                    <div key={i} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:'5px', cursor: total > 0 ? 'pointer' : 'default'}} 
+                                                                        onClick={() => total > 0 && setSelectedDateKey(selectedDateKey === dateStr ? null : dateStr)}>
+                                                                        <div style={{width:'100%', height:`${STACK_MAX_H}px`, display:'flex', flexDirection:'column', justifyContent:'flex-end'}}>
+                                                                            {isEmpty ? (
+                                                                                <div style={{width:'100%', height:'3px', background:'var(--c-border)', borderRadius:'2px'}}></div>
+                                                                            ) : (
+                                                                                <div style={{
+                                                                                    width:'100%',
+                                                                                    borderRadius:'5px 5px 0 0',
+                                                                                    overflow:'hidden',
+                                                                                    borderTop: isSelected ? '3px solid var(--c-primary)' : (isToday ? '2px solid #9ca3af' : 'none'),
+                                                                                    borderLeft: isSelected ? '3px solid var(--c-primary)' : (isToday ? '2px solid #9ca3af' : 'none'),
+                                                                                    borderRight: isSelected ? '3px solid var(--c-primary)' : (isToday ? '2px solid #9ca3af' : 'none'),
+                                                                                    display:'flex',
+                                                                                    flexDirection:'column',
+                                                                                    height:`${barH}px`,
+                                                                                    opacity: isSelected || !selectedDateKey ? 1 : 0.5,
+                                                                                    transition: 'opacity 200ms, border 200ms'
+                                                                                }}>
+                                                                                    {segments.map((s, si) => segPx[si] > 0 && (
+                                                                                        <div key={si} style={{background: s.bg, height:`${segPx[si]}px`, flexShrink:0}}></div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                        <span className="sans-font" style={{fontSize:'9px', color: isSelected ? 'var(--c-primary-text)' : (isToday ? '#4caf6e' : 'var(--c-muted)'), fontWeight: isSelected || isToday ? '500' : '400'}}>{barLabels[i]}</span>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* CTA */}
+                                <button onClick={() => { setSelectedDateKey(null); setIsModalOpen(true); }} className="w-full pk-pink p-5 r-card neo-border neo-shadow active-press flex items-center justify-center gap-3 group">
+                                    <span className="sans-font text-white text-xl tracking-tighter">立即突破</span>
+                                </button>
+                                
+                                {/* 本週活動提醒條 */}
+                                <UpcomingEventsBanner onViewCalendar={() => setActiveTab('calendar')} activities={globalActivities} />
+                            </>
+                        )}
+                        {activeTab === 'calendar' && <CalendarView dailyLogs={dailyLogs} activities={globalActivities} activitiesLoaded={activitiesLoaded} />}
+                        {activeTab === 'milestone' && <MilestoneView dailyLogs={dailyLogs} user={user} />}
+                        {activeTab === 'profile' && <ProfileView dailyLogs={dailyLogs} isAdmin={isAdmin} user={user} userProfile={userProfile} />}
+                        {activeTab === 'leaderboard' && <LeaderboardView currentUser={user} userTeamId={userProfile?.teamId} />}
                     </main>
+
+                    {isModalOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-5 overlay-blur">
+                            <div className="w-full max-w-sm bg-white r-card neo-border neo-shadow p-6 relative">
+                                <button onClick={() => { setIsModalOpen(false); setPendingTaps({}); }} className="absolute -top-3 -right-3 w-8 h-8 bg-white neo-border rounded-full flex items-center justify-center active-press">
+                                    <Icon name="X" size={16} />
+                                </button>
+                                <h3 className="sans-font text-xl mb-6 italic text-center" style={{color:'var(--c-text)'}}>捕捉今日造化</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <MiniActionCard label="練功" onClick={() => handleTap('simple', 'practice')} bgColor="#ffd43b" tapped={(pendingTaps['practice'] || 0) > 0} />
+                                    <MiniActionCard label="五分鐘" onClick={() => handleTap('simple', 'fiveMin')} bgColor="#74c0fc" tapped={(pendingTaps['fiveMin'] || 0) > 0} />
+                                    <TimeActionCard label="運動"
+                                        onSelect={(mins) => handleTap('time', { key: 'exerciseTime', mins })}
+                                        onCancel={() => handleCancel('exerciseTime')}
+                                        bgColor="#ff922b"
+                                        tapped={(pendingTaps['exerciseTime'] || 0) > 0}
+                                        selectedMins={pendingTaps['exerciseTime'] || 0}
+                                    />
+                                    <TimeActionCard label="拉筋"
+                                        onSelect={(mins) => handleTap('time', { key: 'stretchTime', mins })}
+                                        onCancel={() => handleCancel('stretchTime')}
+                                        bgColor="#34d399"
+                                        tapped={(pendingTaps['stretchTime'] || 0) > 0}
+                                        selectedMins={pendingTaps['stretchTime'] || 0}
+                                    />
+                                </div>
+                                <div className="mt-6 flex flex-col gap-2">
+                                    <button onClick={handleCommit} className="w-full py-4 r-btn sans-font text-lg tracking-widest active-press text-white neo-border neo-shadow-sm" style={{background:'#b197fc', borderColor:'#9775fa'}}>修煉圓滿</button>
+                                    <button onClick={handleClearToday} className="w-full py-2 sans-font text-xs hover:text-red-400 transition-colors" style={{color:'var(--c-muted)'}}>清除今日紀錄</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white" style={{borderTop:'1px solid var(--c-border)', paddingBottom:'env(safe-area-inset-bottom, 0px)'}}>
+                        <div className="max-w-md mx-auto flex justify-around items-center" style={{padding:'4px 0 6px'}}>
+                            <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} navIcon="mountain" label="修煉室" />
+                            <NavBtn active={activeTab === 'leaderboard'} onClick={() => setActiveTab('leaderboard')} navIcon="scroll" label="風雲榜" />
+                            <NavBtn active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} navIcon="calendar" label="行事曆" />
+                            <NavBtn active={activeTab === 'milestone'} onClick={() => setActiveTab('milestone')} navIcon="milestone" label="里程碑" />
+                            <NavBtn active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} navIcon="gate" label="小天地" />
+                        </div>
+                    </nav>
                 </div>
             );
         };
+
+        const WeekIconsRow = ({ days, logs, type, color }) => (
+            <div className="flex justify-between">
+                {days.map((date, i) => {
+                    const key = formatDateKey(date);
+                    const isDone = (logs[key]?.[type] || 0) > 0;
+                    const isToday = key === formatDateKey(new Date());
+                    return (
+                        <div key={i} className="flex flex-col items-center gap-1.5">
+                            <div className={`w-8 h-8 r-btn flex items-center justify-center transition-all ${isDone ? color : 'bg-slate-100'} ${isToday ? 'ring-2 ring-offset-1' : ''}`}
+                                style={{ringColor: isToday ? 'var(--c-primary)' : 'transparent'}}>
+                                {isDone ? <Icon name="Smile" size={16} className={color === 'pk-yellow' ? 'text-[#374151]' : 'text-white'} /> : <div className="w-1 h-1 bg-slate-300 rounded-full"/>}
+                            </div>
+                            <span className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>{date.getDate()}</span>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+
+        // ─── Milestone View ─────────────────────────────────────────────
+        const MILESTONE_KEYS = [
+            { key: 'practice',     label: '練功',   unit: '次',  color: '#ffd43b', field: 'practice' },
+            { key: 'fiveMin',      label: '五分鐘', unit: '次',  color: '#38bdf8', field: 'fiveMin' },
+            { key: 'exerciseTime', label: '運動',   unit: '分',  color: '#ff922b', field: 'exerciseTime' },
+            { key: 'stretchTime',  label: '拉筋',   unit: '分',  color: '#34d399', field: 'stretchTime' },
+        ];
+
+        // 各項目每日預設選項
+        const DAILY_OPTIONS = {
+            practice:     [1, 2],
+            fiveMin:      [1, 2],
+            exerciseTime: [10, 20, 30, 60],
+            stretchTime:  [10, 20, 30, 60],
+        };
+
+        const MilestoneView = ({ dailyLogs, user }) => {
+            const [goals, setGoals] = useState({});
+            // dailyGoals: { practice: 2, fiveMin: 2, ... } 每天目標量
+            const [dailyGoals, setDailyGoals] = useState({});
+            const [customInput, setCustomInput] = useState({}); // { key: '自訂值字串' }
+            const [showCustom, setShowCustom] = useState({}); // { key: true/false }
+            const customRefs = useRef({});
+
+            // Load goals from Firestore
+            useEffect(() => {
+                if (!user) return;
+                const unsub = db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
+                    .onSnapshot(snap => {
+                        if (snap.exists) {
+                            setGoals(snap.data().milestoneGoals || {});
+                            setDailyGoals(snap.data().milestoneDailyGoals || {});
+                        }
+                    });
+                return () => unsub();
+            }, [user]);
+
+            // 選擇每日目標 → 自動存週目標 = daily × 7
+            const selectDaily = async (key, daily) => {
+                const weeklyGoal = daily * 7;
+                const updatedGoals = { ...goals, [key]: weeklyGoal };
+                const updatedDaily = { ...dailyGoals, [key]: daily };
+                setGoals(updatedGoals);
+                setDailyGoals(updatedDaily);
+                setShowCustom(prev => ({ ...prev, [key]: false }));
+                await db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
+                    .set({ milestoneGoals: updatedGoals, milestoneDailyGoals: updatedDaily }, { merge: true });
+            };
+
+            // 自訂輸入確認
+            const confirmCustom = async (key) => {
+                const val = parseInt(customInput[key]);
+                if (!val || val <= 0) { setShowCustom(prev => ({ ...prev, [key]: false })); return; }
+                await selectDaily(key, val);
+            };
+
+            // Calc this week's actual values
+            const weekActuals = useMemo(() => {
+                const days = getWeekDays(new Date());
+                const totals = { practice: 0, fiveMin: 0, exerciseTime: 0, stretchTime: 0 };
+                days.forEach(d => {
+                    const data = dailyLogs[formatDateKey(d)] || {};
+                    Object.keys(totals).forEach(k => { totals[k] += Number(data[k]) || 0; });
+                });
+                return totals;
+            }, [dailyLogs]);
+
+            // 今日實際值
+            const todayActuals = useMemo(() => {
+                const data = dailyLogs[formatDateKey(new Date())] || {};
+                return {
+                    practice: Number(data.practice) || 0,
+                    fiveMin: Number(data.fiveMin) || 0,
+                    exerciseTime: Number(data.exerciseTime) || 0,
+                    stretchTime: Number(data.stretchTime) || 0,
+                };
+            }, [dailyLogs]);
+
+            const setItems = MILESTONE_KEYS.filter(m => goals[m.key]);
+            const doneItems = setItems.filter(m => weekActuals[m.field] >= goals[m.key]);
+            const inProgressItems = setItems.filter(m => weekActuals[m.field] < goals[m.key]);
+            const unsetItems = MILESTONE_KEYS.filter(m => !goals[m.key]);
+
+            const renderCard = (m, isUnset = false) => {
+                const actual = weekActuals[m.field];
+                const goal = goals[m.key] || 0;
+                const daily = dailyGoals[m.key] || 0;
+                const pct = goal > 0 ? Math.min(100, Math.round(actual / goal * 100)) : 0;
+                const isWeekDone = actual >= goal && goal > 0;
+                const todayVal = todayActuals[m.field];
+                const isTodayDone = daily > 0 && todayVal >= daily;
+                const opts = DAILY_OPTIONS[m.key];
+                const isCustomShown = showCustom[m.key];
+
+                return (
+                    <div key={m.key} style={{
+                        background: '#fff', borderRadius: '14px', padding: '14px 16px', marginBottom: '8px',
+                        border: isUnset ? '0.5px dashed var(--c-border-strong)' : isWeekDone ? '0.5px solid #bbf7d0' : '0.5px solid var(--c-border)'
+                    }}>
+                        {/* 標題行 */}
+                        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'10px'}}>
+                            <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
+                                <div style={{width:'8px', height:'8px', borderRadius:'50%', background:m.color}}></div>
+                                <span className="sans-font" style={{fontSize:'15px', fontWeight:'500', color:'var(--c-text)'}}>{m.label}</span>
+                                {!isUnset && <span className="sans-font" style={{fontSize:'12px', color:'var(--c-muted)'}}>每天 {daily} {m.unit}</span>}
+                            </div>
+                            {/* 右側：今日狀態（版型A）+ 週達標 */}
+                            {!isUnset && (
+                                <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
+                                    {isTodayDone ? (
+                                        <>
+                                            <div style={{width:'20px', height:'20px', borderRadius:'50%', background:'#dcfce7',
+                                                display:'flex', alignItems:'center', justifyContent:'center'}}>
+                                                <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                                                    <path d="M2 6l3 3 5-5" stroke="#16a34a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                                                </svg>
+                                            </div>
+                                            <span className="sans-font" style={{fontSize:'11px', color:'#16a34a', fontWeight:'500'}}>今日完成</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div style={{width:'20px', height:'20px', borderRadius:'50%',
+                                                background:'var(--c-surface)', border:'1.5px solid var(--c-border-strong)'}}></div>
+                                            <span className="sans-font" style={{fontSize:'11px', color:'var(--c-muted)'}}>
+                                                今日 {todayVal} / {daily}
+                                            </span>
+                                        </>
+                                    )}
+                                    {isWeekDone && (
+                                        <span className="sans-font" style={{fontSize:'12px', padding:'2px 9px', borderRadius:'99px', fontWeight:'500',
+                                            background:'#f0fdf4', color:'#166534', border:'0.5px solid #bbf7d0', marginLeft:'4px'}}>達標</span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 未設定時：顯示膠囊選項列 */}
+                        {isUnset && (
+                            <div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom: '0'}}>
+                                {opts.map(opt => {
+                                    const isActive = daily === opt && !isCustomShown;
+                                    return (
+                                        <button key={opt} onClick={() => selectDaily(m.key, opt)}
+                                            className="sans-font active-press"
+                                            style={{
+                                                padding:'5px 13px', borderRadius:'99px', fontSize:'14px', cursor:'pointer',
+                                                border: isActive ? 'none' : '0.5px solid var(--c-border-strong)',
+                                                background: isActive ? m.color : 'var(--c-surface)',
+                                                color: isActive ? '#1f2937' : 'var(--c-text-sub)',
+                                                fontWeight: isActive ? '500' : '400',
+                                            }}>
+                                            {opt} {m.unit}
+                                        </button>
+                                    );
+                                })}
+                                {isCustomShown ? (
+                                    <input
+                                        ref={el => customRefs.current[m.key] = el}
+                                        type="number" inputMode="numeric"
+                                        value={customInput[m.key] || ''}
+                                        onChange={e => setCustomInput(prev => ({ ...prev, [m.key]: e.target.value }))}
+                                        onBlur={() => confirmCustom(m.key)}
+                                        onKeyDown={e => e.key === 'Enter' && confirmCustom(m.key)}
+                                        placeholder={`自訂 ${m.unit}`}
+                                        style={{width:'80px', fontSize:'14px', padding:'5px 10px', borderRadius:'99px',
+                                            border:'1px solid var(--c-primary)', outline:'none', textAlign:'center',
+                                            fontFamily:"'Noto Sans TC',sans-serif", background:'#fff'}}
+                                    />
+                                ) : (
+                                    <button onClick={() => {
+                                            setShowCustom(prev => ({ ...prev, [m.key]: true }));
+                                            setTimeout(() => customRefs.current[m.key]?.focus(), 50);
+                                        }}
+                                        className="sans-font active-press"
+                                        style={{padding:'5px 13px', borderRadius:'99px', fontSize:'14px', cursor:'pointer',
+                                            border:'0.5px dashed var(--c-border-strong)', background:'var(--c-surface)', color:'var(--c-muted)'}}>
+                                        自訂
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {/* 已設定時：顯示進度條 */}
+                        {!isUnset && (
+                            <>
+                                <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                                    <div style={{flex:1, height:'6px', background:'#f3f4f6', borderRadius:'3px', overflow:'hidden'}}>
+                                        <div style={{height:'100%', width:`${pct}%`, background: m.color, borderRadius:'3px'}}></div>
+                                    </div>
+                                    <span className="sans-font" style={{fontSize:'13px', color:'var(--c-text-sub)', minWidth:'70px', textAlign:'right'}}>
+                                        {actual} / {goal} {m.unit}
+                                    </span>
+                                </div>
+                                {!isWeekDone && (
+                                    <div style={{display:'flex', justifyContent:'flex-end', marginTop:'5px'}}>
+                                        <span className="sans-font" style={{fontSize:'12px', color:'#9ca3af'}}>
+                                            尚欠 {goal - actual} {m.unit}
+                                        </span>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                );
+            };
+
+            return (
+                <div className="animate-in fade-in duration-300" style={{paddingBottom:'2rem'}}>
+                    {/* Header */}
+                    <div className="vibrant-card p-5 r-card float-anim relative overflow-hidden" style={{boxShadow:'0 1px 4px rgba(0,0,0,0.06)', marginBottom:'16px'}}>
+                        <h2 className="sans-font text-2xl mb-1" style={{color:'var(--c-text)'}}>里程碑</h2>
+                        <p className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>立目標、勤精進 (系統以週為單位計算)</p>
+                    </div>
+
+                    {/* 進行中 */}
+                    {inProgressItems.length > 0 && inProgressItems.map(m => renderCard(m))}
+
+                    {/* 達標 */}
+                    {doneItems.length > 0 && (
+                        <>
+                            <p className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)', letterSpacing:'0.5px', padding:'8px 2px 6px'}}>已達標</p>
+                            {doneItems.map(m => renderCard(m))}
+                        </>
+                    )}
+
+                    {/* 未設定 */}
+                    {unsetItems.length > 0 && (
+                        <>
+                            <p className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)', letterSpacing:'0.5px', padding:'8px 2px 6px'}}>尚未設定</p>
+                            {unsetItems.map(m => renderCard(m, true))}
+                        </>
+                    )}
+
+                </div>
+            );
+        };
+
+        const CalendarView = ({ dailyLogs, activities = [], activitiesLoaded = false }) => {
+            const [viewMode, setViewMode] = useState('week');
+            const [viewDate, setViewDate] = useState(new Date());
+            
+            const [selectedEventDate, setSelectedEventDate] = useState(null); // 點擊月曆跳活動用
+            const [expandedActivityId, setExpandedActivityId] = useState(null); // 三角形下拉
+            
+            // ✅ 改為直接使用傳入的 activities，不監聽 Firestore
+            console.log('📅 [CalendarView] 初始化，收到', activities.length, '個活動');
+            
+            // 獲取指定月份的活動
+            const monthActivities = useMemo(() => {
+                const year = viewDate.getFullYear();
+                const month = String(viewDate.getMonth() + 1).padStart(2, '0');
+                const filtered = activities.filter(a => {
+                    return a.date && a.date.substring(0, 7) === `${year}-${month}`;
+                });
+                return filtered.sort((a, b) => a.date.localeCompare(b.date));
+            }, [activities, viewDate]);
+            
+            const monthData = useMemo(() => {
+                const year = viewDate.getFullYear();
+                const month = viewDate.getMonth();
+                const firstDay = new Date(year, month, 1).getDay();
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const grid = [];
+                for (let i = 0; i < firstDay; i++) grid.push(null);
+                for (let d = 1; d <= daysInMonth; d++) grid.push(new Date(year, month, d));
+                return grid;
+            }, [viewDate]);
+            const weekList = useMemo(() => getWeekDays(viewDate), [viewDate]);
+            const prevWeek = () => { const d = new Date(viewDate); d.setDate(d.getDate() - 7); setViewDate(d); };
+            const nextWeek = () => { const d = new Date(viewDate); d.setDate(d.getDate() + 7); setViewDate(d); };
+            const weekLabel = useMemo(() => {
+                const days = getWeekDays(viewDate);
+                const s = days[0], e = days[6];
+                return `${s.getMonth()+1}/${s.getDate()} – ${e.getMonth()+1}/${e.getDate()}`;
+            }, [viewDate]);
+            return (
+                <div className="space-y-4 animate-in fade-in duration-300">
+                    
+                    
+                    {showEventList ? (
+                        // 活動清單視圖 - 自律打卡風格
+                        <div className="space-y-4 animate-in fade-in duration-300">
+                            {/* 月份導航 + 月曆小格 */}
+                            <div className="bg-white p-5 r-card card-shadow">
+                                <div className="flex justify-between items-center mb-3">
+                                    <button onClick={() => { setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1)); setSelectedEventDate(null); }} className="w-8 h-8 bg-slate-50 r-btn flex items-center justify-center active-press" style={{border:'1px solid var(--c-border)'}}><Icon name="ChevronLeft" size={16} /></button>
+                                    <h2 className="sans-font" style={{color:'var(--c-text)', fontSize:'16px', fontWeight:'700'}}>{viewDate.getFullYear()} / {String(viewDate.getMonth() + 1).padStart(2, '0')} 本月活動</h2>
+                                    <button onClick={() => { setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1)); setSelectedEventDate(null); }} className="w-8 h-8 bg-slate-50 r-btn flex items-center justify-center active-press" style={{border:'1px solid var(--c-border)'}}><Icon name="ChevronRight" size={16} /></button>
+                                </div>
+                                {/* 迷你月曆格 — 含活動小點 */}
+                                <div className="grid grid-cols-7 gap-1 mb-2">
+                                    {['日','一','二','三','四','五','六'].map((w, wi) => (
+                                        <div key={w} className="text-center sans-font" style={{fontSize:'9px', color: wi===0||wi===6 ? 'var(--c-danger)' : 'var(--c-muted)', padding:'2px 0', fontWeight: wi===0||wi===6 ? '600' : '400'}}>{w}</div>
+                                    ))}
+                                    {monthData.map((date, i) => {
+                                        if (!date) return <div key={i} />;
+                                        const key = formatDateKey(date);
+                                        const isToday = key === formatDateKey(new Date());
+                                        const isSelected = selectedEventDate === key;
+                                        const dayActs = activities.filter(a => a.date === key);
+                                        const hasEvent = dayActs.length > 0;
+                                        return (
+                                            <div key={i}
+                                                onClick={() => hasEvent && setSelectedEventDate(isSelected ? null : key)}
+                                                style={{
+                                                    position: 'relative',
+                                                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                                    aspectRatio: '1',
+                                                    borderRadius: '8px',
+                                                    fontSize: '11px',
+                                                    fontFamily: "'Noto Sans TC', sans-serif", fontWeight: '500',
+                                                    cursor: hasEvent ? 'pointer' : 'default',
+                                                    background: isSelected ? 'var(--c-primary)' : isToday ? 'var(--c-primary-bg)' : 'transparent',
+                                                    color: isSelected ? 'white' : isToday ? 'var(--c-primary-text)' : hasEvent ? 'var(--c-text)' : 'var(--c-muted)',
+                                                    border: isSelected ? '1.5px solid var(--c-primary)' : hasEvent ? '1px solid var(--c-border)' : 'none',
+                                                    transition: 'all 150ms',
+                                                }}>
+                                                {date.getDate()}
+                                                {hasEvent && (
+                                                    <div style={{position:'absolute', bottom:'2px', left:'50%', transform:'translateX(-50%)', display:'flex', gap:'2px'}}>
+                                                        {dayActs.slice(0,3).map((_,di) => (
+                                                            <div key={di} style={{
+                                                                width:'3px', height:'3px', borderRadius:'50%',
+                                                                background: isSelected ? 'rgba(255,255,255,0.8)' : 'var(--c-primary)',
+                                                            }} />
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                {/* 圖例 */}
+                                <div style={{display:'flex', gap:'12px', alignItems:'center', paddingTop:'8px', borderTop:'1px solid var(--c-border)'}}>
+                                    <div style={{display:'flex', alignItems:'center', gap:'4px'}}>
+                                        <div style={{width:'6px', height:'6px', borderRadius:'50%', background:'var(--c-primary)'}} />
+                                        <span className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)'}}>有活動</span>
+                                    </div>
+                                    <p className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)', marginLeft:'auto'}}>
+                                        共 {monthActivities.length} 場活動{selectedEventDate ? `，已選 ${selectedEventDate.slice(5).replace('-','/')}` : '，點日期篩選'}
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            {!activitiesLoaded ? (
+                                <div className="bg-white p-8 r-card card-shadow flex flex-col items-center justify-center">
+                                    <Icon name="Loader" size={24} style={{color:'var(--c-primary)', animation:'spin 1s linear infinite'}} />
+                                    <p className="sans-font text-xs mt-2" style={{color:'var(--c-muted)'}}>載入活動中...</p>
+                                </div>
+                            ) : (() => {
+                                const displayActivities = selectedEventDate
+                                    ? monthActivities.filter(a => a.date === selectedEventDate)
+                                    : monthActivities;
+                                return displayActivities.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {displayActivities.map(activity => {
+                                            const [year, month, day] = activity.date.split('-');
+                                            const dateObj = new Date(activity.date + 'T00:00:00');
+                                            const weekDayLabel = ['日','一','二','三','四','五','六'][dateObj.getDay()];
+                                            const isExpanded = expandedActivityId === activity.id;
+                                            const hasExtra = (activity.helper && activity.helper.trim()) || (activity.note && activity.note.trim());
+                                            return (
+                                                <div key={activity.id} className="bg-white r-card card-shadow" style={{overflow:'hidden'}}>
+                                                    {/* 主列：點整列切換展開 */}
+                                                    <div className="flex gap-3 p-4"
+                                                        onClick={() => hasExtra && setExpandedActivityId(isExpanded ? null : activity.id)}
+                                                        style={{cursor: hasExtra ? 'pointer' : 'default'}}>
+                                                        {/* 日期區塊：假日紅底，平日藍底 */}
+                                                        {(() => {
+                                                            const actDate = new Date(activity.date + 'T00:00:00');
+                                                            const isWknd = actDate.getDay() === 0 || actDate.getDay() === 6;
+                                                            const bg  = isWknd ? 'var(--c-danger-bg)'    : 'var(--c-primary-bg)';
+                                                            const bdr = isWknd ? '1px solid var(--c-danger)' : '1px solid var(--c-primary)';
+                                                            const clr = isWknd ? 'var(--c-danger-text)'  : 'var(--c-primary-text)';
+                                                            return (
+                                                                <div className="flex-shrink-0 text-center" style={{width:'52px', padding:'8px 6px', background:bg, borderRadius:'var(--r-btn)', border:bdr}}>
+                                                                    <div className="sans-font" style={{fontSize:'10px', color:clr, marginBottom:'2px', opacity:0.7}}>{month}/{day}</div>
+                                                                    <div className="sans-font" style={{fontSize:'20px', color:clr, fontWeight:'700', lineHeight:'1'}}>{day}</div>
+                                                                    <div className="sans-font" style={{fontSize:'10px', color:clr, marginTop:'2px'}}>週{weekDayLabel}</div>
+                                                                </div>
+                                                            );
+                                                        })()}
+                                                        
+                                                        {/* 活動詳情 */}
+                                                        <div className="flex-1 min-w-0">
+                                                            <h3 className="sans-font text-sm" style={{color:'var(--c-text)', fontWeight:'700', marginBottom:'4px'}}>{activity.name}</h3>
+                                                            {(activity.timeStart || activity.timeEnd) && (
+                                                                <p className="text-xs sans-font" style={{color:'var(--c-text-sub)', marginBottom:'4px'}}>
+                                                                    {activity.timeStart}{activity.timeEnd ? ' – ' + activity.timeEnd : ''}
+                                                                </p>
+                                                            )}
+                                                            {activity.courseType && (
+                                                                <span className="inline-block text-xs sans-font r-badge" style={{background:'var(--c-accent-bg)', color:'var(--c-accent-text)', padding:'2px 8px', border:'1px solid var(--c-accent)20'}}>{activity.courseType}</span>
+                                                            )}
+                                                        </div>
+
+                                                        {/* 三角形按鈕 */}
+                                                        {hasExtra && (
+                                                            <div className="flex-shrink-0 flex items-center" style={{paddingLeft:'4px'}}>
+                                                                <span style={{
+                                                                    fontSize:'10px', color:'var(--c-muted)',
+                                                                    display:'inline-block',
+                                                                    transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                                                                    transition:'transform 200ms',
+                                                                }}>▼</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* 下拉展開：值班小幫手 + 備註 */}
+                                                    {isExpanded && (
+                                                        <div style={{borderTop:'1px solid var(--c-border)', padding:'10px 16px 12px', background:'var(--c-surface)', display:'flex', flexDirection:'column', gap:'6px'}}>
+                                                            <div style={{display:'flex', gap:'8px', alignItems:'flex-start'}}>
+                                                                <span className="sans-font" style={{fontSize:'11px', color:'var(--c-muted)', minWidth:'68px', flexShrink:0}}>值班小幫手</span>
+                                                                <span className="sans-font" style={{fontSize:'12px', color: activity.helper && activity.helper.trim() ? 'var(--c-text)' : 'var(--c-muted)'}}>
+                                                                    {activity.helper && activity.helper.trim() ? activity.helper : '未填寫'}
+                                                                </span>
+                                                            </div>
+                                                            <div style={{display:'flex', gap:'8px', alignItems:'flex-start'}}>
+                                                                <span className="sans-font" style={{fontSize:'11px', color:'var(--c-muted)', minWidth:'68px', flexShrink:0}}>備註</span>
+                                                                <span className="sans-font" style={{fontSize:'12px', color: activity.note && activity.note.trim() ? 'var(--c-text)' : 'var(--c-muted)'}}>
+                                                                    {activity.note && activity.note.trim() ? activity.note : '無備註'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="bg-white p-8 r-card card-shadow flex flex-col items-center justify-center">
+                                        <Icon name="Calendar" size={28} style={{color:'var(--c-muted)', marginBottom:'8px'}} />
+                                        <p className="sans-font text-xs" style={{color:'var(--c-muted)', textAlign:'center'}}>
+                                            {selectedEventDate ? `${selectedEventDate.slice(5).replace('-','/')} 無活動` : activities.length === 0 ? '暫無活動排定' : '本月無活動'}
+                                        </p>
+                                        {selectedEventDate && (
+                                            <button onClick={() => setSelectedEventDate(null)} className="mt-3 sans-font text-xs active-press px-3 py-1.5 r-btn" style={{background:'var(--c-primary-bg)', color:'var(--c-primary-text)', border:'1px solid var(--c-primary)'}}>
+                                                顯示全月活動
+                                            </button>
+                                        )}
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    ) : (
+                        // 修煉記錄視圖
+                        <>
+                        <div className="flex bg-white r-card" style={{border:'1px solid var(--c-border)', padding:'3px'}}>
+                            <button onClick={() => setViewMode('week')} className={`flex-1 sans-font text-xs r-btn transition-all ${viewMode === 'week' ? 'pk-blue' : ''}`}
+                                style={{color: viewMode === 'week' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>週曆</button>
+                            <button onClick={() => setViewMode('month')} className={`flex-1 sans-font text-xs r-btn transition-all ${viewMode === 'month' ? 'pk-blue' : ''}`}
+                                style={{color: viewMode === 'month' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>月誌</button>
+                        </div>
+                        {viewMode === 'month' ? (
+                        <div className="bg-white p-5 r-card card-shadow">
+                            <div className="flex justify-between items-center mb-4">
+                                <button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1))} className="w-8 h-8 bg-slate-50 r-btn flex items-center justify-center active-press" style={{border:'1px solid var(--c-border)'}}><Icon name="ChevronLeft" size={16} /></button>
+                                <h2 className="sans-font text-base" style={{color:'var(--c-text)'}}>{viewDate.getFullYear()} / {viewDate.getMonth() + 1}</h2>
+                                <button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1))} className="w-8 h-8 bg-slate-50 r-btn flex items-center justify-center active-press" style={{border:'1px solid var(--c-border)'}}><Icon name="ChevronRight" size={16} /></button>
+                            </div>
+                            <div className="grid grid-cols-7 gap-1.5">
+                                {['日','一','二','三','四','五','六'].map(w => (
+                                    <div key={w} className="text-center text-[10px] sans-font" style={{color:'var(--c-muted)'}}>{w}</div>
+                                ))}
+                                {monthData.map((date, i) => {
+                                    if (!date) return <div key={i} />;
+                                    const key = formatDateKey(date);
+                                    const hasLog = dailyLogs[key] && Object.values(dailyLogs[key]).some(v => v > 0);
+                                    const isToday = key === formatDateKey(new Date());
+                                    const dayActivities = activities.filter(a => a.date === key);
+                                    const hasEvent = dayActivities.length > 0;
+                                    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+
+                                    // 決定背景色
+                                    let bg = 'transparent';
+                                    let outline = 'none';
+                                    let fgColor = 'var(--c-text)';
+                                    if (isToday) {
+                                        bg = 'var(--c-primary-bg)';
+                                        outline = '2px solid var(--c-primary)';
+                                        fgColor = 'var(--c-primary-text)';
+                                    } else if (hasEvent && isWeekend) {
+                                        bg = 'var(--c-danger-bg)';
+                                        fgColor = 'var(--c-danger-text)';
+                                    } else if (hasEvent) {
+                                        bg = 'var(--c-primary-bg)';
+                                        fgColor = 'var(--c-primary-text)';
+                                    } else if (hasLog) {
+                                        bg = 'rgba(0,0,0,0.04)';
+                                        fgColor = 'var(--c-text)';
+                                    }
+
+                                    // 笑臉 SVG（線框，同原始程式碼風格）
+                                    const SmileSvg = ({color}) => (
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                            stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                            <circle cx="12" cy="12" r="10"/>
+                                            <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                                            <line x1="9" y1="9" x2="9.01" y2="9"/>
+                                            <line x1="15" y1="9" x2="15.01" y2="9"/>
+                                        </svg>
+                                    );
+
+                                    return (
+                                        <div key={i}
+                                            onClick={() => {
+                                                if (hasEvent) {
+                                                    setShowEventList(true);
+                                                    setSelectedEventDate(key);
+                                                    setViewDate(new Date(date.getFullYear(), date.getMonth(), date.getDate()));
+                                                }
+                                            }}
+                                            className="aspect-square flex flex-col items-center justify-center r-btn sans-font relative"
+                                            style={{
+                                                background: bg,
+                                                outline: outline,
+                                                outlineOffset: '-2px',
+                                                cursor: hasEvent ? 'pointer' : 'default',
+                                                position: 'relative',
+                                            }}>
+                                            {/* 內容：有打卡顯示笑臉，否則顯示數字 */}
+                                            {hasLog
+                                                ? <SmileSvg color={hasEvent ? fgColor : 'var(--c-muted)'} />
+                                                : <span style={{fontSize:'12px', fontWeight:'500', color: fgColor}}>{date.getDate()}</span>
+                                            }
+                                            {/* 活動小點 */}
+                                            {hasEvent && (
+                                                <div style={{
+                                                    position: 'absolute', bottom: '3px',
+                                                    left: '50%', transform: 'translateX(-50%)',
+                                                    display: 'flex', gap: '2px',
+                                                }}>
+                                                    {dayActivities.slice(0, 3).map((_, di) => (
+                                                        <div key={di} style={{
+                                                            width: '4px', height: '4px', borderRadius: '50%',
+                                                            background: 'rgba(255,255,255,0.85)',
+                                                        }} />
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            {/* 圖例：只有活動、打卡 */}
+                            <div style={{display:'flex', gap:'14px', alignItems:'center', paddingTop:'10px', marginTop:'10px', borderTop:'1px solid var(--c-border)'}}>
+                                <div style={{display:'flex', alignItems:'center', gap:'5px'}}>
+                                    <div style={{width:'12px', height:'12px', borderRadius:'3px', background:'var(--c-primary-bg)', border:'1px solid var(--c-primary)'}} />
+                                    <span className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)'}}>活動</span>
+                                </div>
+                                <div style={{display:'flex', alignItems:'center', gap:'5px'}}>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--c-muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>
+                                    </svg>
+                                    <span className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)'}}>打卡</span>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center px-1 pb-1">
+                                <button onClick={prevWeek} className="w-8 h-8 bg-white r-btn flex items-center justify-center active-press" style={{border:'1px solid var(--c-border)'}}><Icon name="ChevronLeft" size={16} /></button>
+                                <span className="sans-font text-xs" style={{color:'var(--c-muted)'}}>{weekLabel}</span>
+                                <button onClick={nextWeek} className="w-8 h-8 bg-white r-btn flex items-center justify-center active-press" style={{border:'1px solid var(--c-border)'}}><Icon name="ChevronRight" size={16} /></button>
+                            </div>
+                            {weekList.map((date) => {
+                                const key = formatDateKey(date);
+                                const data = dailyLogs[key] || {};
+                                const totalEx = (Number(data.exerciseTime) || 0) + (Number(data.stretchTime) || 0);
+                                const hasActivity = totalEx > 0 || data.practice > 0 || data.fiveMin > 0;
+                                const isToday = key === formatDateKey(new Date());
+                                const dayActivities = activities.filter(a => a.date === key);
+                                return (
+                                    <div key={key} className={`bg-white p-3.5 r-card flex items-center justify-between`}
+                                        style={{border: hasActivity ? '1px solid var(--c-success)' : '1px solid var(--c-border)', opacity: hasActivity || isToday || dayActivities.length > 0 ? 1 : 0.55,
+                                            boxShadow: isToday ? '0 0 0 2px rgba(116,192,252,0.3)' : 'none'}}>
+                                        <div className="flex flex-col">
+                                            <span className="sans-font text-xs" style={{color:'var(--c-text)'}}>{date.getMonth() + 1}/{date.getDate()}</span>
+                                            <span className="text-[10px] sans-font" style={{color: date.getDay()===0||date.getDay()===6 ? 'var(--c-danger)' : 'var(--c-muted)', fontWeight: date.getDay()===0||date.getDay()===6 ? '600' : '400'}}>{['日','一','二','三','四','五','六'][date.getDay()]}</span>
+                                        </div>
+                                        <div className="flex gap-1.5 items-center flex-wrap justify-end" style={{maxWidth:'70%'}}>
+                                            {data.practice > 0 && <span className="pk-yellow px-2 py-0.5 r-badge text-[9px] sans-font" style={{color:'var(--c-accent-text)'}}>練功 {data.practice}</span>}
+                                            {data.fiveMin > 0 && <span className="pk-blue px-2 py-0.5 r-badge text-[9px] sans-font" style={{color:'var(--c-primary-text)'}}>五分鐘 {data.fiveMin}</span>}
+                                            {totalEx > 0 && <span className="pk-pink px-2 py-0.5 r-badge text-[9px] sans-font" style={{color:'var(--c-danger-text)'}}>運動 {totalEx}m</span>}
+                                            {/* 活動標籤 */}
+                                            {dayActivities.map((ev, ei) => (
+                                                <span key={ei} className="px-2 py-0.5 r-badge text-[9px] sans-font"
+                                                    style={{background:'var(--c-primary-bg)', color:'var(--c-primary-text)', border:'1px solid var(--c-primary)'}}>
+                                                    📅 {ev.name}
+                                                </span>
+                                            ))}
+                                            {hasActivity && <Icon name="Smile" size={15} style={{color:'var(--c-accent-text)'}} />}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        )}
+                        </>
+                        )}
+                </div>
+            );
+        };
+
+        const ProfileView = ({ dailyLogs, isAdmin, user, userProfile }) => {
+            const mStats = useMemo(() => {
+                const now = new Date();
+                const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                let mActiveDays = 0, mExMins = 0, mStretchMins = 0, mPracCount = 0, mFiveCount = 0;
+                // All-time totals for level
+                let atActiveDays = 0, atExMins = 0, atStretchMins = 0, atPracCount = 0;
+                Object.entries(dailyLogs).forEach(([key, val]) => {
+                    const p = val.practice || 0, f = val.fiveMin || 0, e = val.exerciseTime || 0, s = val.stretchTime || 0;
+                    if ((p + f + e + s) > 0) atActiveDays++;
+                    atExMins += e; atStretchMins += s; atPracCount += p;
+                    if (key.startsWith(prefix)) {
+                        if ((p + f + e + s) > 0) mActiveDays++;
+                        mExMins += e; mStretchMins += s; mPracCount += p; mFiveCount += f;
+                    }
+                });
+                const totalMinutes = mExMins + mStretchMins;
+                const totalHoursNum = totalMinutes / 60;
+                const atScore = Math.round((atActiveDays * 10) + (atExMins + atStretchMins) / 60 + (atPracCount * 5));
+                let realm = { title: "自律新星", level: 1, icon: "Sprout", color: "pk-green" };
+                if (atScore >= 600) realm = { title: "自律仙人", level: 90, icon: "Sun", color: "pk-yellow" };
+                else if (atScore >= 350) realm = { title: "自律達人", level: 70, icon: "Zap", color: "pk-purple" };
+                else if (atScore >= 150) realm = { title: "自律英雄", level: 30, icon: "Sword", color: "pk-orange" };
+                else if (atScore >= 50) realm = { title: "自律俠客", level: 10, icon: "Mountain", color: "pk-blue" };
+                const displayLevel = calcLevel(atScore);
+                // 週資料計算
+                const getWeekPrefix = (offset) => {
+                    const d = new Date(); d.setDate(d.getDate() - d.getDay() + offset * 7);
+                    return Array.from({length:7}, (_,i) => { const dd = new Date(d); dd.setDate(d.getDate()+i); return formatDateKey(dd); });
+                };
+                const thisDays = getWeekPrefix(0); const lastDays = getWeekPrefix(-1);
+                const sumWeek = (days) => days.reduce((acc, k) => {
+                    const v = dailyLogs[k] || {};
+                    return { ex: acc.ex+(v.exerciseTime||0), st: acc.st+(v.stretchTime||0), pr: acc.pr+(v.practice||0), fi: acc.fi+(v.fiveMin||0) };
+                }, {ex:0,st:0,pr:0,fi:0});
+                const tw = sumWeek(thisDays); const lw = sumWeek(lastDays);
+                const pct = (a,b) => b===0 ? null : Math.round((a-b)/b*100);
+                const weekComp = [
+                    { label:'運動', thisVal:tw.ex, lastVal:lw.ex, unit:'分', color:'#ff922b' },
+                    { label:'拉筋', thisVal:tw.st, lastVal:lw.st, unit:'分', color:'#34d399' },
+                    { label:'練功', thisVal:tw.pr, lastVal:lw.pr, unit:'次', color:'#ffd43b' },
+                    { label:'五分鐘', thisVal:tw.fi, lastVal:lw.fi, unit:'次', color:'#38bdf8' },
+                ];
+                return { mActiveDays, totalHours: totalHoursNum.toFixed(1), mPracCount, mFiveCount, mExMins, mStretchMins, realm, displayLevel, weekComp };
+            }, [dailyLogs]);
+
+            const colorMap = {
+                修煉時長: '#b197fc',
+                練功: '#ffd43b',
+                五分鐘: '#74c0fc',
+                本月自律: '#b197fc',
+                運動: '#ff922b',
+                拉筋: '#ff8787'
+            };
+
+            return (
+                <div className="space-y-4 animate-in slide-in-from-bottom-4" style={{paddingBottom:'2rem'}}>
+                    {/* 用戶信息卡片 */}
+                    <div className="bg-white r-card card-shadow p-5 float-anim" style={{display:'flex', gap:'1rem', alignItems:'center'}}>
+                        {/* 頭像 */}
+                        <div style={{flexShrink:0}}>
+                            <div style={{width:'72px', height:'72px', borderRadius:'50%', background:'linear-gradient(135deg, #74c0fc 0%, #5dbdff 100%)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'32px', color:'white', fontWeight:'500', border:'2px solid white', boxShadow:'0 2px 8px rgba(0,0,0,0.08)'}}>
+                                {user?.photoURL ? (
+                                    <img src={user.photoURL} alt="avatar" style={{width:'100%', height:'100%', objectFit:'cover', borderRadius:'50%'}} />
+                                ) : (
+                                    <Icon name={mStats.realm.icon} size={32} style={{color:'white'}} />
+                                )}
+                            </div>
+                        </div>
+                        {/* 用戶信息 */}
+                        <div style={{flex:1}}>
+                            <h2 className="sans-font" style={{fontSize:'16px', fontWeight:'500', margin:'0 0 2px 0', color:'var(--c-text)'}}>{userProfile?.displayName || user?.displayName?.split(' ')[0] || user?.email?.split('@')[0]}</h2>
+                            <p className="sans-font" style={{fontSize:'13px', color:'var(--c-text-sub)', margin:0}}>{mStats.realm.title}</p>
+                        </div>
+                        {/* 等級卡片 */}
+                        <div style={{background:'#8ce99a', border:'0.5px solid #4caf6e', borderRadius:'12px', padding:'12px 14px', textAlign:'center', flexShrink:0}}>
+                            <div className="sans-font" style={{fontSize:'18px', fontWeight:'500', color:'#1a4731'}}>Lv.{mStats.displayLevel}</div>
+                        </div>
+                    </div>
+
+                    {/* 統計卡片區域 */}
+                    <div style={{padding:'0 0.5rem'}}>
+                        <h3 className="sans-font" style={{fontSize:'13px', fontWeight:'500', color:'#6b7280', margin:'0 0 1rem 0', textTransform:'uppercase', letterSpacing:'0.5px'}}>本月統計</h3>
+                        
+                        {/* 第一行 - 3個卡片 */}
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'10px', marginBottom:'10px'}}>
+                            {[
+                                {label:'修煉時長', value:mStats.totalHours, unit:'時', border:'#b197fc'},
+                                {label:'練功',     value:mStats.mPracCount,  unit:'次', border:'#ffd43b'},
+                                {label:'五分鐘',   value:mStats.mFiveCount,  unit:'次', border:'#38bdf8'},
+                            ].map(({label,value,unit,border}) => (
+                                <div key={label} style={{background:'#ffffff', border:`2px solid ${border}`, borderRadius:'12px', padding:'12px 8px 10px', display:'flex', flexDirection:'column', alignItems:'center', minHeight:'80px', position:'relative'}}>
+                                    <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'8px'}}>{label}</div>
+                                    <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937', lineHeight:1}}>{value}</span>
+                                    <span className="sans-font" style={{fontSize:'11px', color:'#9ca3af', position:'absolute', bottom:'8px', right:'10px'}}>{unit}</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* 第二行 - 本月自律、運動、拉筋 */}
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'10px'}}>
+                            {[
+                                {label:'本月自律', value:mStats.mActiveDays,                             unit:'天', border:'#e879f9'},
+                                {label:'運動',     value:(mStats.mExMins/60).toFixed(1),                  unit:'時', border:'#ff922b'},
+                                {label:'拉筋',     value:(mStats.mStretchMins/60).toFixed(1),             unit:'時', border:'#34d399'},
+                            ].map(({label,value,unit,border}) => (
+                                <div key={label} style={{background:'#ffffff', border:`2px solid ${border}`, borderRadius:'12px', padding:'12px 8px 10px', display:'flex', flexDirection:'column', alignItems:'center', minHeight:'80px', position:'relative'}}>
+                                    <div className="sans-font" style={{fontSize:'11px', color:'#6b7280', fontWeight:'500', marginBottom:'8px'}}>{label}</div>
+                                    <span className="sans-font" style={{fontSize:'28px', fontWeight:'500', color:'#1f2937', lineHeight:1}}>{value}</span>
+                                    <span className="sans-font" style={{fontSize:'11px', color:'#9ca3af', position:'absolute', bottom:'8px', right:'10px'}}>{unit}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* 週對比 */}
+                    <div style={{padding:'0 0.5rem'}}>
+                        <h3 className="sans-font" style={{fontSize:'13px', fontWeight:'500', color:'#6b7280', margin:'0 0 1rem 0', textTransform:'uppercase', letterSpacing:'0.5px'}}>週對比</h3>
+                        <div className="bg-white r-card card-shadow" style={{padding:'14px 16px'}}>
+                            <div style={{display:'flex', gap:'14px', marginBottom:'12px'}}>
+                                <div style={{display:'flex', alignItems:'center', gap:'5px'}}>
+                                    <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#4b5563', flexShrink:0}}></div>
+                                    <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>本週</span>
+                                </div>
+                                <div style={{display:'flex', alignItems:'center', gap:'5px'}}>
+                                    <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#9ca3af', flexShrink:0}}></div>
+                                    <span className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>上週</span>
+                                </div>
+                            </div>
+                            {mStats.weekComp.map(({label, thisVal, lastVal, unit, color}) => {
+                                const maxVal = Math.max(thisVal, lastVal, 1);
+                                const diff = lastVal === 0 ? null : Math.round((thisVal - lastVal) / lastVal * 100);
+                                const deltaLabel = diff === null ? '—' : diff > 0 ? `▲ ${diff}%` : diff < 0 ? `▼ ${Math.abs(diff)}%` : '— 持平';
+                                const deltaStyle = diff === null || diff === 0
+                                    ? {background:'#f3f4f6', color:'#6b7280'}
+                                    : diff > 0 ? {background:'#f0fdf4', color:'#15803d'} : {background:'#fff0f0', color:'#b91c1c'};
+                                return (
+                                    <div key={label} style={{display:'flex', alignItems:'center', gap:'8px', padding:'7px 0', borderBottom:'1px solid #f3f4f6'}}>
+                                        <span className="sans-font" style={{fontSize:'11px', color:'#6b7280', width:'46px', flexShrink:0}}>{label}</span>
+                                        <div style={{flex:1, display:'flex', flexDirection:'column', gap:'4px'}}>
+                                            <div style={{height:'6px', background:'#f3f4f6', borderRadius:'3px', overflow:'hidden', position:'relative'}}>
+                                                <div style={{position:'absolute', left:0, top:0, bottom:0, width:`${(thisVal/maxVal)*100}%`, background:color, borderRadius:'3px'}}></div>
+                                            </div>
+                                            <div style={{height:'6px', background:'#f3f4f6', borderRadius:'3px', overflow:'hidden', position:'relative'}}>
+                                                <div style={{position:'absolute', left:0, top:0, bottom:0, width:`${(lastVal/maxVal)*100}%`, background:color, opacity:0.35, borderRadius:'3px'}}></div>
+                                            </div>
+                                        </div>
+                                        <span className="sans-font" style={{fontSize:'10px', color:'#1f2937', width:'34px', textAlign:'right', flexShrink:0}}>{thisVal}{unit}</span>
+                                        <span className="sans-font" style={{fontSize:'10px', padding:'2px 5px', borderRadius:'5px', flexShrink:0, minWidth:'46px', textAlign:'center', ...deltaStyle}}>{deltaLabel}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* 修煉足跡 */}
+                    {(() => {
+                        const now = new Date();
+                        const todayYear = now.getFullYear();
+                        const todayMonth = now.getMonth();
+                        const todayDate = now.getDate();
+                        const [fpOffset, setFpOffset] = useState(0);
+                        const viewYear = new Date(todayYear, todayMonth + fpOffset, 1).getFullYear();
+                        const viewMonth = new Date(todayYear, todayMonth + fpOffset, 1).getMonth();
+                        const isCurrentMonth = (viewYear === todayYear && viewMonth === todayMonth);
+                        const today = isCurrentMonth ? todayDate : 0;
+                        const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+                        const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+                        const prefix = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}`;
+                        // 連續天數（從今天往回跨月）
+                        let streak = 0;
+                        const sd = new Date(now); sd.setHours(0,0,0,0);
+                        for (let i = 0; i < 365; i++) {
+                            const k = formatDateKey(sd);
+                            const v = dailyLogs[k] || {};
+                            if ((v.practice||0)+(v.fiveMin||0)+(v.exerciseTime||0)+(v.stretchTime||0) > 0) { streak++; sd.setDate(sd.getDate()-1); }
+                            else break;
+                        }
+                        // 新強度邏輯
+                        const intensity = {}; const isGold = {};
+                        for (let d = 1; d <= daysInMonth; d++) {
+                            const key = `${prefix}-${String(d).padStart(2,'0')}`;
+                            const v = dailyLogs[key] || {};
+                            const prac = v.practice||0, five = v.fiveMin||0;
+                            const exer = v.exerciseTime||0, stre = v.stretchTime||0;
+                            const bothTwo = prac >= 2 && five >= 2;
+                            const eitherTwo = (prac >= 2 || five >= 2) && !bothTwo;
+                            const hasAnyMove = exer > 0 || stre > 0;
+                            const hasBothMove = exer > 0 && stre > 0;
+                            const totalMove = exer + stre;
+                            const hasAny = prac > 0 || five > 0 || exer > 0 || stre > 0;
+                            // 邏輯保留，但不會在UI上顯示深綠和金邊
+                            if (bothTwo && hasBothMove) { intensity[d] = 3; isGold[d] = totalMove >= 120; }
+                            else if (bothTwo && hasAnyMove) intensity[d] = 3;
+                            else if (bothTwo) intensity[d] = 2;
+                            else if (eitherTwo || hasAny) intensity[d] = 1;
+                            else intensity[d] = 0;
+                        }
+                        // 色系：灰→淡綠→中綠→亮綠（深綠和金邊保留給未來的技能解鎖功能，現在隱藏）
+                        const heatColors = ['#f3f4f6','#dcfce7','#bbf7d0','#4ade80'];
+                        const heatText   = ['#d1d5db','#166534','#166534','#ffffff'];
+                        const cells = [];
+                        for (let i = 0; i < firstDay; i++) cells.push(<div key={`e${i}`} style={{height:'26px'}}></div>);
+                        for (let d = 1; d <= daysInMonth; d++) {
+                            const isFuture = isCurrentMonth && d > today;
+                            const lv = isFuture ? -1 : intensity[d];
+                            // const gold = !isFuture && isGold[d]; // 註釋：金邊保留給未來使用
+                            const bg = lv === -1 ? 'transparent' : heatColors[Math.min(lv, 3)];
+                            const tc = lv === -1 ? '#e5e7eb' : heatText[Math.min(lv, 3)];
+                            const isToday = isCurrentMonth && d === today;
+                            cells.push(
+                                <div key={d} style={{
+                                    height:'26px', borderRadius:'5px', display:'flex',
+                                    alignItems:'center', justifyContent:'center',
+                                    background: bg, color: tc,
+                                    fontSize:'12px', fontWeight:'900',
+                                    fontFamily:"'Noto Sans TC',sans-serif",
+                                    outline: isToday ? '2px solid #16a34a' : 'none',
+                                    // outline: gold ? '2px solid #f59e0b' : isToday ? '2px solid #16a34a' : 'none', // 註釋：保留原邏輯，未來解開金邊
+                                    outlineOffset: '-1px',
+                                }}>{d}</div>
+                            );
+                        }
+                        return (
+                            <div style={{padding:'0 0.5rem'}}>
+                                <h3 className="sans-font" style={{fontSize:'13px', fontWeight:'500', color:'#6b7280', margin:'0 0 1rem 0', textTransform:'uppercase', letterSpacing:'0.5px'}}>修煉足跡</h3>
+                                <div className="bg-white r-card card-shadow" style={{padding:'14px 16px'}}>
+                                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px'}}>
+                                        <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                                            <button onClick={() => setFpOffset(o => o - 1)}
+                                                style={{width:'24px', height:'24px', borderRadius:'6px', border:'1px solid var(--c-border)', background:'var(--c-surface)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer'}}>
+                                                <Icon name="ChevronLeft" size={14} />
+                                            </button>
+                                            <span className="sans-font" style={{fontSize:'13px', color:'#1f2937', minWidth:'72px', textAlign:'center'}}>{viewYear}年 {viewMonth+1}月</span>
+                                            <button onClick={() => setFpOffset(o => Math.min(0, o + 1))}
+                                                style={{width:'24px', height:'24px', borderRadius:'6px', border:'1px solid var(--c-border)', background:'var(--c-surface)', display:'flex', alignItems:'center', justifyContent:'center', cursor: isCurrentMonth ? 'not-allowed' : 'pointer', opacity: isCurrentMonth ? 0.35 : 1}}>
+                                                <Icon name="ChevronRight" size={14} />
+                                            </button>
+                                        </div>
+                                        <span className="sans-font" style={{fontSize:'11px', color:'#6b7280'}}>連續 {streak} 天</span>
+                                    </div>
+                                    <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'2px', marginBottom:'4px'}}>
+                                        {['日','一','二','三','四','五','六'].map(d => (
+                                            <div key={d} style={{textAlign:'center', fontSize:'9px', color:'#9ca3af', fontFamily:"'Noto Sans TC',sans-serif", padding:'2px 0'}}>{d}</div>
+                                        ))}
+                                    </div>
+                                    <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'2px'}}>{cells}</div>
+                                    <div style={{display:'flex', alignItems:'center', gap:'4px', justifyContent:'flex-end', marginTop:'8px'}}>
+                                        {['#f3f4f6','#dcfce7','#bbf7d0','#4ade80','#16a34a'].map(c => (
+                                            <div key={c} style={{width:'10px', height:'10px', borderRadius:'3px', background:c}}></div>
+                                        ))}
+                                        <div style={{width:'10px', height:'10px', borderRadius:'3px', background:'#16a34a', outline:'2px solid #f59e0b', outlineOffset:'-1px'}}></div>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
+
+                    {isAdmin && (
+                        <div className="mt-4">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Icon name="Shield" size={16} className="text-[#4b5563]" />
+                                <span className="sans-font text-xs text-[#4b5563] tracking-widest">管理員後台</span>
+                            </div>
+                            <AdminView />
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const StatBlock = ({ label, value, unit, color }) => (
+            <div className="bg-white p-4 r-card card-shadow flex flex-col justify-between h-32 relative overflow-hidden">
+                <div className="sans-font text-xs tracking-widest relative z-10" style={{color:'var(--c-text-sub)'}}>{label}</div>
+                <div className="relative z-10 flex items-baseline gap-1">
+                    <span className="sans-font text-4xl" style={{color:'var(--c-text)'}}>{value}</span>
+                    <span className="sans-font text-xs" style={{color:'var(--c-muted)'}}>{unit}</span>
+                </div>
+                <div className={`absolute -right-3 -bottom-3 w-14 h-14 ${color} rounded-full`} style={{opacity:0.12}}></div>
+            </div>
+        );
+
+        const MiniActionCard = ({ label, onClick, bgColor, tapped }) => {
+            return (
+                <button onClick={onClick}
+                    className="aspect-square r-card flex flex-col items-center justify-center gap-3 neo-shadow-sm active-press"
+                    style={{
+                        background: tapped ? '#fee2e2' : `${bgColor}cc`,
+                        border: tapped ? '2px solid #ef4444' : `1.5px solid ${bgColor}`,
+                        transition: 'all 0.15s',
+                    }}>
+                    <span className="sans-font" style={{fontSize:'18px', color: tapped ? '#991b1b' : 'var(--c-text)', fontWeight:'900'}}>{label}</span>
+                    {tapped
+                        ? <span className="sans-font" style={{fontSize:'12px', color:'#ef4444', fontWeight:'500', background:'#fecaca', padding:'3px 12px', borderRadius:'99px'}}>已選取</span>
+                        : <span className="sans-font" style={{fontSize:'12px', color:'rgba(0,0,0,0.35)'}}>點擊選取</span>
+                    }
+                </button>
+            );
+        };
+
+        const TimeActionCard = ({ label, onSelect, onCancel, bgColor, tapped, selectedMins }) => {
+            const [open, setOpen] = React.useState(false);
+            const options = [10, 20, 30, 60];
+            return (
+                <div className="aspect-square r-card flex flex-col items-center justify-center gap-2 neo-shadow-sm relative"
+                    onClick={tapped ? onCancel : undefined}
+                    style={{
+                        background: tapped ? '#fee2e2' : `${bgColor}cc`,
+                        border: tapped ? '2px solid #ef4444' : `1.5px solid ${bgColor}`,
+                        transition: 'all 0.15s',
+                        padding: '12px',
+                        cursor: tapped ? 'pointer' : 'default',
+                    }}>
+                    <span className="sans-font" style={{fontSize:'18px', color: tapped ? '#991b1b' : 'var(--c-text)', fontWeight:'900'}}>{label}</span>
+                    {tapped
+                        ? <span className="sans-font" style={{fontSize:'12px', color:'#ef4444', fontWeight:'500', background:'#fecaca', padding:'3px 12px', borderRadius:'99px'}}>{selectedMins} 分鐘</span>
+                        : (
+                            <div style={{position:'relative', width:'100%'}} onClick={e => e.stopPropagation()}>
+                                <button onClick={() => setOpen(o => !o)}
+                                    className="w-full sans-font active-press"
+                                    style={{fontSize:'12px', background:'rgba(255,255,255,0.75)', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:'8px', padding:'7px 10px', color:'var(--c-text)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+                                    <span>選擇時間</span>
+                                    <span style={{fontSize:'10px', opacity:0.5}}>{open ? '▲' : '▼'}</span>
+                                </button>
+                                {open && (
+                                    <div style={{position:'absolute', top:'calc(100% + 4px)', left:0, right:0, background:'white', border:'1px solid var(--c-border)', borderRadius:'10px', overflow:'hidden', zIndex:10, boxShadow:'0 4px 12px rgba(0,0,0,0.1)'}}>
+                                        {options.map(m => (
+                                            <button key={m} onClick={() => { onSelect(m); setOpen(false); }}
+                                                className="w-full sans-font active-press"
+                                                style={{display:'block', padding:'10px 14px', fontSize:'14px', textAlign:'left', color:'var(--c-text)', borderBottom:'0.5px solid var(--c-border)', background:'white'}}>
+                                                {m} 分鐘
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    }
+                </div>
+            );
+        };
+
+        // ─── Admin View ─────────────────────────────────────────────────
+        const AdminView = () => {
+            const [teams, setTeams] = useState([]);
+            const [users, setUsers] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [movingUser, setMovingUser] = useState(null); // { uid, name }
+            const [newTeamName, setNewTeamName] = useState('');
+            const [creating, setCreating] = useState(false);
+            const [tab, setTab] = useState('teams'); // 'teams' | 'users'
+
+            useEffect(() => {
+                const unsubTeams = db.collection('artifacts').doc(appId).collection('teams')
+                    .onSnapshot(snap => {
+                        const list = [];
+                        snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+                        setTeams(list);
+                    });
+                const unsubUsers = db.collection('artifacts').doc(appId).collection('users')
+                    .onSnapshot(snap => {
+                        const list = [];
+                        snap.forEach(doc => list.push({ uid: doc.id, ...doc.data() }));
+                        setUsers(list);
+                        setLoading(false);
+                    });
+                return () => { unsubTeams(); unsubUsers(); };
+            }, []);
+
+            const deleteTeam = async (team) => {
+                const membersInTeam = users.filter(u => u.teamId === team.id);
+                if (!window.confirm(`確定刪除「${team.name}」門派？\n${membersInTeam.length > 0 ? `⚠️ 裡面還有 ${membersInTeam.length} 位成員，他們將變成無門派狀態。` : '此門派目前沒有成員。'}`)) return;
+                // Clear teamId for all members
+                const batch = db.batch();
+                membersInTeam.forEach(u => {
+                    const ref = db.collection('artifacts').doc(appId).collection('users').doc(u.uid);
+                    batch.update(ref, { teamId: firebase.firestore.FieldValue.delete(), teamName: firebase.firestore.FieldValue.delete() });
+                });
+                batch.delete(db.collection('artifacts').doc(appId).collection('teams').doc(team.id));
+                await batch.commit();
+            };
+
+            const createTeam = async () => {
+                const name = newTeamName.trim();
+                if (!name) return;
+                setCreating(true);
+                await db.collection('artifacts').doc(appId).collection('teams').add({
+                    name, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                setNewTeamName('');
+                setCreating(false);
+            };
+
+            const moveUserToTeam = async (uid, teamId, teamName) => {
+                await db.collection('artifacts').doc(appId).collection('users').doc(uid)
+                    .update({ teamId, teamName });
+                setMovingUser(null);
+            };
+
+            const removeUserFromTeam = async (uid) => {
+                if (!window.confirm('確定將此成員移出門派？')) return;
+                await db.collection('artifacts').doc(appId).collection('users').doc(uid)
+                    .update({ teamId: firebase.firestore.FieldValue.delete(), teamName: firebase.firestore.FieldValue.delete() });
+            };
+
+            const teamColors = ['pk-yellow','pk-blue','pk-pink','pk-green','pk-purple','pk-orange'];
+
+            return (
+                <div className="space-y-4 animate-in fade-in duration-300">
+                    {/* Header */}
+                    <div className="p-5 r-card relative overflow-hidden" style={{background:'var(--c-text)'}}>
+                        <div className="relative z-10">
+                            <h2 className="sans-font text-xl text-white mb-0.5">管理員後台</h2>
+                            <p className="text-xs sans-font" style={{color:'rgba(255,255,255,0.5)'}}>門派與成員管理</p>
+                        </div>
+                        <Icon name="Shield" size={72} className="absolute -bottom-3 -right-2 rotate-12" style={{color:'rgba(255,255,255,0.08)'}} />
+                    </div>
+
+                    {/* Sub tabs */}
+                    <div className="flex bg-white r-card" style={{border:'1px solid var(--c-border)', padding:'3px'}}>
+                        <button onClick={() => setTab('teams')} className={`flex-1 sans-font text-xs r-btn transition-all ${tab === 'teams' ? 'pk-blue' : ''}`}
+                            style={{color: tab === 'teams' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>門派管理</button>
+                        <button onClick={() => setTab('users')} className={`flex-1 sans-font text-xs r-btn transition-all ${tab === 'users' ? 'pk-blue' : ''}`}
+                            style={{color: tab === 'users' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>成員管理</button>
+                    </div>
+
+                    {/* ── Teams tab ── */}
+                    {tab === 'teams' && (
+                        <div className="space-y-4">
+                            {/* Create team */}
+                            <div className="bg-white p-4 r-card card-shadow space-y-3">
+                                <p className="sans-font text-xs tracking-widest" style={{color:'var(--c-muted)'}}>新增門派</p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text" value={newTeamName}
+                                        onChange={e => setNewTeamName(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && createTeam()}
+                                        placeholder="門派名稱..."
+                                        className="flex-1 px-3 py-2 text-sm sans-font focus:outline-none bg-slate-50 r-btn"
+                                        style={{border:'1px solid var(--c-border-strong)'}}
+                                    />
+                                    <button onClick={createTeam} disabled={creating || !newTeamName.trim()}
+                                        className="pk-green px-4 py-2 r-btn neo-border-thin sans-font text-sm active-press disabled:opacity-30">
+                                        {creating ? '...' : '新增'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Team list */}
+                            {teams.length === 0 && <p className="text-center text-xs sans-font py-4" style={{color:'var(--c-muted)'}}>尚無門派</p>}
+                            {teams.map((team, i) => {
+                                const memberCount = users.filter(u => u.teamId === team.id).length;
+                                const color = teamColors[i % teamColors.length];
+                                return (
+                                    <div key={team.id} className="bg-white p-4 r-card card-shadow">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-9 h-9 ${color} neo-border-thin r-btn flex items-center justify-center`}>
+                                                    <Icon name="Sword" size={16} style={{color:'var(--c-text)'}} />
+                                                </div>
+                                                <div>
+                                                    <p className="sans-font text-sm" style={{color:'var(--c-text)'}}>{team.name}</p>
+                                                    <p className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>{memberCount} 位成員</p>
+                                                </div>
+                                            </div>
+                                            <button onClick={() => deleteTeam(team)}
+                                                className="w-8 h-8 r-btn flex items-center justify-center active-press hover:bg-red-50"
+                                                style={{border:'1px solid var(--c-border)'}}>
+                                                <Icon name="Trash2" size={14} style={{color:'var(--c-danger-text)'}} />
+                                            </button>
+                                        </div>
+                                        {memberCount > 0 && (
+                                            <div className="mt-3 flex flex-wrap gap-1 pl-12">
+                                                {users.filter(u => u.teamId === team.id).map(u => (
+                                                    <span key={u.uid} className="text-[10px] bg-slate-100 px-2 py-0.5 r-badge sans-font truncate max-w-[120px]" style={{color:'var(--c-text-sub)'}}>
+                                                        {u.displayName || u.email}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* ── Users tab ── */}
+                    {tab === 'users' && (
+                        <div className="space-y-3">
+                            {loading && <p className="text-center text-xs sans-font py-4" style={{color:'var(--c-muted)'}}>載入中...</p>}
+                            {users.map(u => {
+                                const teamName = teams.find(t => t.id === u.teamId)?.name;
+                                return (
+                                    <div key={u.uid} className="bg-white p-4 r-card card-shadow">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="sans-font text-sm truncate" style={{color:'var(--c-text)'}}>{u.displayName || u.email}</p>
+                                                <p className="text-[10px] sans-font truncate" style={{color:'var(--c-muted)'}}>{u.email}</p>
+                                                {teamName
+                                                    ? <span className="text-[10px] pk-blue px-2 py-0.5 r-badge sans-font mt-1 inline-block" style={{color:'var(--c-primary-text)'}}>{teamName}</span>
+                                                    : <span className="text-[10px] px-2 py-0.5 r-badge sans-font mt-1 inline-block" style={{background:'var(--c-danger-bg)',color:'var(--c-danger-text)'}}>無門派</span>
+                                                }
+                                            </div>
+                                            <div className="flex gap-2 ml-2">
+                                                <button onClick={() => setMovingUser({ uid: u.uid, name: u.displayName || u.email })}
+                                                    className="px-3 py-1.5 bg-slate-100 r-btn text-[10px] sans-font active-press" style={{border:'1px solid var(--c-border)'}}>
+                                                    換組
+                                                </button>
+                                                {u.teamId && (
+                                                    <button onClick={() => removeUserFromTeam(u.uid)}
+                                                        className="w-8 h-8 r-btn flex items-center justify-center active-press"
+                                                        style={{background:'var(--c-danger-bg)',border:'1px solid var(--c-danger)'}}>
+                                                        <Icon name="UserMinus" size={13} style={{color:'var(--c-danger-text)'}} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* Move user modal */}
+                    {movingUser && (
+                        <div className="fixed inset-0 z-50 flex items-end justify-center overlay-blur p-5">
+                            <div className="w-full max-w-sm bg-white r-card neo-border neo-shadow p-5 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <p className="sans-font text-sm" style={{color:'var(--c-text)'}}>將 <span style={{color:'var(--c-primary-text)'}}>{movingUser.name}</span> 移至...</p>
+                                    <button onClick={() => setMovingUser(null)} style={{color:'var(--c-muted)'}}><Icon name="X" size={18} /></button>
+                                </div>
+                                <div className="space-y-2 max-h-64 overflow-y-auto">
+                                    {teams.map((team, i) => (
+                                        <button key={team.id} onClick={() => moveUserToTeam(movingUser.uid, team.id, team.name)}
+                                            className="w-full flex items-center gap-3 p-3 r-card active-press hover:bg-slate-50" style={{border:'1px solid var(--c-border)'}}>
+                                            <div className={`w-7 h-7 ${teamColors[i % teamColors.length]} r-btn flex items-center justify-center neo-border-thin`}>
+                                                <Icon name="Sword" size={13} />
+                                            </div>
+                                            <span className="sans-font text-sm" style={{color:'var(--c-text)'}}>{team.name}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const NavIcons = {
+            mountain: (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 20l7-12 4 6 2-3 5 9H3z" />
+                </svg>
+            ),
+            scroll: (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6" />
+                    <path d="M4 18a2 2 0 0 0 2 2" />
+                    <path d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2" />
+                    <line x1="9" y1="7" x2="15" y2="7" />
+                    <line x1="9" y1="11" x2="15" y2="11" />
+                    <line x1="9" y1="15" x2="13" y2="15" />
+                </svg>
+            ),
+            calendar: (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+            ),
+            hourglass: (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 2h14" />
+                    <path d="M5 22h14" />
+                    <path d="M5 2l7 9-7 11" />
+                    <path d="M19 2l-7 9 7 11" />
+                    <line x1="8" y1="18" x2="16" y2="18" />
+                </svg>
+            ),
+            milestone: (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 3v18" />
+                    <path d="M5 5h12l-3 4 3 4H5" />
+                </svg>
+            ),
+            gate: (
+                <svg width="22" height="22" viewBox="0 0 26 26" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 23V13a9 9 0 0 1 18 0v10" />
+                    <line x1="2" y1="23" x2="24" y2="23" />
+                    <path d="M10 23v-7a3 3 0 0 1 6 0v7" />
+                    <circle cx="13" cy="14" r="1" fill="currentColor" stroke="none" />
+                </svg>
+            ),
+        };
+
+        const NavBtn = ({ active, onClick, navIcon, label }) => (
+            <button onClick={onClick} className={`flex flex-col items-center px-4 py-1 r-btn transition-all relative ${active ? '' : ''}`}
+                style={{color: active ? 'var(--c-primary-text)' : 'var(--c-muted)'}}>
+                {active && <span style={{position:'absolute',bottom:0,left:'50%',transform:'translateX(-50%)',width:'20px',height:'3px',background:'var(--c-primary)',borderRadius:'2px 2px 0 0'}}></span>}
+                <span className="inline-flex items-center justify-center" style={{transform:'scale(0.85)'}}>
+                    {NavIcons[navIcon]}
+                </span>
+                <span className="text-[9px] sans-font" style={{marginTop:'1px'}}>{label}</span>
+            </button>
+        );
 
         ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
