@@ -502,55 +502,70 @@
             };
 
             useEffect(() => {
-                const unsubTeams = db.collection('artifacts').doc(appId).collection('teams')
-                    .onSnapshot(async teamSnap => {
-                        const teams = {};
-                        teamSnap.forEach(doc => { teams[doc.id] = { id: doc.id, name: doc.data().name, members: [] }; });
+                let teamsCache = {};
+                let usersCache = {};
 
-                        const usersSnap = await db.collection('artifacts').doc(appId).collection('users').get();
-                        const userPromises = [];
-                        const membersFlat = [];
+                const rebuild = async (teams, users) => {
+                    const userPromises = [];
+                    const membersFlat = [];
+                    const teamsResult = {};
+                    Object.values(teams).forEach(t => { teamsResult[t.id] = { ...t, members: [] }; });
 
-                        usersSnap.forEach(userDoc => {
-                            const userData = userDoc.data();
-                            if (userData.teamId && teams[userData.teamId]) {
-                                const uid = userDoc.id;
-                                userPromises.push(
-                                    db.collection('artifacts').doc(appId).collection('users').doc(uid)
-                                        .collection('dailyLogs').get()
-                                        .then(logsSnap => {
-                                            const logs = {};
-                                            logsSnap.forEach(d => logs[d.id] = d.data());
-                                            const score = calcScore(logs);
-                                            const lv = calcLevel(calcAllTimeScore(logs));
-                                            const activeDays = calcActiveDays(logs);
-                                            const member = {
-                                                uid,
-                                                name: userData.displayName || userData.email,
-                                                teamId: userData.teamId,
-                                                teamName: teams[userData.teamId]?.name || '',
-                                                score, lv, activeDays
-                                            };
-                                            teams[userData.teamId].members.push(member);
-                                            membersFlat.push(member);
-                                        })
-                                );
-                            }
-                        });
-                        await Promise.all(userPromises);
-
-                        const result = Object.values(teams).map(t => {
-                            const total = t.members.reduce((s, m) => s + m.score, 0);
-                            const avg = t.members.length ? Math.round(total / t.members.length) : 0;
-                            const avgLv = t.members.length ? Math.round(t.members.reduce((s, m) => s + m.lv, 0) / t.members.length) : 0;
-                            return { ...t, total, avg, avgLv };
-                        }).sort((a, b) => b.avgLv - a.avgLv);
-
-                        setLeaderboard(result);
-                        setAllMembers(membersFlat.sort((a, b) => b.lv - a.lv));
-                        setLoading(false);
+                    Object.values(users).forEach(userData => {
+                        if (userData.teamId && teamsResult[userData.teamId]) {
+                            const uid = userData.uid;
+                            userPromises.push(
+                                db.collection('artifacts').doc(appId).collection('users').doc(uid)
+                                    .collection('dailyLogs').get()
+                                    .then(logsSnap => {
+                                        const logs = {};
+                                        logsSnap.forEach(d => logs[d.id] = d.data());
+                                        const score = calcScore(logs);
+                                        const lv = calcLevel(calcAllTimeScore(logs));
+                                        const activeDays = calcActiveDays(logs);
+                                        const member = {
+                                            uid,
+                                            name: userData.displayName || userData.email,
+                                            teamId: userData.teamId,
+                                            teamName: teamsResult[userData.teamId]?.name || '',
+                                            score, lv, activeDays
+                                        };
+                                        teamsResult[userData.teamId].members.push(member);
+                                        membersFlat.push(member);
+                                    })
+                            );
+                        }
                     });
-                return () => unsubTeams();
+                    await Promise.all(userPromises);
+
+                    const result = Object.values(teamsResult).map(t => {
+                        const total = t.members.reduce((s, m) => s + m.score, 0);
+                        const avg = t.members.length ? Math.round(total / t.members.length) : 0;
+                        const avgLv = t.members.length ? Math.round(t.members.reduce((s, m) => s + m.lv, 0) / t.members.length) : 0;
+                        return { ...t, total, avg, avgLv };
+                    }).sort((a, b) => b.avgLv - a.avgLv);
+
+                    setLeaderboard(result);
+                    setAllMembers(membersFlat.sort((a, b) => b.lv - a.lv));
+                    setLoading(false);
+                };
+
+                // 同時監聽 teams 與 users，任一變動都重算
+                const unsubTeams = db.collection('artifacts').doc(appId).collection('teams')
+                    .onSnapshot(snap => {
+                        teamsCache = {};
+                        snap.forEach(doc => { teamsCache[doc.id] = { id: doc.id, name: doc.data().name }; });
+                        rebuild(teamsCache, usersCache);
+                    });
+
+                const unsubUsers = db.collection('artifacts').doc(appId).collection('users')
+                    .onSnapshot(snap => {
+                        usersCache = {};
+                        snap.forEach(doc => { usersCache[doc.id] = { uid: doc.id, ...doc.data() }; });
+                        rebuild(teamsCache, usersCache);
+                    });
+
+                return () => { unsubTeams(); unsubUsers(); };
             }, []);
 
             const teamAccentColors = ['#ffd43b','#74c0fc','#ff8787','#8ce99a','#b197fc','#ff922b'];
