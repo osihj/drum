@@ -833,6 +833,43 @@
                 };
             }, []);  // 空依賴陣列，確保只初始化一次
 
+            // 🔔 監聽臨時通知（來自管理員的即時推播）
+            useEffect(() => {
+                console.log('🔔 [App] 初始化臨時通知監聽器');
+                
+                const unsubscribe = activityDB.doc('adminData/notifications')
+                    .onSnapshot(
+                        snap => {
+                            if (!snap.exists) return;
+                            const data = snap.data() || {};
+                            
+                            // 監聽 instant 欄位的變化
+                            if (data.instant && data.instant.message) {
+                                const message = data.instant.message;
+                                console.log('📢 [App] 收到臨時通知:', message);
+                                
+                                // 如果瀏覽器支援，直接顯示通知（即使 SW 未啟用也能通知）
+                                if ('Notification' in window && Notification.permission === 'granted') {
+                                    new Notification('臨時通知', {
+                                        body: message,
+                                        icon: '/icon-96x96.png',
+                                        badge: '/icon-96x96.png',
+                                        tag: 'instant-notif'
+                                    });
+                                }
+                            }
+                        },
+                        err => {
+                            console.error('❌ [App] 通知監聽失敗:', err.message);
+                        }
+                    );
+                
+                return () => {
+                    console.log('🔌 [App] 卸載通知監聽器');
+                    unsubscribe();
+                };
+            }, []);
+
             // Load user profile (team info)
             useEffect(() => {
                 if (!user) return;
