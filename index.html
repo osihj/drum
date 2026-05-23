@@ -554,14 +554,14 @@
             }, []);
 
             const teamAccentColors = ['#ffd43b','#74c0fc','#ff8787','#8ce99a','#b197fc','#ff922b'];
-            // Richer background fills that contrast with the border color
+            // Gradient top colors — low opacity so the fade to white feels soft and warm
             const teamBgColors = [
-                '#fef6c7', // warm yellow — pairs with #ffd43b
-                '#dbeafe', // sky blue    — pairs with #74c0fc
-                '#ffe4e4', // soft rose   — pairs with #ff8787
-                '#dcfce7', // mint green  — pairs with #8ce99a
-                '#ede9fe', // lavender    — pairs with #b197fc
-                '#fff0e0', // peach       — pairs with #ff922b
+                'rgba(255,212,59,0.13)',   // honey yellow
+                'rgba(116,192,252,0.14)',  // sky blue
+                'rgba(255,135,135,0.13)',  // blush rose
+                'rgba(140,233,154,0.13)',  // mint
+                'rgba(177,151,252,0.14)',  // soft lavender
+                'rgba(255,146,43,0.12)',   // warm peach
             ];
 
 
@@ -598,27 +598,27 @@
                             {leaderboard.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有門派資料</div>}
                             {leaderboard.map((team, i) => {
                                 const isMyTeam = team.id === userTeamId;
-                                const accentColor = isMyTeam ? '#8ce99a' : teamAccentColors[i % teamAccentColors.length];
-                                const bgColor = isMyTeam ? '#f0fdf4' : teamBgColors[i % teamBgColors.length];
+                                const accentColor = isMyTeam ? '#74d99f' : teamAccentColors[i % teamAccentColors.length];
+                                const gradientTop = isMyTeam ? 'rgba(116,217,159,0.15)' : teamBgColors[i % teamBgColors.length];
                                 const visibleMembers = team.members
                                     .sort((a,b) => b.lv - a.lv);
                                 return (
                                     <div key={team.id} className="rounded-[1.5rem] overflow-hidden"
-                                        style={{border:`2px solid ${accentColor}`, padding:'16px 18px', background: bgColor}}>
+                                        style={{border:`1.5px solid ${accentColor}`, padding:'16px 18px', background:`linear-gradient(160deg, ${gradientTop} 0%, #ffffff 55%)`}}>
                                         {/* Team header */}
                                         <div className="flex items-start justify-between mb-3">
                                             <div className="flex items-center gap-2">
                                                 <div>
                                                     <p className="sans-font text-base" style={{color:'#374151'}}>{team.name}</p>
                                                 </div>
-                                                {isMyTeam && <span className="text-[10px] px-2 py-0.5 rounded-full sans-font ml-1" style={{background:'#8ce99a', color:'#14532d'}}>我的陣營</span>}
+                                                {isMyTeam && <span className="text-[10px] px-2 py-0.5 rounded-full sans-font ml-1" style={{background:'#74d99f', color:'#0a4a2a'}}>我的陣營</span>}
                                             </div>
                                             <div className="flex items-stretch gap-2">
-                                                <div className="rounded-xl text-center flex flex-col items-center justify-center" style={{padding:'10px 12px', minWidth:'58px', background:'rgba(255,255,255,0.7)', border:`1px solid ${accentColor}80`}}>
+                                                <div className="rounded-xl text-center flex flex-col items-center justify-center" style={{padding:'10px 12px', minWidth:'58px', background:'rgba(255,255,255,0.82)', border:`1px solid ${accentColor}55`}}>
                                                     <div className="sans-font text-lg" style={{lineHeight:'1.2', color:'#374151'}}>{team.total}</div>
                                                     <div className="sans-font" style={{fontSize:'9px', color:'#9ca3af'}}>總點</div>
                                                 </div>
-                                                <div className="rounded-xl text-center flex flex-col items-center justify-center" style={{padding:'10px 12px', minWidth:'58px', background:'rgba(255,255,255,0.7)', border:`1px solid ${accentColor}80`}}>
+                                                <div className="rounded-xl text-center flex flex-col items-center justify-center" style={{padding:'10px 12px', minWidth:'58px', background:'rgba(255,255,255,0.82)', border:`1px solid ${accentColor}55`}}>
                                                     <div className="sans-font text-lg" style={{lineHeight:'1.2', color:'#374151'}}>{team.avg}</div>
                                                     <div className="sans-font" style={{fontSize:'9px', color:'#9ca3af'}}>均值</div>
                                                 </div>
@@ -626,7 +626,7 @@
                                         </div>
                                         {/* Members mini list — hide self */}
                                         {visibleMembers.length > 0 && (
-                                            <div style={{borderTop:`1px solid ${accentColor}50`, paddingTop:'8px'}}>
+                                            <div style={{borderTop:`1px solid ${accentColor}40`, paddingTop:'8px'}}>
                                                 {visibleMembers.map((m, mi) => (
                                                     <div key={m.uid} className="flex items-center justify-between" style={{padding:'5px 4px'}}>
                                                         <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
