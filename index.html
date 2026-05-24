@@ -267,14 +267,8 @@
                 setLoading(true);
                 setError('');
                 const provider = new firebase.auth.GoogleAuthProvider();
-                // iOS PWA (加到主畫面) 強制用 redirect
-                const isIOSPWA = window.navigator.standalone === true;
                 try {
-                    if (isIOSPWA) {
-                        await auth.signInWithRedirect(provider);
-                    } else {
-                        await auth.signInWithPopup(provider);
-                    }
+                    await auth.signInWithPopup(provider);
                 } catch (popupError) {
                     if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/popup-closed-by-user') {
                         try {
@@ -291,22 +285,9 @@
             };
 
             useEffect(() => {
-                // 處理 iOS PWA redirect 登入結果
-                const handled = sessionStorage.getItem('redirectHandled');
-                if (handled) {
-                    sessionStorage.removeItem('redirectHandled');
-                    setLoading(false);
-                    return;
-                }
                 auth.getRedirectResult().then(result => {
-                    if (result?.user) {
-                        sessionStorage.setItem('redirectHandled', '1');
-                    }
-                    setLoading(false);
-                }).catch((err) => {
-                    console.error('getRedirectResult 失敗:', err);
-                    setLoading(false);
-                });
+                    if (result?.user) setLoading(false);
+                }).catch(() => setLoading(false));
             }, []);
 
             return (
