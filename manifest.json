@@ -1,9 +1,9 @@
 {
   "name": "自律動起來",
   "short_name": "自律動起來",
-  "start_url": "/drum/",
+  "start_url": "/",
   "display": "standalone",
-  "scope": "/drum/",
+  "scope": "/",
   "orientation": "portrait-primary",
   "theme_color": "#74c0fc",
   "background_color": "#f8fafc",
