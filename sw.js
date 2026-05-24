@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════
 //  sw.js  ─  自律打卡 Service Worker
-//  負責：背景排程定時通知 + 接收臨時即時通知
+//  負責：背景排程定時通知 + 接收臨時即時通知 + FCM 推播
 // ═══════════════════════════════════════════════════
 
 const CACHE_NAME = 'jilv-v1';
@@ -10,15 +10,47 @@ const NOTIF_ICON = '/icon-96x96.png';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 
+// ── 接收 FCM 推播（背景通知）────────────────────────
+self.addEventListener('push', event => {
+  let title = '自律動起來';
+  let body = '你有一則新通知';
+  let icon = NOTIF_ICON;
+  let url = '/';
+
+  try {
+    const data = event.data?.json();
+    if (data?.notification) {
+      title = data.notification.title || title;
+      body  = data.notification.body  || body;
+      icon  = data.notification.icon  || icon;
+    }
+    if (data?.webpush?.fcm_options?.link) {
+      url = data.webpush.fcm_options.link;
+    }
+  } catch (e) {
+    // 如果不是 JSON，用純文字
+    body = event.data?.text() || body;
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon,
+      badge: NOTIF_ICON,
+      tag: 'fcm-push',
+      data: { url },
+    })
+  );
+});
+
 // ── 接收主執行緒傳來的通知設定 ────────────────────────
-// 格式：{ type: 'SCHEDULE', settings: { daily, scheduled, ... } }
 self.addEventListener('message', event => {
   const { type, settings } = event.data || {};
   if (type === 'SCHEDULE') {
     applySettings(settings);
   }
   if (type === 'INSTANT') {
-    showNotif('緊急通知', event.data.message, 'instant');
+    showNotif('自律動起來', event.data.message, 'instant');
   }
 });
 
@@ -46,7 +78,7 @@ function applySettings(settings) {
     const delay = new Date(item.datetime).getTime() - Date.now();
     if (delay > 0) {
       const t = setTimeout(() => {
-        showNotif(item.title || '活動提醒', item.message, 'scheduled');
+        showNotif('自律動起來', item.message, 'scheduled');
       }, delay);
       _scheduledTimers.push(t);
     }
@@ -59,12 +91,11 @@ function scheduleDailyNotif(timeStr, message) {
   const now  = new Date();
   const next = new Date(now);
   next.setHours(h, m, 0, 0);
-  if (next <= now) next.setDate(next.getDate() + 1); // 今天已過 → 排明天
+  if (next <= now) next.setDate(next.getDate() + 1);
 
   const delay = next.getTime() - now.getTime();
   _dailyTimer = setTimeout(() => {
     showNotif('自律動起來', message, 'daily');
-    // 觸發後再排下一天
     scheduleDailyNotif(timeStr, message);
   }, delay);
 }
@@ -75,7 +106,7 @@ function showNotif(title, body, tag = 'general') {
     body,
     icon:  NOTIF_ICON,
     badge: NOTIF_ICON,
-    tag,                   // 同 tag 的新通知會取代舊的，避免堆積
+    tag,
     data:  { url: '/' },
   });
 }
