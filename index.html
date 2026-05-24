@@ -881,7 +881,8 @@
                     try {
                         const VAPID_KEY = 'BAccaj-6qJIE1ex_FoAKoctf4KChetNBzsCDcnD-tY3q3DzPRQH4bwif1teE-tRLfp5_LoFSAdatlfwd8KKdtLU';
                         const messaging = firebase.messaging();
-                        const swReg = await navigator.serviceWorker.register('/sw.js');
+                        const swPath = location.hostname === 'osihj.github.io' ? '/drum/sw.js' : '/sw.js';
+                        const swReg = await navigator.serviceWorker.register(swPath);
                         const token = await messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
                         if (token) {
                             await db.collection('fcmTokens').doc(user.uid).set({
