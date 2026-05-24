@@ -40,6 +40,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"></script>
 
     <style type="text/tailwindcss">
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
@@ -502,70 +503,55 @@
             };
 
             useEffect(() => {
-                let teamsCache = {};
-                let usersCache = {};
-
-                const rebuild = async (teams, users) => {
-                    const userPromises = [];
-                    const membersFlat = [];
-                    const teamsResult = {};
-                    Object.values(teams).forEach(t => { teamsResult[t.id] = { ...t, members: [] }; });
-
-                    Object.values(users).forEach(userData => {
-                        if (userData.teamId && teamsResult[userData.teamId]) {
-                            const uid = userData.uid;
-                            userPromises.push(
-                                db.collection('artifacts').doc(appId).collection('users').doc(uid)
-                                    .collection('dailyLogs').get()
-                                    .then(logsSnap => {
-                                        const logs = {};
-                                        logsSnap.forEach(d => logs[d.id] = d.data());
-                                        const score = calcScore(logs);
-                                        const lv = calcLevel(calcAllTimeScore(logs));
-                                        const activeDays = calcActiveDays(logs);
-                                        const member = {
-                                            uid,
-                                            name: userData.displayName || userData.email,
-                                            teamId: userData.teamId,
-                                            teamName: teamsResult[userData.teamId]?.name || '',
-                                            score, lv, activeDays
-                                        };
-                                        teamsResult[userData.teamId].members.push(member);
-                                        membersFlat.push(member);
-                                    })
-                            );
-                        }
-                    });
-                    await Promise.all(userPromises);
-
-                    const result = Object.values(teamsResult).map(t => {
-                        const total = t.members.reduce((s, m) => s + m.score, 0);
-                        const avg = t.members.length ? Math.round(total / t.members.length) : 0;
-                        const avgLv = t.members.length ? Math.round(t.members.reduce((s, m) => s + m.lv, 0) / t.members.length) : 0;
-                        return { ...t, total, avg, avgLv };
-                    }).sort((a, b) => b.avgLv - a.avgLv);
-
-                    setLeaderboard(result);
-                    setAllMembers(membersFlat.sort((a, b) => b.lv - a.lv));
-                    setLoading(false);
-                };
-
-                // 同時監聽 teams 與 users，任一變動都重算
                 const unsubTeams = db.collection('artifacts').doc(appId).collection('teams')
-                    .onSnapshot(snap => {
-                        teamsCache = {};
-                        snap.forEach(doc => { teamsCache[doc.id] = { id: doc.id, name: doc.data().name }; });
-                        rebuild(teamsCache, usersCache);
-                    });
+                    .onSnapshot(async teamSnap => {
+                        const teams = {};
+                        teamSnap.forEach(doc => { teams[doc.id] = { id: doc.id, name: doc.data().name, members: [] }; });
 
-                const unsubUsers = db.collection('artifacts').doc(appId).collection('users')
-                    .onSnapshot(snap => {
-                        usersCache = {};
-                        snap.forEach(doc => { usersCache[doc.id] = { uid: doc.id, ...doc.data() }; });
-                        rebuild(teamsCache, usersCache);
-                    });
+                        const usersSnap = await db.collection('artifacts').doc(appId).collection('users').get();
+                        const userPromises = [];
+                        const membersFlat = [];
 
-                return () => { unsubTeams(); unsubUsers(); };
+                        usersSnap.forEach(userDoc => {
+                            const userData = userDoc.data();
+                            if (userData.teamId && teams[userData.teamId]) {
+                                const uid = userDoc.id;
+                                userPromises.push(
+                                    db.collection('artifacts').doc(appId).collection('users').doc(uid)
+                                        .collection('dailyLogs').get()
+                                        .then(logsSnap => {
+                                            const logs = {};
+                                            logsSnap.forEach(d => logs[d.id] = d.data());
+                                            const score = calcScore(logs);
+                                            const lv = calcLevel(calcAllTimeScore(logs));
+                                            const activeDays = calcActiveDays(logs);
+                                            const member = {
+                                                uid,
+                                                name: userData.displayName || userData.email,
+                                                teamId: userData.teamId,
+                                                teamName: teams[userData.teamId]?.name || '',
+                                                score, lv, activeDays
+                                            };
+                                            teams[userData.teamId].members.push(member);
+                                            membersFlat.push(member);
+                                        })
+                                );
+                            }
+                        });
+                        await Promise.all(userPromises);
+
+                        const result = Object.values(teams).map(t => {
+                            const total = t.members.reduce((s, m) => s + m.score, 0);
+                            const avg = t.members.length ? Math.round(total / t.members.length) : 0;
+                            const avgLv = t.members.length ? Math.round(t.members.reduce((s, m) => s + m.lv, 0) / t.members.length) : 0;
+                            return { ...t, total, avg, avgLv };
+                        }).sort((a, b) => b.avgLv - a.avgLv);
+
+                        setLeaderboard(result);
+                        setAllMembers(membersFlat.sort((a, b) => b.lv - a.lv));
+                        setLoading(false);
+                    });
+                return () => unsubTeams();
             }, []);
 
             const teamAccentColors = ['#ffd43b','#74c0fc','#ff8787','#8ce99a','#b197fc','#ff922b'];
@@ -851,6 +837,7 @@
             // 🔔 監聽臨時通知（來自管理員的即時推播）
             useEffect(() => {
                 console.log('🔔 [App] 初始化臨時通知監聽器');
+                let lastSeenSentAt = null;
                 
                 const unsubscribe = activityDB.doc('adminData/notifications')
                     .onSnapshot(
@@ -858,17 +845,19 @@
                             if (!snap.exists) return;
                             const data = snap.data() || {};
                             
-                            // 監聽 instant 欄位的變化
-                            if (data.instant && data.instant.message) {
-                                const message = data.instant.message;
+                            // 監聽 instant 欄位的變化，用 sentAt 防止重複觸發
+                            if (data.instant && data.instant.message && data.instant.sentAt) {
+                                const { message, sentAt } = data.instant;
+                                if (lastSeenSentAt === sentAt) return; // 已處理過，跳過
+                                lastSeenSentAt = sentAt;
                                 console.log('📢 [App] 收到臨時通知:', message);
                                 
-                                // 如果瀏覽器支援，直接顯示通知（即使 SW 未啟用也能通知）
+                                // 如果瀏覽器支援，直接顯示通知
                                 if ('Notification' in window && Notification.permission === 'granted') {
-                                    new Notification('臨時通知', {
+                                    new Notification('自律動起來', {
                                         body: message,
-                                        icon: '/icon-96x96.png',
-                                        badge: '/icon-96x96.png',
+                                        icon: '/drum/icon-96x96.png',
+                                        badge: '/drum/icon-96x96.png',
                                         tag: 'instant-notif'
                                     });
                                 }
@@ -885,24 +874,40 @@
                 };
             }, []);
 
+            // 📱 FCM Token 自動註冊
+            useEffect(() => {
+                if (!user) return;
+                const registerFCMToken = async () => {
+                    try {
+                        const VAPID_KEY = 'BAccaj-6qJIE1ex_FoAKoctf4KChetNBzsCDcnD-tY3q3DzPRQH4bwif1teE-tRLfp5_LoFSAdatlfwd8KKdtLU';
+                        const messaging = firebase.messaging();
+                        const swReg = await navigator.serviceWorker.register('/drum/sw.js');
+                        const token = await messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
+                        if (token) {
+                            await db.collection('fcmTokens').doc(user.uid).set({
+                                token,
+                                uid: user.uid,
+                                email: user.email,
+                                updatedAt: Date.now()
+                            });
+                            console.log('✅ FCM token 已儲存');
+                        }
+                    } catch (err) {
+                        console.warn('⚠️ FCM token 註冊失敗:', err.message);
+                    }
+                };
+                if ('serviceWorker' in navigator && 'Notification' in window && Notification.permission === 'granted') {
+                    registerFCMToken();
+                }
+            }, [user]);
+
             // Load user profile (team info)
-            // 收到更新後，若有 teamId 則自動查詢 teams 取最新 teamName，防止直接改 Firebase 時名稱不同步
             useEffect(() => {
                 if (!user) return;
                 const unsub = db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
-                    .onSnapshot(async snap => {
-                        if (!snap.exists) { setUserProfile(null); return; }
-                        const data = snap.data();
-                        if (data.teamId) {
-                            try {
-                                const teamSnap = await db.collection('artifacts').doc(appId)
-                                    .collection('teams').doc(data.teamId).get();
-                                if (teamSnap.exists) {
-                                    data.teamName = teamSnap.data().name || data.teamName;
-                                }
-                            } catch (e) { /* 查不到就用原本的 teamName */ }
-                        }
-                        setUserProfile(data);
+                    .onSnapshot(snap => {
+                        if (snap.exists) setUserProfile(snap.data());
+                        else setUserProfile(null);
                     });
                 return () => unsub();
             }, [user]);
@@ -1262,8 +1267,6 @@
             const [goals, setGoals] = useState({});
             // dailyGoals: { practice: 2, fiveMin: 2, ... } 每天目標量
             const [dailyGoals, setDailyGoals] = useState({});
-            // pendingGoals: 暫存尚未確認鎖定的選擇，不影響已鎖定的 goals
-            const [pendingDaily, setPendingDaily] = useState({});
             const [customInput, setCustomInput] = useState({}); // { key: '自訂值字串' }
             const [showCustom, setShowCustom] = useState({}); // { key: true/false }
             const customRefs = useRef({});
@@ -1293,23 +1296,14 @@
                 return () => unsub();
             }, [user, thisWeekKey]);
 
-            // 暫存選擇，尚未存入 Firestore（不立即鎖定）
-            const selectDaily = (key, daily) => {
-                setPendingDaily(prev => ({ ...prev, [key]: daily }));
-                setShowCustom(prev => ({ ...prev, [key]: false }));
-            };
-
-            // 確認鎖定：將暫存目標存入 Firestore
-            const commitGoals = async () => {
-                const updatedGoals = { ...goals };
-                const updatedDaily = { ...dailyGoals };
-                Object.entries(pendingDaily).forEach(([key, daily]) => {
-                    updatedGoals[key] = daily * 7;
-                    updatedDaily[key] = daily;
-                });
+            // 選擇每日目標 → 自動存週目標 = daily × 7，同時存入本週 key
+            const selectDaily = async (key, daily) => {
+                const weeklyGoal = daily * 7;
+                const updatedGoals = { ...goals, [key]: weeklyGoal };
+                const updatedDaily = { ...dailyGoals, [key]: daily };
                 setGoals(updatedGoals);
                 setDailyGoals(updatedDaily);
-                setPendingDaily({});
+                setShowCustom(prev => ({ ...prev, [key]: false }));
                 await db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
                     .set({
                         milestoneGoals: updatedGoals,
@@ -1319,10 +1313,10 @@
             };
 
             // 自訂輸入確認
-            const confirmCustom = (key) => {
+            const confirmCustom = async (key) => {
                 const val = parseInt(customInput[key]);
                 if (!val || val <= 0) { setShowCustom(prev => ({ ...prev, [key]: false })); return; }
-                selectDaily(key, val);
+                await selectDaily(key, val);
             };
 
             // Calc this week's actual values
@@ -1355,8 +1349,7 @@
             const renderCard = (m, isUnset = false) => {
                 const actual = weekActuals[m.field];
                 const goal = goals[m.key] || 0;
-                // 未設定模式下，daily 優先取 pendingDaily（使用者尚未鎖定的暫存選擇）
-                const daily = isUnset ? (pendingDaily[m.key] || dailyGoals[m.key] || 0) : (dailyGoals[m.key] || 0);
+                const daily = dailyGoals[m.key] || 0;
                 const pct = goal > 0 ? Math.min(100, Math.round(actual / goal * 100)) : 0;
                 const isWeekDone = actual >= goal && goal > 0;
                 const todayVal = todayActuals[m.field];
@@ -1418,7 +1411,7 @@
                         {isUnset && (
                             <div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom: '0'}}>
                                 {opts.map(opt => {
-                                    const isActive = (pendingDaily[m.key] === opt || (!pendingDaily[m.key] && daily === opt)) && !isCustomShown;
+                                    const isActive = daily === opt && !isCustomShown;
                                     return (
                                         <button key={opt} onClick={() => selectDaily(m.key, opt)}
                                             className="sans-font active-press"
@@ -1524,15 +1517,6 @@
                             </p>
                             {unsetItems.map(m => renderCard(m, true))}
                         </>
-                    )}
-
-                    {/* 確認鎖定按鈕：有暫存選擇時才顯示 */}
-                    {Object.keys(pendingDaily).length > 0 && (
-                        <button onClick={commitGoals}
-                            className="w-full py-4 r-btn sans-font text-base tracking-widest active-press neo-border neo-shadow-sm"
-                            style={{background:'var(--c-accent)', color:'#1f2937', marginTop:'8px'}}>
-                            🔒 確認鎖定目標
-                        </button>
                     )}
 
                 </div>
