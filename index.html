@@ -292,8 +292,16 @@
 
             useEffect(() => {
                 auth.getRedirectResult().then(result => {
-                    if (result?.user) setLoading(false);
-                }).catch(() => setLoading(false));
+                    if (result?.user) {
+                        // redirect 登入成功，onAuthStateChanged 會自動處理
+                        setLoading(false);
+                    } else {
+                        setLoading(false);
+                    }
+                }).catch((err) => {
+                    console.error('getRedirectResult 失敗:', err);
+                    setLoading(false);
+                });
             }, []);
 
             return (
@@ -787,8 +795,10 @@
             const todayKey = useMemo(() => formatDateKey(new Date()), []);
             const currentWeekDays = useMemo(() => getWeekDays(new Date()), []);
 
-            // Auth state
+            // Auth state + 處理 iOS PWA redirect 登入
             useEffect(() => {
+                // 先處理 redirect 結果（iOS PWA 需要）
+                auth.getRedirectResult().catch(() => {});
                 return auth.onAuthStateChanged(u => {
                     setUser(u);
                     setAuthReady(true);
