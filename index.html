@@ -158,6 +158,8 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
+        // iOS PWA 保持登入狀態
+        firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
         const appId = "discipline-app-v15";
         const ADMIN_EMAIL = "hsinglinstar@gmail.com";
         
@@ -265,10 +267,15 @@
                 setLoading(true);
                 setError('');
                 const provider = new firebase.auth.GoogleAuthProvider();
+                // iOS PWA (加到主畫面) 強制用 redirect
+                const isIOSPWA = window.navigator.standalone === true;
                 try {
-                    await auth.signInWithPopup(provider);
+                    if (isIOSPWA) {
+                        await auth.signInWithRedirect(provider);
+                    } else {
+                        await auth.signInWithPopup(provider);
+                    }
                 } catch (popupError) {
-                    // popup blocked, fallback to redirect
                     if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/popup-closed-by-user') {
                         try {
                             await auth.signInWithRedirect(provider);
