@@ -136,7 +136,7 @@
         const { useState, useEffect, useRef, useMemo } = React;
         const firebaseConfig = {
             apiKey: "AIzaSyAdCP5BvvIhcjYt2_Re80JKKDKqfbgjtvk",
-            authDomain: "drumstar.pages.dev",
+            authDomain: "drum-8d969.firebaseapp.com",
             projectId: "drum-8d969",
             storageBucket: "drum-8d969.firebasestorage.app",
             messagingSenderId: "28100257204",
@@ -291,13 +291,18 @@
             };
 
             useEffect(() => {
+                // 處理 iOS PWA redirect 登入結果
+                const handled = sessionStorage.getItem('redirectHandled');
+                if (handled) {
+                    sessionStorage.removeItem('redirectHandled');
+                    setLoading(false);
+                    return;
+                }
                 auth.getRedirectResult().then(result => {
                     if (result?.user) {
-                        // redirect 登入成功，onAuthStateChanged 會自動處理
-                        setLoading(false);
-                    } else {
-                        setLoading(false);
+                        sessionStorage.setItem('redirectHandled', '1');
                     }
+                    setLoading(false);
                 }).catch((err) => {
                     console.error('getRedirectResult 失敗:', err);
                     setLoading(false);
@@ -795,10 +800,8 @@
             const todayKey = useMemo(() => formatDateKey(new Date()), []);
             const currentWeekDays = useMemo(() => getWeekDays(new Date()), []);
 
-            // Auth state + 處理 iOS PWA redirect 登入
+            // Auth state
             useEffect(() => {
-                // 先處理 redirect 結果（iOS PWA 需要）
-                auth.getRedirectResult().catch(() => {});
                 return auth.onAuthStateChanged(u => {
                     setUser(u);
                     setAuthReady(true);
