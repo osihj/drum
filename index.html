@@ -40,6 +40,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"></script>
 
     <style type="text/tailwindcss">
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
@@ -157,6 +158,8 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
+        // iOS PWA 保持登入狀態
+        firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
         const appId = "discipline-app-v15";
         const ADMIN_EMAIL = "hsinglinstar@gmail.com";
         
@@ -267,7 +270,6 @@
                 try {
                     await auth.signInWithPopup(provider);
                 } catch (popupError) {
-                    // popup blocked, fallback to redirect
                     if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/popup-closed-by-user') {
                         try {
                             await auth.signInWithRedirect(provider);
@@ -836,6 +838,7 @@
             // 🔔 監聽臨時通知（來自管理員的即時推播）
             useEffect(() => {
                 console.log('🔔 [App] 初始化臨時通知監聽器');
+                let lastSeenSentAt = null;
                 
                 const unsubscribe = activityDB.doc('adminData/notifications')
                     .onSnapshot(
@@ -843,17 +846,19 @@
                             if (!snap.exists) return;
                             const data = snap.data() || {};
                             
-                            // 監聽 instant 欄位的變化
-                            if (data.instant && data.instant.message) {
-                                const message = data.instant.message;
+                            // 監聽 instant 欄位的變化，用 sentAt 防止重複觸發
+                            if (data.instant && data.instant.message && data.instant.sentAt) {
+                                const { message, sentAt } = data.instant;
+                                if (lastSeenSentAt === sentAt) return; // 已處理過，跳過
+                                lastSeenSentAt = sentAt;
                                 console.log('📢 [App] 收到臨時通知:', message);
                                 
-                                // 如果瀏覽器支援，直接顯示通知（即使 SW 未啟用也能通知）
+                                // 如果瀏覽器支援，直接顯示通知
                                 if ('Notification' in window && Notification.permission === 'granted') {
-                                    new Notification('臨時通知', {
+                                    new Notification('自律動起來', {
                                         body: message,
-                                        icon: '/icon-96x96.png',
-                                        badge: '/icon-96x96.png',
+                                        icon: '/drum/icon-96x96.png',
+                                        badge: '/drum/icon-96x96.png',
                                         tag: 'instant-notif'
                                     });
                                 }
@@ -869,6 +874,55 @@
                     unsubscribe();
                 };
             }, []);
+
+            // 📱 Web Push 訂閱自動註冊（支援 iOS Safari + Android Chrome）
+            useEffect(() => {
+                if (!user) return;
+                const registerPushSubscription = async () => {
+                    try {
+                        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+                            console.warn('⚠️ 此裝置不支援 Web Push');
+                            return;
+                        }
+                        if (Notification.permission !== 'granted') return;
+
+                        const VAPID_KEY = 'BAccaj-6qJIE1ex_FoAKoctf4KChetNBzsCDcnD-tY3q3DzPRQH4bwif1teE-tRLfp5_LoFSAdatlfwd8KKdtLU';
+                        const swPath = location.hostname === 'osihj.github.io' ? '/drum/sw.js' : '/sw.js';
+                        const swReg = await navigator.serviceWorker.register(swPath);
+
+                        // 將 VAPID key 轉換為 Uint8Array
+                        const urlBase64ToUint8Array = (base64String) => {
+                            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+                            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+                            const rawData = window.atob(base64);
+                            const outputArray = new Uint8Array(rawData.length);
+                            for (let i = 0; i < rawData.length; ++i) {
+                                outputArray[i] = rawData.charCodeAt(i);
+                            }
+                            return outputArray;
+                        };
+
+                        // 訂閱 Web Push
+                        const subscription = await swReg.pushManager.subscribe({
+                            userVisibleOnly: true,
+                            applicationServerKey: urlBase64ToUint8Array(VAPID_KEY)
+                        });
+
+                        // 儲存訂閱資訊到 Firestore
+                        await db.collection('fcmTokens').doc(user.uid).set({
+                            subscription: JSON.stringify(subscription),
+                            endpoint: subscription.endpoint,
+                            uid: user.uid,
+                            email: user.email || null,
+                            updatedAt: Date.now()
+                        });
+                        console.log('✅ Web Push 訂閱已儲存');
+                    } catch (err) {
+                        console.warn('⚠️ Web Push 訂閱失敗:', err.message);
+                    }
+                };
+                registerPushSubscription();
+            }, [user]);
 
             // Load user profile (team info)
             useEffect(() => {
@@ -1238,9 +1292,6 @@
             const [dailyGoals, setDailyGoals] = useState({});
             const [customInput, setCustomInput] = useState({}); // { key: '自訂值字串' }
             const [showCustom, setShowCustom] = useState({}); // { key: true/false }
-            // 暫存用戶正在設定的選擇（尚未鎖定）
-            const [pendingDaily, setPendingDaily] = useState({});
-            const [saving, setSaving] = useState(false);
             const customRefs = useRef({});
 
             // 本週 key（週日 00:00 更新，週六 23:59 截止）
@@ -1268,37 +1319,27 @@
                 return () => unsub();
             }, [user, thisWeekKey]);
 
-            // 選擇每日目標 → 只更新暫存，不立即存 Firestore
-            const selectDaily = (key, daily) => {
-                setPendingDaily(prev => ({ ...prev, [key]: daily }));
+            // 選擇每日目標 → 自動存週目標 = daily × 7，同時存入本週 key
+            const selectDaily = async (key, daily) => {
+                const weeklyGoal = daily * 7;
+                const updatedGoals = { ...goals, [key]: weeklyGoal };
+                const updatedDaily = { ...dailyGoals, [key]: daily };
+                setGoals(updatedGoals);
+                setDailyGoals(updatedDaily);
                 setShowCustom(prev => ({ ...prev, [key]: false }));
-            };
-
-            // 確認鎖定：把所有暫存目標一次寫入 Firestore
-            const confirmLock = async () => {
-                if (Object.keys(pendingDaily).length === 0) return;
-                setSaving(true);
-                const updatedGoals = { ...goals };
-                const updatedDaily = { ...dailyGoals };
-                Object.entries(pendingDaily).forEach(([key, daily]) => {
-                    updatedGoals[key] = daily * 7;
-                    updatedDaily[key] = daily;
-                });
                 await db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
                     .set({
                         milestoneGoals: updatedGoals,
                         milestoneDailyGoals: updatedDaily,
-                        milestoneWeekKey: thisWeekKey,
+                        milestoneWeekKey: thisWeekKey,   // 記錄目標所屬的週
                     }, { merge: true });
-                setPendingDaily({});
-                setSaving(false);
             };
 
             // 自訂輸入確認
-            const confirmCustom = (key) => {
+            const confirmCustom = async (key) => {
                 const val = parseInt(customInput[key]);
                 if (!val || val <= 0) { setShowCustom(prev => ({ ...prev, [key]: false })); return; }
-                selectDaily(key, val);
+                await selectDaily(key, val);
             };
 
             // Calc this week's actual values
@@ -1332,7 +1373,6 @@
                 const actual = weekActuals[m.field];
                 const goal = goals[m.key] || 0;
                 const daily = dailyGoals[m.key] || 0;
-                const pending = pendingDaily[m.key]; // 暫存但未鎖定的選擇
                 const pct = goal > 0 ? Math.min(100, Math.round(actual / goal * 100)) : 0;
                 const isWeekDone = actual >= goal && goal > 0;
                 const todayVal = todayActuals[m.field];
@@ -1394,7 +1434,7 @@
                         {isUnset && (
                             <div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom: '0'}}>
                                 {opts.map(opt => {
-                                    const isActive = pending === opt && !isCustomShown;
+                                    const isActive = daily === opt && !isCustomShown;
                                     return (
                                         <button key={opt} onClick={() => selectDaily(m.key, opt)}
                                             className="sans-font active-press"
@@ -1500,28 +1540,6 @@
                             </p>
                             {unsetItems.map(m => renderCard(m, true))}
                         </>
-                    )}
-
-                    {/* 確認鎖定按鈕：有暫存選擇才顯示 */}
-                    {Object.keys(pendingDaily).length > 0 && (
-                        <div style={{position:'sticky', bottom:'90px', zIndex:20, padding:'8px 0'}}>
-                            <button onClick={confirmLock} disabled={saving}
-                                className="w-full sans-font active-press"
-                                style={{
-                                    background: saving ? '#9ca3af' : '#374151',
-                                    color: '#fff',
-                                    border: 'none',
-                                    borderRadius: '12px',
-                                    padding: '16px',
-                                    fontSize: '16px',
-                                    fontWeight: '500',
-                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                                    cursor: saving ? 'not-allowed' : 'pointer',
-                                    fontFamily: "'Noto Sans TC', sans-serif",
-                                }}>
-                                {saving ? '儲存中...' : `🔒 確認鎖定本週目標（${Object.keys(pendingDaily).length} 項）`}
-                            </button>
-                        </div>
                     )}
 
                 </div>
