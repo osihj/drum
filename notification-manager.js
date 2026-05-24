@@ -1,6 +1,5 @@
 // ═══════════════════════════════════════════════════
-//  notification-manager.js
-//  貼入活動行事曆 HTML 的 <script type="module"> 區塊內
+//  notification-manager.js  ─  drum 站
 //  依賴：window.firebaseDB 已由 Firebase module 初始化
 // ═══════════════════════════════════════════════════
 
@@ -9,10 +8,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // Firestore 路徑
-//   adminData/notifications        → 全域設定（每日定時）
-//   adminData/notifications/scheduled → 子集合（預約通知清單）
 const NOTIF_DOC = () => doc(window.firebaseDB, 'adminData', 'notifications');
 const SCHEDULED_COL = () => collection(window.firebaseDB, 'adminData', 'notifications', 'scheduled');
+
+// Apps Script 網址（負責呼叫 FCM API 推送給所有裝置）
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyrd2uQNkjTCHSn3XTNvGcuqMMgJn5bJ-0Mhs6hXk5GFNqqIERz_H8syK7CzE0aHJsb/exec';
+const APPS_SCRIPT_SECRET = 'drum2024';
 
 // ── 1. 初始化：申請通知權限 + 註冊 SW ────────────────
 export async function initNotifications() {
@@ -21,15 +22,13 @@ export async function initNotifications() {
     return false;
   }
 
-  // 註冊 Service Worker
   try {
-    await navigator.serviceWorker.register('/rollcall/sw.js');
+    await navigator.serviceWorker.register('/drum/sw.js');
   } catch (e) {
     console.error('[SW] 註冊失敗', e);
     return false;
   }
 
-  // 申請授權（只在使用者互動後呼叫，例如點按鈕時）
   if (Notification.permission === 'default') {
     const result = await Notification.requestPermission();
     if (result !== 'granted') {
@@ -38,17 +37,15 @@ export async function initNotifications() {
     }
   }
 
-  // 監聽 Firestore 設定變化，推送給 SW
   listenAndSync();
   return true;
 }
 
 // ── 2. 即時監聽 Firestore → 傳給 SW ────────────────
+// ✅ 只同步排程設定，不處理 instant 欄位（避免 onSnapshot 觸發重複通知）
 function listenAndSync() {
   onSnapshot(NOTIF_DOC(), async snap => {
     const settings = snap.exists() ? snap.data() : {};
-    // 讀取預約通知子集合
-    const schedSnap = await getDoc(doc(window.firebaseDB, 'adminData', 'notifications'));
     const scheduled = await loadScheduled();
     sendToSW({ type: 'SCHEDULE', settings: { ...settings, scheduled } });
   });
@@ -68,30 +65,46 @@ function sendToSW(message) {
 
 // ── 3. 管理員操作 API ────────────────────────────────
 
-// 儲存每日定時設定
 export async function saveDailySettings({ enabled, time, message }) {
   await setDoc(NOTIF_DOC(), { dailyEnabled: enabled, dailyTime: time, dailyMessage: message }, { merge: true });
 }
 
-// 新增預約通知
-// item = { title, message, datetime: '2025-06-14T09:30' }
 export async function addScheduled(item) {
   await addDoc(SCHEDULED_COL(), { ...item, createdAt: Date.now() });
 }
 
-// 刪除預約通知
 export async function deleteScheduled(id) {
   await deleteDoc(doc(window.firebaseDB, 'adminData', 'notifications', 'scheduled', id));
 }
 
-// 臨時立即推播（寫入 Firestore + 直接通知本機 SW）
+// ── 臨時立即推播 ──────────────────────────────────────
+// 只透過 FCM 推送，不再另外叫 SW 或靠 onSnapshot 顯示，避免重複通知
 export async function sendInstant(message) {
-  // 寫入 Firestore 讓其他使用者的 SW 也能透過 onSnapshot 收到
+  // 寫入 Firestore（紀錄用，不靠它觸發通知）
   await setDoc(NOTIF_DOC(), {
     instant: { message, sentAt: Date.now() }
   }, { merge: true });
-  // 同時通知本機 SW（管理員自己也看到）
-  sendToSW({ type: 'INSTANT', message });
+
+  // 呼叫 Apps Script 推送 FCM（這是唯一的通知來源）
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        title: '自律動起來',
+        message,
+        secret: APPS_SCRIPT_SECRET
+      })
+    });
+    const result = await res.json();
+    console.log('[FCM] 推送結果:', result);
+  } catch (err) {
+    console.warn('[FCM] 推送失敗:', err.message);
+  }
+
+  // ✅ 已移除 sendToSW({ type: 'INSTANT', message })
+  // ✅ 已移除靠 onSnapshot 顯示通知的邏輯
+  // FCM 是唯一通知來源，兩個站的 SW 都會透過 FCM 收到，不會重複
 }
 
 // ── 4. 讀取目前設定（供 UI 顯示用）─────────────────
