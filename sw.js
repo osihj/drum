@@ -49,9 +49,8 @@ self.addEventListener('message', event => {
   if (type === 'SCHEDULE') {
     applySettings(settings);
   }
-  if (type === 'INSTANT') {
-    showNotif('自律動起來', event.data.message, 'instant');
-  }
+  // ✅ 已移除 INSTANT 處理
+  // 原本這裡會再顯示一次通知，與 FCM 推播重複，造成通知出現兩次
 });
 
 // ── 排程管理 ─────────────────────────────────────────
