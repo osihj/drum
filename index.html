@@ -368,10 +368,14 @@
 
             const joinTeam = async (teamId, teamName) => {
                 setLoading(true);
+                // email fallback：redirect 登入時 user.email 有時是 null，改從 providerData 取
+                const resolvedEmail = user.email
+                    || user.providerData?.[0]?.email
+                    || null;
                 await db.collection('users').doc(user.uid).set({
                     teamId, teamName,
-                    displayName: customName.trim() || user.displayName || user.email,
-                    email: user.email,
+                    displayName: customName.trim() || user.displayName || resolvedEmail || '',
+                    email: resolvedEmail,
                     photoURL: user.photoURL || '',
                     role: 'user',
                 }, { merge: true });
@@ -835,9 +839,9 @@
                                     setAuthReady(true);
                                     return;
                                 }
-                                // 補回 email
+                                // 補回 email（含初次寫入就是 null 的情況）
                                 const authEmail = u.email || u.providerData?.[0]?.email || null;
-                                if (authEmail && data.email !== authEmail) {
+                                if (authEmail && !data.email) {
                                     await db.collection('users').doc(u.uid)
                                         .set({ email: authEmail }, { merge: true });
                                 }
