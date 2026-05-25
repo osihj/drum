@@ -813,6 +813,14 @@
                                     setAuthReady(true);
                                     return;
                                 }
+                                // ✅ 補寫 email / photoURL（舊帳號可能為 null）
+                                const needsUpdate = {};
+                                if (!data.email && u.email) needsUpdate.email = u.email;
+                                if (!data.photoURL && u.photoURL) needsUpdate.photoURL = u.photoURL;
+                                if (Object.keys(needsUpdate).length > 0) {
+                                    await db.collection('artifacts').doc(appId).collection('users').doc(u.uid).update(needsUpdate);
+                                    console.log('[Auth] 已補寫缺少的欄位:', needsUpdate);
+                                }
                             }
                         } catch (e) {
                             console.warn('[Auth] 無法讀取使用者狀態:', e.message);
