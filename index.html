@@ -289,8 +289,19 @@
 
             useEffect(() => {
                 auth.getRedirectResult().then(result => {
-                    if (result?.user) setLoading(false);
-                }).catch(() => setLoading(false));
+                    if (result?.user) {
+                        console.log('[Redirect Result]', {
+                            email: result.user.email,
+                            providerData: result.user.providerData
+                        });
+                    } else {
+                        console.log('[Redirect Result] 無 user（可能是 popup 登入或尚未 redirect）');
+                    }
+                    setLoading(false);
+                }).catch(e => {
+                    console.error('[Redirect Error]', e);
+                    setLoading(false);
+                });
             }, []);
 
             return (
