@@ -91,17 +91,6 @@
             .sans-normal      { font-family: 'Noto Sans TC', sans-serif; font-weight: 400; }
             .float-anim       { animation: float 3s ease-in-out infinite; }
             @keyframes float  { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-            @keyframes like-pop { 0% { transform: scale(1); } 25% { transform: scale(1.45); } 50% { transform: scale(0.88); } 75% { transform: scale(1.1); } 100% { transform: scale(1); } }
-            @keyframes heart-float { 0% { opacity:1; transform: translateY(0) scale(1); } 100% { opacity:0; transform: translateY(-70px) scale(0.6); } }
-            @keyframes svg-fill-in { 0% { stroke-dashoffset: 60; opacity:0.3; } 100% { stroke-dashoffset: 0; opacity:1; } }
-            @keyframes ripple-out { 0% { transform: scale(0.6); opacity:0.6; } 100% { transform: scale(2.2); opacity:0; } }
-            @keyframes particle-fly { 0% { transform: translate(0,0) scale(1); opacity:1; } 100% { transform: translate(var(--tx),var(--ty)) scale(0); opacity:0; } }
-            .like-pop { animation: like-pop 0.45s cubic-bezier(.36,.07,.19,.97) both; }
-            .vec-icon { display:block; pointer-events:none; }
-            .like-ripple { position:absolute; inset:0; border-radius:inherit; pointer-events:none; }
-            .like-ripple::after { content:''; position:absolute; inset:0; border-radius:inherit; animation: ripple-out 0.5s ease-out forwards; }
-            .heart-ripple::after { border: 2px solid #ff6b6b; }
-            .thumb-ripple::after { border: 2px solid #4dabf7; }
 
             /* 統一色塊 — 主色 / 輔色 / 強調 */
             .pk-blue   { background-color: var(--c-primary); }
@@ -277,34 +266,30 @@
             const handleGoogleLogin = async () => {
                 setLoading(true);
                 setError('');
-                const provider = new firebase.auth.GoogleAuthProvider();
-                provider.addScope('email');
-                provider.addScope('profile');
-                provider.setCustomParameters({ prompt: 'select_account' });
                 try {
-                    // popup 優先（桌面 Chrome 最穩定）
-                    const result = await auth.signInWithPopup(provider);
-                    console.log('[Popup 登入成功]', { uid: result.user?.uid, email: result.user?.email });
-                } catch (popupError) {
-                    console.warn('[Popup 失敗]', popupError.code);
-                    if (
-                        popupError.code === 'auth/popup-blocked' ||
-                        popupError.code === 'auth/popup-closed-by-user' ||
-                        popupError.code === 'auth/cancelled-popup-request'
-                    ) {
-                        // popup 被封鎖才改用 redirect（行動裝置 Safari）
-                        try {
-                            await auth.signInWithRedirect(provider);
-                        } catch (e) {
-                            setError('登入失敗，請再試一次');
-                            setLoading(false);
-                        }
-                    } else {
-                        setError('登入失敗：' + popupError.message);
-                        setLoading(false);
-                    }
+                    const provider = new firebase.auth.GoogleAuthProvider();
+                    provider.addScope('email');
+                    provider.addScope('profile');
+                    provider.setCustomParameters({ prompt: 'select_account' });
+                    await auth.signInWithRedirect(provider);
+                } catch (e) {
+                    setError('登入失敗，請再試一次');
+                    setLoading(false);
                 }
             };
+
+            useEffect(() => {
+                auth.getRedirectResult().then(result => {
+                    if (result?.user) {
+                        console.log('[Login 成功]', { uid: result.user.uid, email: result.user.email });
+                    }
+                    setLoading(false);
+                }).catch(e => {
+                    console.error('[Login 失敗]', e);
+                    setError('登入失敗：' + e.message);
+                    setLoading(false);
+                });
+            }, []);
 
             return (
                 <div className="max-w-md mx-auto min-h-screen flex flex-col items-center justify-center p-8 gap-10">
@@ -373,7 +358,6 @@
                     displayName: customName.trim() || user.displayName || user.email,
                     email: user.email,
                     photoURL: user.photoURL || '',
-                    role: 'user',
                 }, { merge: true });
                 onJoinTeam(teamId, teamName);
             };
@@ -454,14 +438,14 @@
                         </div>
                         <h2 className="sans-font text-3xl tracking-tighter" style={{color:'var(--c-text)'}}>選擇陣營</h2>
                         <p className="text-xs sans-font mt-1" style={{color:'var(--c-muted)'}}>
-                            <span style={{color:'#374151', fontWeight:'500'}}>{customName}</span>，加入或創建你的修煉陣營
+                            <span style={{color:'#374151', fontWeight:'500'}}>{customName}</span>，加入或創建你的修煉門派
                         </p>
                     </div>
 
                     {/* Existing teams */}
                     <div className="space-y-3">
                         {teams.length === 0 && (
-                            <p className="text-center text-xs opacity-30 sans-font py-4">還沒有陣營，成為第一個創立者！</p>
+                            <p className="text-center text-xs opacity-30 sans-font py-4">還沒有門派，成為第一個創立者！</p>
                         )}
                         {teams.map(t => (
                             <button key={t.id} onClick={() => joinTeam(t.id, t.name)}
@@ -479,19 +463,19 @@
 
                     {/* Create new team */}
                     <div className="bg-white p-5 r-card card-shadow space-y-3">
-                        <p className="sans-font text-xs tracking-widest" style={{color:'var(--c-muted)'}}>創建新陣營</p>
+                        <p className="sans-font text-xs tracking-widest" style={{color:'var(--c-muted)'}}>創建新門派</p>
                         <input
                             type="text"
                             value={newTeamName}
                             onChange={e => setNewTeamName(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && createTeam()}
-                            placeholder="輸入陣營名稱..."
+                            placeholder="輸入門派名稱..."
                             className="w-full px-4 py-2.5 text-sm sans-font focus:outline-none bg-slate-50 neo-border-thin r-btn"
                             style={{border:'1px solid var(--c-border-strong)'}}
                         />
                         <button onClick={createTeam} disabled={creating || !newTeamName.trim()}
                             className="w-full pk-green py-3 r-btn neo-border sans-font text-base active-press disabled:opacity-30 neo-shadow-sm">
-                            {creating ? '創立中...' : '創立陣營'}
+                            {creating ? '創立中...' : '創立門派'}
                         </button>
                     </div>
 
@@ -546,67 +530,27 @@
                 return () => unsub();
             }, [currentUser]);
 
-            const vibrateDevice = (pattern = [30]) => {
-                if ('vibrate' in navigator) navigator.vibrate(pattern);
-            };
-
-            const spawnFloatingHeart = (el, type = 'heart') => {
-                if (!el) return;
-                const rect = el.getBoundingClientRect();
-                const cx = rect.left + rect.width / 2;
-                const cy = rect.top + rect.height / 2;
-                // 主要上升圖示
-                const main = document.createElement('div');
-                const isHeart = type === 'heart' || type === '❤️';
-                main.innerHTML = isHeart
-                    ? `<svg width="22" height="22" viewBox="0 0 24 24" fill="#ff6b6b" xmlns="http://www.w3.org/2000/svg"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`
-                    : `<svg width="22" height="22" viewBox="0 0 24 24" fill="#4dabf7" xmlns="http://www.w3.org/2000/svg"><path d="M2 20h2c.55 0 1-.45 1-1v-9c0-.55-.45-1-1-1H2v11zm19.83-7.12c.11-.25.17-.52.17-.8V11c0-1.1-.9-2-2-2h-5.5l.92-4.65c.05-.22.02-.46-.08-.66-.23-.45-.52-.86-.88-1.22L14 2 7.59 8.41C7.21 8.79 7 9.3 7 9.83V19c0 1.1.9 2 2 2h9c.83 0 1.58-.5 1.91-1.28l3-7.72z"/></svg>`;
-                main.style.cssText = `position:fixed;left:${cx - 11}px;top:${cy - 11}px;pointer-events:none;z-index:9999;animation:heart-float 0.75s ease-out forwards;`;
-                document.body.appendChild(main);
-                setTimeout(() => main.remove(), 800);
-                // 小粒子
-                const colors = isHeart ? ['#ff8787','#ffa8a8','#ff6b6b'] : ['#74c0fc','#a5d8ff','#4dabf7'];
-                for (let k = 0; k < 5; k++) {
-                    const p = document.createElement('div');
-                    const angle = (k / 5) * Math.PI * 2;
-                    const dist = 22 + Math.random() * 14;
-                    const tx = Math.cos(angle) * dist;
-                    const ty = Math.sin(angle) * dist - 10;
-                    p.style.cssText = `position:fixed;left:${cx - 3}px;top:${cy - 3}px;width:6px;height:6px;border-radius:50%;background:${colors[k % colors.length]};pointer-events:none;z-index:9999;--tx:${tx}px;--ty:${ty}px;animation:particle-fly 0.55s ease-out ${k * 0.04}s forwards;`;
-                    document.body.appendChild(p);
-                    setTimeout(() => p.remove(), 650);
-                }
-            };
-
-            const toggleTeamLike = async (teamId, btnEl) => {
+            const toggleTeamLike = async (teamId) => {
                 if (!currentUser) return;
                 const likeId = `${currentUser.uid}_team_${teamId}`;
                 const ref = db.collection('artifacts').doc(appId).collection('likes').doc(likeId);
                 const existing = teamLikes[teamId]?.likedByMe;
                 if (existing) {
                     await ref.delete();
-                    vibrateDevice([10]);
                 } else {
                     await ref.set({ type: 'team', targetId: teamId, uid: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-                    vibrateDevice([20, 10, 20]);
-                    spawnFloatingHeart(btnEl, 'heart');
-                    if (btnEl) { btnEl.classList.remove('like-pop'); void btnEl.offsetWidth; btnEl.classList.add('like-pop'); }
                 }
             };
 
-            const toggleMemberLike = async (uid, btnEl) => {
+            const toggleMemberLike = async (uid) => {
                 if (!currentUser || uid === currentUser.uid) return;
                 const likeId = `${currentUser.uid}_member_${uid}`;
                 const ref = db.collection('artifacts').doc(appId).collection('likes').doc(likeId);
                 const existing = memberLikes[uid]?.likedByMe;
                 if (existing) {
                     await ref.delete();
-                    vibrateDevice([10]);
                 } else {
                     await ref.set({ type: 'member', targetId: uid, uid: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-                    vibrateDevice([20, 10, 20]);
-                    spawnFloatingHeart(btnEl, 'thumb');
-                    if (btnEl) { btnEl.classList.remove('like-pop'); void btnEl.offsetWidth; btnEl.classList.add('like-pop'); }
                 }
             };
 
@@ -701,10 +645,10 @@
 
                     {loading && <div className="text-center py-12 opacity-30 sans-font text-sm">載入中...</div>}
 
-                    {/* ── 陣營排名 tab ── */}
+                    {/* ── 門派排名 tab ── */}
                     {!loading && lbTab === 'teams' && (
                         <div className="space-y-3">
-                            {leaderboard.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有陣營資料</div>}
+                            {leaderboard.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有門派資料</div>}
                             {leaderboard.map((team, i) => {
                                 const isMyTeam = team.id === userTeamId;
                                 const accentColor = isMyTeam ? '#74d99f' : teamAccentColors[i % teamAccentColors.length];
@@ -732,30 +676,13 @@
                                                     <div className="sans-font text-lg" style={{lineHeight:'1.2', color:'#374151'}}>{team.avg}</div>
                                                     <div className="sans-font" style={{fontSize:'9px', color:'#9ca3af'}}>均值</div>
                                                 </div>
-                                                {/* ❤️ 鼓勵按鈕 (vector) */}
-                                                {(() => {
-                                                    const liked = teamLikes[team.id]?.likedByMe;
-                                                    const count = teamLikes[team.id]?.count || 0;
-                                                    return (
-                                                        <button onClick={(e) => { e.stopPropagation(); toggleTeamLike(team.id, e.currentTarget); }}
-                                                            className="rounded-xl flex flex-col items-center justify-center active-press"
-                                                            style={{padding:'8px 10px', minWidth:'50px', position:'relative', overflow:'visible',
-                                                                background: liked ? 'linear-gradient(135deg,#ff8787,#ff6b6b)' : '#ffffff',
-                                                                border: liked ? '1.5px solid #ff6b6b' : `1.5px solid ${accentColor}70`,
-                                                                boxShadow: liked ? '0 2px 10px rgba(255,107,107,0.4)' : 'none',
-                                                                transition:'all 0.22s cubic-bezier(.34,1.56,.64,1)'}}>
-                                                            <svg className="vec-icon" width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
-                                                                style={{transition:'transform 0.22s cubic-bezier(.34,1.56,.64,1)'}}>
-                                                                {liked ? (
-                                                                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#fff"/>
-                                                                ) : (
-                                                                    <path d="M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z" fill={`${accentColor}cc`}/>
-                                                                )}
-                                                            </svg>
-                                                            <div className="sans-font" style={{fontSize:'10px', fontWeight:'700', color: liked ? '#fff' : '#9ca3af', marginTop:'2px'}}>{count > 0 ? count : '鼓勵'}</div>
-                                                        </button>
-                                                    );
-                                                })()}
+                                                {/* ❤️ 鼓勵按鈕 */}
+                                                <button onClick={(e) => { e.stopPropagation(); toggleTeamLike(team.id); }}
+                                                    className="rounded-xl flex flex-col items-center justify-center active-press"
+                                                    style={{padding:'8px 10px', minWidth:'46px', background: teamLikes[team.id]?.likedByMe ? '#ffe4e4' : '#ffffff', border: teamLikes[team.id]?.likedByMe ? '1px solid #ff8787' : `1px solid ${accentColor}70`, transition:'all 0.15s'}}>
+                                                    <span style={{fontSize:'16px', lineHeight:'1.2'}}>{teamLikes[team.id]?.likedByMe ? '❤️' : '🤍'}</span>
+                                                    <div className="sans-font" style={{fontSize:'9px', color: teamLikes[team.id]?.likedByMe ? '#9b1c1c' : '#9ca3af'}}>{teamLikes[team.id]?.count || 0}</div>
+                                                </button>
                                             </div>
                                         </div>
                                         {/* White body — members list */}
@@ -779,7 +706,7 @@
                         </div>
                     )}
 
-                    {/* ── 陣營成員 tab ── */}
+                    {/* ── 門派成員 tab ── */}
                     {!loading && lbTab === 'members' && (
                         <div className="space-y-2">
                             {allMembers.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有成員資料</div>}
@@ -814,41 +741,22 @@
                                                 <div className="sans-font" style={{fontSize:'15px', fontWeight:'500', color:'#1f2937'}}>Lv.{m.lv}</div>
                                                 <div className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>{m.score} 點</div>
                                             </div>
-                                            {/* 👍 點讚按鈕 (vector) */}
-                                            {!isMe && (() => {
-                                                const liked = memberLikes[m.uid]?.likedByMe;
-                                                const count = memberLikes[m.uid]?.count || 0;
-                                                return (
-                                                    <button onClick={(e) => toggleMemberLike(m.uid, e.currentTarget)}
-                                                        className="flex flex-col items-center justify-center active-press r-btn"
-                                                        style={{padding:'7px 9px', minWidth:'44px', position:'relative',
-                                                            background: liked ? 'linear-gradient(135deg,#74c0fc,#4dabf7)' : '#f8fafc',
-                                                            border: liked ? '1.5px solid #4dabf7' : '1.5px solid var(--c-border)',
-                                                            boxShadow: liked ? '0 2px 8px rgba(116,192,252,0.45)' : 'none',
-                                                            transition:'all 0.22s cubic-bezier(.34,1.56,.64,1)'}}>
-                                                        <svg className="vec-icon" width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                            {liked ? (
-                                                                <path d="M2 20h2c.55 0 1-.45 1-1v-9c0-.55-.45-1-1-1H2v11zm19.83-7.12c.11-.25.17-.52.17-.8V11c0-1.1-.9-2-2-2h-5.5l.92-4.65c.05-.22.02-.46-.08-.66-.23-.45-.52-.86-.88-1.22L14 2 7.59 8.41C7.21 8.79 7 9.3 7 9.83V19c0 1.1.9 2 2 2h9c.83 0 1.58-.5 1.91-1.28l3-7.72z" fill="#fff"/>
-                                                            ) : (
-                                                                <path d="M9 21h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 2 7.58 8.59C7.22 8.95 7 9.45 7 10v9c0 1.1.9 2 2 2zM9 10l4.34-4.34L12 10h9v2l-3 7H9V10zM1 10h4v11H1z" fill="#9ca3af"/>
-                                                            )}
-                                                        </svg>
-                                                        <span className="sans-font" style={{fontSize:'9px', fontWeight:'700', color: liked ? '#fff' : '#9ca3af', marginTop:'2px'}}>{count > 0 ? count : '讚'}</span>
-                                                    </button>
-                                                );
-                                            })()}
-                                            {isMe && (() => {
-                                                const count = memberLikes[m.uid]?.count || 0;
-                                                return count > 0 ? (
-                                                    <div className="flex flex-col items-center justify-center r-btn"
-                                                        style={{padding:'7px 9px', minWidth:'44px', background:'linear-gradient(135deg,#ff8787,#ff6b6b)', border:'1.5px solid #ff6b6b', boxShadow:'0 2px 6px rgba(255,107,107,0.3)'}}>
-                                                        <svg className="vec-icon" width="16" height="16" viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg">
-                                                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                                                        </svg>
-                                                        <span className="sans-font" style={{fontSize:'9px', fontWeight:'700', color:'#fff', marginTop:'2px'}}>{count}</span>
-                                                    </div>
-                                                ) : null;
-                                            })()}
+                                            {/* 👍 點讚按鈕（不能給自己點讚） */}
+                                            {!isMe && (
+                                                <button onClick={() => toggleMemberLike(m.uid)}
+                                                    className="flex flex-col items-center justify-center active-press r-btn"
+                                                    style={{padding:'6px 8px', background: memberLikes[m.uid]?.likedByMe ? '#ffe4e4' : '#f8fafc', border: memberLikes[m.uid]?.likedByMe ? '1px solid #ff8787' : '1px solid var(--c-border)', transition:'all 0.15s', minWidth:'38px'}}>
+                                                    <span style={{fontSize:'14px', lineHeight:1}}>{memberLikes[m.uid]?.likedByMe ? '👍' : '👍'}</span>
+                                                    <span className="sans-font" style={{fontSize:'9px', color: memberLikes[m.uid]?.likedByMe ? '#9b1c1c' : '#9ca3af', marginTop:'2px'}}>{memberLikes[m.uid]?.count || 0}</span>
+                                                </button>
+                                            )}
+                                            {isMe && memberLikes[m.uid]?.count > 0 && (
+                                                <div className="flex flex-col items-center justify-center r-btn"
+                                                    style={{padding:'6px 8px', background:'#fff0f0', border:'1px solid #ff8787', minWidth:'38px'}}>
+                                                    <span style={{fontSize:'14px', lineHeight:1}}>❤️</span>
+                                                    <span className="sans-font" style={{fontSize:'9px', color:'#9b1c1c', marginTop:'2px'}}>{memberLikes[m.uid]?.count}</span>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 );
@@ -950,45 +858,8 @@
             const currentWeekDays = useMemo(() => getWeekDays(new Date()), []);
 
             // Auth state
-            // redirect 登入回來後取得結果（必須在 App 層執行）
             useEffect(() => {
-                auth.getRedirectResult().then(result => {
-                    if (result?.user) {
-                        console.log('[Redirect 登入成功]', {
-                            uid: result.user.uid,
-                            email: result.user.email,
-                        });
-                    }
-                }).catch(e => {
-                    console.error('[Redirect 登入失敗]', e.message);
-                });
-            }, []);
-
-            useEffect(() => {
-                return auth.onAuthStateChanged(async u => {
-                    if (u) {
-                        try {
-                            const userDoc = await db.collection('artifacts').doc(appId).collection('users').doc(u.uid).get();
-                            if (userDoc.exists) {
-                                const data = userDoc.data();
-                                if (data.active === false) {
-                                    await auth.signOut();
-                                    alert('此帳號已停用，請聯絡管理員。');
-                                    setUser(null);
-                                    setAuthReady(true);
-                                    return;
-                                }
-                                // 補回 email
-                                const authEmail = u.email || u.providerData?.[0]?.email || null;
-                                if (authEmail && data.email !== authEmail) {
-                                    await db.collection('artifacts').doc(appId).collection('users').doc(u.uid)
-                                        .set({ email: authEmail }, { merge: true });
-                                }
-                            }
-                        } catch (e) {
-                            console.warn('[Auth] 讀取失敗:', e.message);
-                        }
-                    }
+                return auth.onAuthStateChanged(u => {
                     setUser(u);
                     setAuthReady(true);
                 });
@@ -1156,7 +1027,7 @@
                 setUserProfile(prev => ({ ...prev, teamId, teamName }));
             };
 
-            const isAdmin = userProfile?.role === 'admin' || user?.email?.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase().trim();
+            const isAdmin = user?.email?.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase().trim();
 
             const stats = useMemo(() => {
                 const startOfWeek = currentWeekDays[0];
@@ -2400,7 +2271,7 @@
             const [sending, setSending] = useState(false);
             const messagesEndRef = React.useRef(null);
 
-            // 載入所有陣營
+            // 載入所有門派
             useEffect(() => {
                 const unsub = db.collection('artifacts').doc(appId).collection('teams')
                     .onSnapshot(snap => {
@@ -2411,7 +2282,7 @@
                 return () => unsub();
             }, []);
 
-            // 載入訊息（選擇陣營後）
+            // 載入訊息（選擇門派後）
             useEffect(() => {
                 if (!selectedTeam) return;
                 const unsub = db.collection('artifacts').doc(appId)
@@ -2467,7 +2338,7 @@
             const teamAccentColors = ['#ffd43b','#74c0fc','#ff8787','#8ce99a','#b197fc','#ff922b'];
             const teamBgColors = ['#fef3c7','#e0f2fe','#ffe4e4','#d1fae5','#ede9fe','#fff0e0'];
 
-            // ── 陣營選擇畫面 ──
+            // ── 門派選擇畫面 ──
             if (!selectedTeam) return (
                 <div className="space-y-4 animate-in fade-in duration-300" style={{paddingBottom:'2rem'}}>
                     <div className="vibrant-card p-5 r-card float-anim" style={{boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
@@ -2612,7 +2483,7 @@
 
             const deleteTeam = async (team) => {
                 const membersInTeam = users.filter(u => u.teamId === team.id);
-                if (!window.confirm(`確定刪除「${team.name}」陣營？\n${membersInTeam.length > 0 ? `⚠️ 裡面還有 ${membersInTeam.length} 位成員，他們將變成無陣營狀態。` : '此陣營目前沒有成員。'}`)) return;
+                if (!window.confirm(`確定刪除「${team.name}」門派？\n${membersInTeam.length > 0 ? `⚠️ 裡面還有 ${membersInTeam.length} 位成員，他們將變成無門派狀態。` : '此門派目前沒有成員。'}`)) return;
                 // Clear teamId for all members
                 const batch = db.batch();
                 membersInTeam.forEach(u => {
@@ -2641,7 +2512,7 @@
             };
 
             const removeUserFromTeam = async (uid) => {
-                if (!window.confirm('確定將此成員移出陣營？')) return;
+                if (!window.confirm('確定將此成員移出門派？')) return;
                 await db.collection('artifacts').doc(appId).collection('users').doc(uid)
                     .update({ teamId: firebase.firestore.FieldValue.delete(), teamName: firebase.firestore.FieldValue.delete() });
             };
@@ -2654,7 +2525,7 @@
                     <div className="p-5 r-card relative overflow-hidden" style={{background:'var(--c-text)'}}>
                         <div className="relative z-10">
                             <h2 className="sans-font text-xl text-white mb-0.5">管理員後台</h2>
-                            <p className="text-xs sans-font" style={{color:'rgba(255,255,255,0.5)'}}>陣營與成員管理</p>
+                            <p className="text-xs sans-font" style={{color:'rgba(255,255,255,0.5)'}}>門派與成員管理</p>
                         </div>
                         <Icon name="Shield" size={72} className="absolute -bottom-3 -right-2 rotate-12" style={{color:'rgba(255,255,255,0.08)'}} />
                     </div>
@@ -2662,7 +2533,7 @@
                     {/* Sub tabs */}
                     <div className="flex bg-white r-card" style={{border:'1px solid var(--c-border)', padding:'3px'}}>
                         <button onClick={() => setTab('teams')} className={`flex-1 sans-font text-xs r-btn transition-all ${tab === 'teams' ? 'pk-blue' : ''}`}
-                            style={{color: tab === 'teams' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>陣營管理</button>
+                            style={{color: tab === 'teams' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>門派管理</button>
                         <button onClick={() => setTab('users')} className={`flex-1 sans-font text-xs r-btn transition-all ${tab === 'users' ? 'pk-blue' : ''}`}
                             style={{color: tab === 'users' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>成員管理</button>
                     </div>
@@ -2672,13 +2543,13 @@
                         <div className="space-y-4">
                             {/* Create team */}
                             <div className="bg-white p-4 r-card card-shadow space-y-3">
-                                <p className="sans-font text-xs tracking-widest" style={{color:'var(--c-muted)'}}>新增陣營</p>
+                                <p className="sans-font text-xs tracking-widest" style={{color:'var(--c-muted)'}}>新增門派</p>
                                 <div className="flex gap-2">
                                     <input
                                         type="text" value={newTeamName}
                                         onChange={e => setNewTeamName(e.target.value)}
                                         onKeyDown={e => e.key === 'Enter' && createTeam()}
-                                        placeholder="陣營名稱..."
+                                        placeholder="門派名稱..."
                                         className="flex-1 px-3 py-2 text-sm sans-font focus:outline-none bg-slate-50 r-btn"
                                         style={{border:'1px solid var(--c-border-strong)'}}
                                     />
@@ -2690,7 +2561,7 @@
                             </div>
 
                             {/* Team list */}
-                            {teams.length === 0 && <p className="text-center text-xs sans-font py-4" style={{color:'var(--c-muted)'}}>尚無陣營</p>}
+                            {teams.length === 0 && <p className="text-center text-xs sans-font py-4" style={{color:'var(--c-muted)'}}>尚無門派</p>}
                             {teams.map((team, i) => {
                                 const memberCount = users.filter(u => u.teamId === team.id).length;
                                 const color = teamColors[i % teamColors.length];
@@ -2741,7 +2612,7 @@
                                                 <p className="text-[10px] sans-font truncate" style={{color:'var(--c-muted)'}}>{u.email}</p>
                                                 {teamName
                                                     ? <span className="text-[10px] pk-blue px-2 py-0.5 r-badge sans-font mt-1 inline-block" style={{color:'var(--c-primary-text)'}}>{teamName}</span>
-                                                    : <span className="text-[10px] px-2 py-0.5 r-badge sans-font mt-1 inline-block" style={{background:'var(--c-danger-bg)',color:'var(--c-danger-text)'}}>無陣營</span>
+                                                    : <span className="text-[10px] px-2 py-0.5 r-badge sans-font mt-1 inline-block" style={{background:'var(--c-danger-bg)',color:'var(--c-danger-text)'}}>無門派</span>
                                                 }
                                             </div>
                                             <div className="flex gap-2 ml-2">
