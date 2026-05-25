@@ -353,7 +353,7 @@
             }, [step]);
 
             useEffect(() => {
-                const unsub = db.collection('artifacts').doc(appId).collection('teams')
+                const unsub = db.collection('teams')
                     .onSnapshot(snap => {
                         const list = [];
                         snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
@@ -368,7 +368,7 @@
 
             const joinTeam = async (teamId, teamName) => {
                 setLoading(true);
-                await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).set({
+                await db.collection('users').doc(user.uid).set({
                     teamId, teamName,
                     displayName: customName.trim() || user.displayName || user.email,
                     email: user.email,
@@ -382,7 +382,7 @@
                 const name = newTeamName.trim();
                 if (!name) return;
                 setCreating(true);
-                const ref = db.collection('artifacts').doc(appId).collection('teams').doc();
+                const ref = db.collection('teams').doc();
                 await ref.set({ name, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
                 await joinTeam(ref.id, name);
             };
@@ -454,14 +454,14 @@
                         </div>
                         <h2 className="sans-font text-3xl tracking-tighter" style={{color:'var(--c-text)'}}>選擇陣營</h2>
                         <p className="text-xs sans-font mt-1" style={{color:'var(--c-muted)'}}>
-                            <span style={{color:'#374151', fontWeight:'500'}}>{customName}</span>，加入或創建你的修煉門派
+                            <span style={{color:'#374151', fontWeight:'500'}}>{customName}</span>，加入或創建你的修煉陣營
                         </p>
                     </div>
 
                     {/* Existing teams */}
                     <div className="space-y-3">
                         {teams.length === 0 && (
-                            <p className="text-center text-xs opacity-30 sans-font py-4">還沒有門派，成為第一個創立者！</p>
+                            <p className="text-center text-xs opacity-30 sans-font py-4">還沒有陣營，成為第一個創立者！</p>
                         )}
                         {teams.map(t => (
                             <button key={t.id} onClick={() => joinTeam(t.id, t.name)}
@@ -479,19 +479,19 @@
 
                     {/* Create new team */}
                     <div className="bg-white p-5 r-card card-shadow space-y-3">
-                        <p className="sans-font text-xs tracking-widest" style={{color:'var(--c-muted)'}}>創建新門派</p>
+                        <p className="sans-font text-xs tracking-widest" style={{color:'var(--c-muted)'}}>創建新陣營</p>
                         <input
                             type="text"
                             value={newTeamName}
                             onChange={e => setNewTeamName(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && createTeam()}
-                            placeholder="輸入門派名稱..."
+                            placeholder="輸入陣營名稱..."
                             className="w-full px-4 py-2.5 text-sm sans-font focus:outline-none bg-slate-50 neo-border-thin r-btn"
                             style={{border:'1px solid var(--c-border-strong)'}}
                         />
                         <button onClick={createTeam} disabled={creating || !newTeamName.trim()}
                             className="w-full pk-green py-3 r-btn neo-border sans-font text-base active-press disabled:opacity-30 neo-shadow-sm">
-                            {creating ? '創立中...' : '創立門派'}
+                            {creating ? '創立中...' : '創立陣營'}
                         </button>
                     </div>
 
@@ -521,12 +521,12 @@
             };
 
             useEffect(() => {
-                const unsubTeams = db.collection('artifacts').doc(appId).collection('teams')
+                const unsubTeams = db.collection('teams')
                     .onSnapshot(async teamSnap => {
                         const teams = {};
                         teamSnap.forEach(doc => { teams[doc.id] = { id: doc.id, name: doc.data().name, members: [] }; });
 
-                        const usersSnap = await db.collection('artifacts').doc(appId).collection('users').get();
+                        const usersSnap = await db.collection('users').get();
                         const userPromises = [];
                         const membersFlat = [];
 
@@ -535,7 +535,7 @@
                             if (userData.teamId && teams[userData.teamId]) {
                                 const uid = userDoc.id;
                                 userPromises.push(
-                                    db.collection('artifacts').doc(appId).collection('users').doc(uid)
+                                    db.collection('users').doc(uid)
                                         .collection('dailyLogs').get()
                                         .then(logsSnap => {
                                             const logs = {};
@@ -611,10 +611,10 @@
 
                     {loading && <div className="text-center py-12 opacity-30 sans-font text-sm">載入中...</div>}
 
-                    {/* ── 門派排名 tab ── */}
+                    {/* ── 陣營排名 tab ── */}
                     {!loading && lbTab === 'teams' && (
                         <div className="space-y-3">
-                            {leaderboard.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有門派資料</div>}
+                            {leaderboard.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有陣營資料</div>}
                             {leaderboard.map((team, i) => {
                                 const isMyTeam = team.id === userTeamId;
                                 const accentColor = isMyTeam ? '#74d99f' : teamAccentColors[i % teamAccentColors.length];
@@ -671,7 +671,7 @@
                         </div>
                     )}
 
-                    {/* ── 門派成員 tab ── */}
+                    {/* ── 陣營成員 tab ── */}
                     {!loading && lbTab === 'members' && (
                         <div className="space-y-2">
                             {allMembers.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有成員資料</div>}
@@ -825,7 +825,7 @@
                 return auth.onAuthStateChanged(async u => {
                     if (u) {
                         try {
-                            const userDoc = await db.collection('artifacts').doc(appId).collection('users').doc(u.uid).get();
+                            const userDoc = await db.collection('users').doc(u.uid).get();
                             if (userDoc.exists) {
                                 const data = userDoc.data();
                                 if (data.active === false) {
@@ -838,7 +838,7 @@
                                 // 補回 email
                                 const authEmail = u.email || u.providerData?.[0]?.email || null;
                                 if (authEmail && data.email !== authEmail) {
-                                    await db.collection('artifacts').doc(appId).collection('users').doc(u.uid)
+                                    await db.collection('users').doc(u.uid)
                                         .set({ email: authEmail }, { merge: true });
                                 }
                             }
@@ -989,7 +989,7 @@
             // Load user profile (team info)
             useEffect(() => {
                 if (!user) return;
-                const unsub = db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
+                const unsub = db.collection('users').doc(user.uid)
                     .onSnapshot(snap => {
                         if (snap.exists) setUserProfile(snap.data());
                         else setUserProfile(null);
@@ -1000,7 +1000,7 @@
             // Load daily logs
             useEffect(() => {
                 if (!user) return;
-                const unsub = db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
+                const unsub = db.collection('users').doc(user.uid)
                     .collection('dailyLogs').onSnapshot(snap => {
                         const logs = {};
                         snap.forEach(doc => logs[doc.id] = doc.data());
@@ -1056,7 +1056,7 @@
                 Object.entries(pendingTaps).forEach(([field, val]) => {
                     updates[field] = firebase.firestore.FieldValue.increment(val);
                 });
-                await db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
+                await db.collection('users').doc(user.uid)
                     .collection('dailyLogs').doc(todayKey).set(updates, { merge: true });
                 window.confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, colors: ['#74c0fc', '#ffd43b', '#ff8787'] });
                 setPendingTaps({});
@@ -1069,7 +1069,7 @@
             const handleClearToday = async () => {
                 if (!user) return;
                 if (window.confirm("確定要清除今日的所有紀錄嗎？")) {
-                    await db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
+                    await db.collection('users').doc(user.uid)
                         .collection('dailyLogs').doc(todayKey).delete();
                 }
             };
@@ -1302,7 +1302,7 @@
                     )}
 
                     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white" style={{borderTop:'1px solid var(--c-border)', paddingBottom:'env(safe-area-inset-bottom, 0px)'}}>
-                        <div className="max-w-md mx-auto flex justify-around items-center" style={{padding:'4px 0 6px'}}>
+                        <div className="max-w-md mx-auto" style={{display:'grid', gridTemplateColumns:'repeat(6,1fr)', alignItems:'end', padding:'4px 0 6px'}}>
                             <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} navIcon="mountain" label="修煉室" />
                             <NavBtn active={activeTab === 'leaderboard'} onClick={() => setActiveTab('leaderboard')} navIcon="scroll" label="風雲榜" />
                             <NavBtn active={activeTab === 'messageboard'} onClick={() => setActiveTab('messageboard')} navIcon="message" label="留言板" />
@@ -1364,7 +1364,7 @@
             // Load goals from Firestore — 只讀取本週 key 的目標，舊週自動視為空
             useEffect(() => {
                 if (!user) return;
-                const unsub = db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
+                const unsub = db.collection('users').doc(user.uid)
                     .onSnapshot(snap => {
                         if (snap.exists) {
                             const data = snap.data();
@@ -1391,7 +1391,7 @@
                 setGoals(updatedGoals);
                 setDailyGoals(updatedDaily);
                 setShowCustom(prev => ({ ...prev, [key]: false }));
-                await db.collection('artifacts').doc(appId).collection('users').doc(user.uid)
+                await db.collection('users').doc(user.uid)
                     .set({
                         milestoneGoals: updatedGoals,
                         milestoneDailyGoals: updatedDaily,
@@ -2285,8 +2285,7 @@
                     const cutoff = new Date();
                     cutoff.setDate(cutoff.getDate() - 7);
                     const cutoffTs = firebase.firestore.Timestamp.fromDate(cutoff);
-                    const oldSnap = await db.collection('artifacts').doc(appId)
-                        .collection('messages').doc(teamId)
+                    const oldSnap = await db.collection('messages').doc(teamId)
                         .collection('chat')
                         .where('createdAt', '<', cutoffTs)
                         .limit(50).get();
@@ -2296,9 +2295,9 @@
                 } catch(e) { /* 靜默忽略權限錯誤 */ }
             };
 
-            // ── 載入所有門派 ──
+            // ── 載入所有陣營 ──
             useEffect(() => {
-                const unsub = db.collection('artifacts').doc(appId).collection('teams')
+                const unsub = db.collection('teams')
                     .onSnapshot(snap => {
                         const list = [];
                         snap.forEach(doc => list.push({ id: doc.id, name: doc.data().name }));
@@ -2309,7 +2308,7 @@
 
             // ── 監聽所有陣營在線人數 ──
             useEffect(() => {
-                const unsub = db.collection('artifacts').doc(appId).collection('presence')
+                const unsub = db.collection('presence')
                     .where('online', '==', true)
                     .onSnapshot(snap => {
                         const counts = {};
@@ -2328,8 +2327,7 @@
                 const cutoff = new Date(Date.now() - 5 * 60 * 1000);
                 const cutoffTs = firebase.firestore.Timestamp.fromDate(cutoff);
                 const unsubs = teams.map(team => {
-                    return db.collection('artifacts').doc(appId)
-                        .collection('messages').doc(team.id)
+                    return db.collection('messages').doc(team.id)
                         .collection('chat')
                         .where('createdAt', '>=', cutoffTs)
                         .onSnapshot(snap => {
@@ -2343,8 +2341,7 @@
             useEffect(() => {
                 if (!selectedTeam || !currentUser) return;
                 cleanupOldMessages(selectedTeam.id);
-                const presenceRef = db.collection('artifacts').doc(appId)
-                    .collection('presence').doc(currentUser.uid);
+                const presenceRef = db.collection('presence').doc(currentUser.uid);
                 const teamId = userProfile?.teamId || selectedTeam.id;
                 presenceRef.set({
                     uid: currentUser.uid,
@@ -2377,8 +2374,7 @@
             // ── 載入訊息 ──
             useEffect(() => {
                 if (!selectedTeam) return;
-                const unsub = db.collection('artifacts').doc(appId)
-                    .collection('messages').doc(selectedTeam.id)
+                const unsub = db.collection('messages').doc(selectedTeam.id)
                     .collection('chat')
                     .orderBy('createdAt', 'asc')
                     .limitToLast(100)
@@ -2416,8 +2412,7 @@
                 const text = messageText.trim();
                 setMessageText('');
                 try {
-                    await db.collection('artifacts').doc(appId)
-                        .collection('messages').doc(selectedTeam.id)
+                    await db.collection('messages').doc(selectedTeam.id)
                         .collection('chat').add({
                             text,
                             uid: currentUser.uid,
@@ -2434,8 +2429,7 @@
             // ── 切換訊息愛心 ──
             const toggleMsgLike = async (msg, btnEl) => {
                 if (!currentUser) return;
-                const msgRef = db.collection('artifacts').doc(appId)
-                    .collection('messages').doc(selectedTeam.id)
+                const msgRef = db.collection('messages').doc(selectedTeam.id)
                     .collection('chat').doc(msg.id);
                 const liked = msgLikes[msg.id]?.likedByMe;
                 if (liked) {
@@ -2452,7 +2446,7 @@
             const teamAccentColors = ['#ffd43b','#74c0fc','#ff8787','#8ce99a','#b197fc','#ff922b'];
             const teamBgColors = ['#fef3c7','#e0f2fe','#ffe4e4','#d1fae5','#ede9fe','#fff0e0'];
 
-            // ── 門派選擇畫面 ──
+            // ── 陣營選擇畫面 ──
             if (!selectedTeam) return (
                 <div className="space-y-4 animate-in fade-in duration-300" style={{paddingBottom:'2rem'}}>
                     <div className="vibrant-card p-5 r-card float-anim" style={{boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
@@ -2620,7 +2614,7 @@
             );
         };
 
-  // ─── Admin View ─────────────────────────────────────────────────
+        ─── Admin View ─────────────────────────────────────────────────
   const AdminView = () => {
             const [teams, setTeams] = useState([]);
             const [users, setUsers] = useState([]);
