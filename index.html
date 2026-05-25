@@ -446,14 +446,14 @@
                         </div>
                         <h2 className="sans-font text-3xl tracking-tighter" style={{color:'var(--c-text)'}}>選擇陣營</h2>
                         <p className="text-xs sans-font mt-1" style={{color:'var(--c-muted)'}}>
-                            <span style={{color:'#374151', fontWeight:'500'}}>{customName}</span>，加入或創建你的修煉門派
+                            <span style={{color:'#374151', fontWeight:'500'}}>{customName}</span>，加入或創建你的修煉陣營
                         </p>
                     </div>
 
                     {/* Existing teams */}
                     <div className="space-y-3">
                         {teams.length === 0 && (
-                            <p className="text-center text-xs opacity-30 sans-font py-4">還沒有門派，成為第一個創立者！</p>
+                            <p className="text-center text-xs opacity-30 sans-font py-4">還沒有陣營，成為第一個創立者！</p>
                         )}
                         {teams.map(t => (
                             <button key={t.id} onClick={() => joinTeam(t.id, t.name)}
@@ -471,19 +471,19 @@
 
                     {/* Create new team */}
                     <div className="bg-white p-5 r-card card-shadow space-y-3">
-                        <p className="sans-font text-xs tracking-widest" style={{color:'var(--c-muted)'}}>創建新門派</p>
+                        <p className="sans-font text-xs tracking-widest" style={{color:'var(--c-muted)'}}>創建新陣營</p>
                         <input
                             type="text"
                             value={newTeamName}
                             onChange={e => setNewTeamName(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && createTeam()}
-                            placeholder="輸入門派名稱..."
+                            placeholder="輸入陣營名稱..."
                             className="w-full px-4 py-2.5 text-sm sans-font focus:outline-none bg-slate-50 neo-border-thin r-btn"
                             style={{border:'1px solid var(--c-border-strong)'}}
                         />
                         <button onClick={createTeam} disabled={creating || !newTeamName.trim()}
                             className="w-full pk-green py-3 r-btn neo-border sans-font text-base active-press disabled:opacity-30 neo-shadow-sm">
-                            {creating ? '創立中...' : '創立門派'}
+                            {creating ? '創立中...' : '創立陣營'}
                         </button>
                     </div>
 
@@ -545,11 +545,16 @@
             const spawnFloatingHeart = (el, emoji = '❤️') => {
                 if (!el) return;
                 const rect = el.getBoundingClientRect();
-                const heart = document.createElement('div');
-                heart.textContent = emoji;
-                heart.style.cssText = `position:fixed;left:${rect.left + rect.width/2 - 12}px;top:${rect.top}px;font-size:22px;pointer-events:none;z-index:9999;animation:heart-float 0.8s ease-out forwards;`;
-                document.body.appendChild(heart);
-                setTimeout(() => heart.remove(), 900);
+                const colors=['#7BC8A4','#7AB8FF','#B89CFF','#FFB6D9','#FFD97A'];
+                for(let i=0;i<3;i++){
+                    const heart=document.createElement('div');
+                    heart.innerHTML = emoji==='⭐'
+                    ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14 2 9.27l6.91-1.01z"/></svg>'
+                    : '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.35-9.33-8.03C.7 9.83 2.32 5.5 6.5 5.5c2.2 0 3.58 1.18 4.5 2.45.92-1.27 2.3-2.45 4.5-2.45 4.18 0 5.8 4.33 3.83 7.47C19 16.65 12 21 12 21z"/></svg>';
+                    heart.style.cssText=`position:fixed;left:${rect.left+rect.width/2-10+(Math.random()*20-10)}px;top:${rect.top}px;color:${colors[Math.floor(Math.random()*colors.length)]};pointer-events:none;z-index:9999;animation:heart-float 1.2s ease-out forwards;`;
+                    document.body.appendChild(heart);
+                    setTimeout(()=>heart.remove(),1300);
+                }
             };
 
             const toggleTeamLike = async (teamId, btnEl) => {
@@ -675,10 +680,10 @@
 
                     {loading && <div className="text-center py-12 opacity-30 sans-font text-sm">載入中...</div>}
 
-                    {/* ── 門派排名 tab ── */}
+                    {/* ── 陣營排名 tab ── */}
                     {!loading && lbTab === 'teams' && (
                         <div className="space-y-3">
-                            {leaderboard.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有門派資料</div>}
+                            {leaderboard.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有陣營資料</div>}
                             {leaderboard.map((team, i) => {
                                 const isMyTeam = team.id === userTeamId;
                                 const accentColor = isMyTeam ? '#74d99f' : teamAccentColors[i % teamAccentColors.length];
@@ -746,7 +751,7 @@
                         </div>
                     )}
 
-                    {/* ── 門派成員 tab ── */}
+                    {/* ── 陣營成員 tab ── */}
                     {!loading && lbTab === 'members' && (
                         <div className="space-y-2">
                             {allMembers.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有成員資料</div>}
@@ -2359,7 +2364,7 @@
             const [sending, setSending] = useState(false);
             const messagesEndRef = React.useRef(null);
 
-            // 載入所有門派
+            // 載入所有陣營
             useEffect(() => {
                 const unsub = db.collection('artifacts').doc(appId).collection('teams')
                     .onSnapshot(snap => {
@@ -2370,7 +2375,7 @@
                 return () => unsub();
             }, []);
 
-            // 載入訊息（選擇門派後）
+            // 載入訊息（選擇陣營後）
             useEffect(() => {
                 if (!selectedTeam) return;
                 const unsub = db.collection('artifacts').doc(appId)
@@ -2426,7 +2431,7 @@
             const teamAccentColors = ['#ffd43b','#74c0fc','#ff8787','#8ce99a','#b197fc','#ff922b'];
             const teamBgColors = ['#fef3c7','#e0f2fe','#ffe4e4','#d1fae5','#ede9fe','#fff0e0'];
 
-            // ── 門派選擇畫面 ──
+            // ── 陣營選擇畫面 ──
             if (!selectedTeam) return (
                 <div className="space-y-4 animate-in fade-in duration-300" style={{paddingBottom:'2rem'}}>
                     <div className="vibrant-card p-5 r-card float-anim" style={{boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
@@ -2571,7 +2576,7 @@
 
             const deleteTeam = async (team) => {
                 const membersInTeam = users.filter(u => u.teamId === team.id);
-                if (!window.confirm(`確定刪除「${team.name}」門派？\n${membersInTeam.length > 0 ? `⚠️ 裡面還有 ${membersInTeam.length} 位成員，他們將變成無門派狀態。` : '此門派目前沒有成員。'}`)) return;
+                if (!window.confirm(`確定刪除「${team.name}」陣營？\n${membersInTeam.length > 0 ? `⚠️ 裡面還有 ${membersInTeam.length} 位成員，他們將變成無陣營狀態。` : '此陣營目前沒有成員。'}`)) return;
                 // Clear teamId for all members
                 const batch = db.batch();
                 membersInTeam.forEach(u => {
@@ -2600,7 +2605,7 @@
             };
 
             const removeUserFromTeam = async (uid) => {
-                if (!window.confirm('確定將此成員移出門派？')) return;
+                if (!window.confirm('確定將此成員移出陣營？')) return;
                 await db.collection('artifacts').doc(appId).collection('users').doc(uid)
                     .update({ teamId: firebase.firestore.FieldValue.delete(), teamName: firebase.firestore.FieldValue.delete() });
             };
@@ -2613,7 +2618,7 @@
                     <div className="p-5 r-card relative overflow-hidden" style={{background:'var(--c-text)'}}>
                         <div className="relative z-10">
                             <h2 className="sans-font text-xl text-white mb-0.5">管理員後台</h2>
-                            <p className="text-xs sans-font" style={{color:'rgba(255,255,255,0.5)'}}>門派與成員管理</p>
+                            <p className="text-xs sans-font" style={{color:'rgba(255,255,255,0.5)'}}>陣營與成員管理</p>
                         </div>
                         <Icon name="Shield" size={72} className="absolute -bottom-3 -right-2 rotate-12" style={{color:'rgba(255,255,255,0.08)'}} />
                     </div>
@@ -2621,7 +2626,7 @@
                     {/* Sub tabs */}
                     <div className="flex bg-white r-card" style={{border:'1px solid var(--c-border)', padding:'3px'}}>
                         <button onClick={() => setTab('teams')} className={`flex-1 sans-font text-xs r-btn transition-all ${tab === 'teams' ? 'pk-blue' : ''}`}
-                            style={{color: tab === 'teams' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>門派管理</button>
+                            style={{color: tab === 'teams' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>陣營管理</button>
                         <button onClick={() => setTab('users')} className={`flex-1 sans-font text-xs r-btn transition-all ${tab === 'users' ? 'pk-blue' : ''}`}
                             style={{color: tab === 'users' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>成員管理</button>
                     </div>
@@ -2631,13 +2636,13 @@
                         <div className="space-y-4">
                             {/* Create team */}
                             <div className="bg-white p-4 r-card card-shadow space-y-3">
-                                <p className="sans-font text-xs tracking-widest" style={{color:'var(--c-muted)'}}>新增門派</p>
+                                <p className="sans-font text-xs tracking-widest" style={{color:'var(--c-muted)'}}>新增陣營</p>
                                 <div className="flex gap-2">
                                     <input
                                         type="text" value={newTeamName}
                                         onChange={e => setNewTeamName(e.target.value)}
                                         onKeyDown={e => e.key === 'Enter' && createTeam()}
-                                        placeholder="門派名稱..."
+                                        placeholder="陣營名稱..."
                                         className="flex-1 px-3 py-2 text-sm sans-font focus:outline-none bg-slate-50 r-btn"
                                         style={{border:'1px solid var(--c-border-strong)'}}
                                     />
@@ -2649,7 +2654,7 @@
                             </div>
 
                             {/* Team list */}
-                            {teams.length === 0 && <p className="text-center text-xs sans-font py-4" style={{color:'var(--c-muted)'}}>尚無門派</p>}
+                            {teams.length === 0 && <p className="text-center text-xs sans-font py-4" style={{color:'var(--c-muted)'}}>尚無陣營</p>}
                             {teams.map((team, i) => {
                                 const memberCount = users.filter(u => u.teamId === team.id).length;
                                 const color = teamColors[i % teamColors.length];
@@ -2700,7 +2705,7 @@
                                                 <p className="text-[10px] sans-font truncate" style={{color:'var(--c-muted)'}}>{u.email}</p>
                                                 {teamName
                                                     ? <span className="text-[10px] pk-blue px-2 py-0.5 r-badge sans-font mt-1 inline-block" style={{color:'var(--c-primary-text)'}}>{teamName}</span>
-                                                    : <span className="text-[10px] px-2 py-0.5 r-badge sans-font mt-1 inline-block" style={{background:'var(--c-danger-bg)',color:'var(--c-danger-text)'}}>無門派</span>
+                                                    : <span className="text-[10px] px-2 py-0.5 r-badge sans-font mt-1 inline-block" style={{background:'var(--c-danger-bg)',color:'var(--c-danger-text)'}}>無陣營</span>
                                                 }
                                             </div>
                                             <div className="flex gap-2 ml-2">
