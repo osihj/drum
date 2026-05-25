@@ -278,19 +278,6 @@
                 }
             };
 
-            useEffect(() => {
-                auth.getRedirectResult().then(result => {
-                    if (result?.user) {
-                        console.log('[Login 成功]', { uid: result.user.uid, email: result.user.email });
-                    }
-                    setLoading(false);
-                }).catch(e => {
-                    console.error('[Login 失敗]', e);
-                    setError('登入失敗：' + e.message);
-                    setLoading(false);
-                });
-            }, []);
-
             return (
                 <div className="max-w-md mx-auto min-h-screen flex flex-col items-center justify-center p-8 gap-10">
                     <div className="text-center space-y-3">
@@ -858,8 +845,45 @@
             const currentWeekDays = useMemo(() => getWeekDays(new Date()), []);
 
             // Auth state
+            // redirect 登入回來後取得結果（必須在 App 層執行）
             useEffect(() => {
-                return auth.onAuthStateChanged(u => {
+                auth.getRedirectResult().then(result => {
+                    if (result?.user) {
+                        console.log('[Redirect 登入成功]', {
+                            uid: result.user.uid,
+                            email: result.user.email,
+                        });
+                    }
+                }).catch(e => {
+                    console.error('[Redirect 登入失敗]', e.message);
+                });
+            }, []);
+
+            useEffect(() => {
+                return auth.onAuthStateChanged(async u => {
+                    if (u) {
+                        try {
+                            const userDoc = await db.collection('artifacts').doc(appId).collection('users').doc(u.uid).get();
+                            if (userDoc.exists) {
+                                const data = userDoc.data();
+                                if (data.active === false) {
+                                    await auth.signOut();
+                                    alert('此帳號已停用，請聯絡管理員。');
+                                    setUser(null);
+                                    setAuthReady(true);
+                                    return;
+                                }
+                                // 補回 email
+                                const authEmail = u.email || u.providerData?.[0]?.email || null;
+                                if (authEmail && data.email !== authEmail) {
+                                    await db.collection('artifacts').doc(appId).collection('users').doc(u.uid)
+                                        .set({ email: authEmail }, { merge: true });
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('[Auth] 讀取失敗:', e.message);
+                        }
+                    }
                     setUser(u);
                     setAuthReady(true);
                 });
