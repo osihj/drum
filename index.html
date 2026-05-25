@@ -803,11 +803,14 @@
                     if (u) {
                         // ✅ 讀取 Firestore user 文件，檢查 active 狀態
                         try {
+                            // u.email 有時為 null，從 providerData 補取
+                            const authEmail = u.email || (u.providerData && u.providerData[0] && u.providerData[0].email) || null;
+                            console.log('[Auth] uid=', u.uid, 'u.email=', u.email, 'authEmail=', authEmail, 'providerData=', JSON.stringify(u.providerData));
                             const userDoc = await db.collection('artifacts').doc(appId).collection('users').doc(u.uid).get();
-                            console.log('[Auth] u.uid=', u.uid, 'u.email=', u.email, 'userDoc.exists=', userDoc.exists);
+                            console.log('[Auth] userDoc.exists=', userDoc.exists);
                             if (userDoc.exists) {
                                 const data = userDoc.data();
-                                console.log('[Auth] Firestore email=', data.email, 'photoURL=', data.photoURL);
+                                console.log('[Auth] Firestore email=', data.email);
                                 if (data.active === false) {
                                     await auth.signOut();
                                     alert('此帳號已停用，請聯絡管理員。');
@@ -815,18 +818,20 @@
                                     setAuthReady(true);
                                     return;
                                 }
-                                // ✅ 強制補寫 email / photoURL（用 set+merge 確保成功）
+                                // 補寫 email / photoURL
                                 const patch = {};
-                                if (u.email && (data.email !== u.email)) patch.email = u.email;
+                                if (authEmail && (data.email !== authEmail)) patch.email = authEmail;
                                 if (u.photoURL && (data.photoURL !== u.photoURL)) patch.photoURL = u.photoURL;
                                 if (Object.keys(patch).length > 0) {
                                     console.log('[Auth] 補寫欄位:', patch);
                                     await db.collection('artifacts').doc(appId).collection('users').doc(u.uid).set(patch, { merge: true });
                                     console.log('[Auth] ✅ 補寫完成');
                                 } else {
-                                    console.log('[Auth] email 已是最新，無需更新');
+                                    console.log('[Auth] 無需更新');
                                 }
                             }
+                            // 將 authEmail 補回 user 物件，供 joinTeam 使用
+                            if (authEmail && !u.email) u.email = authEmail;
                         } catch (e) {
                             console.warn('[Auth] 無法讀取使用者狀態:', e.message);
                         }
