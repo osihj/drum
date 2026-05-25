@@ -91,6 +91,9 @@
             .sans-normal      { font-family: 'Noto Sans TC', sans-serif; font-weight: 400; }
             .float-anim       { animation: float 3s ease-in-out infinite; }
             @keyframes float  { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+            @keyframes like-pop { 0% { transform: scale(1); } 30% { transform: scale(1.5); } 60% { transform: scale(0.9); } 100% { transform: scale(1); } }
+            @keyframes heart-float { 0% { opacity:1; transform: translateY(0) scale(1); } 100% { opacity:0; transform: translateY(-60px) scale(1.4); } }
+            .like-pop { animation: like-pop 0.4s cubic-bezier(.36,.07,.19,.97) both; }
 
             /* 統一色塊 — 主色 / 輔色 / 強調 */
             .pk-blue   { background-color: var(--c-primary); }
@@ -266,15 +269,32 @@
             const handleGoogleLogin = async () => {
                 setLoading(true);
                 setError('');
+                const provider = new firebase.auth.GoogleAuthProvider();
+                provider.addScope('email');
+                provider.addScope('profile');
+                provider.setCustomParameters({ prompt: 'select_account' });
                 try {
-                    const provider = new firebase.auth.GoogleAuthProvider();
-                    provider.addScope('email');
-                    provider.addScope('profile');
-                    provider.setCustomParameters({ prompt: 'select_account' });
-                    await auth.signInWithRedirect(provider);
-                } catch (e) {
-                    setError('登入失敗，請再試一次');
-                    setLoading(false);
+                    // popup 優先（桌面 Chrome 最穩定）
+                    const result = await auth.signInWithPopup(provider);
+                    console.log('[Popup 登入成功]', { uid: result.user?.uid, email: result.user?.email });
+                } catch (popupError) {
+                    console.warn('[Popup 失敗]', popupError.code);
+                    if (
+                        popupError.code === 'auth/popup-blocked' ||
+                        popupError.code === 'auth/popup-closed-by-user' ||
+                        popupError.code === 'auth/cancelled-popup-request'
+                    ) {
+                        // popup 被封鎖才改用 redirect（行動裝置 Safari）
+                        try {
+                            await auth.signInWithRedirect(provider);
+                        } catch (e) {
+                            setError('登入失敗，請再試一次');
+                            setLoading(false);
+                        }
+                    } else {
+                        setError('登入失敗：' + popupError.message);
+                        setLoading(false);
+                    }
                 }
             };
 
@@ -517,27 +537,49 @@
                 return () => unsub();
             }, [currentUser]);
 
-            const toggleTeamLike = async (teamId) => {
+            const vibrateDevice = (pattern = [30]) => {
+                if ('vibrate' in navigator) navigator.vibrate(pattern);
+            };
+
+            const spawnFloatingHeart = (el, emoji = '❤️') => {
+                if (!el) return;
+                const rect = el.getBoundingClientRect();
+                const heart = document.createElement('div');
+                heart.textContent = emoji;
+                heart.style.cssText = `position:fixed;left:${rect.left + rect.width/2 - 12}px;top:${rect.top}px;font-size:22px;pointer-events:none;z-index:9999;animation:heart-float 0.8s ease-out forwards;`;
+                document.body.appendChild(heart);
+                setTimeout(() => heart.remove(), 900);
+            };
+
+            const toggleTeamLike = async (teamId, btnEl) => {
                 if (!currentUser) return;
                 const likeId = `${currentUser.uid}_team_${teamId}`;
                 const ref = db.collection('artifacts').doc(appId).collection('likes').doc(likeId);
                 const existing = teamLikes[teamId]?.likedByMe;
                 if (existing) {
                     await ref.delete();
+                    vibrateDevice([10]);
                 } else {
                     await ref.set({ type: 'team', targetId: teamId, uid: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                    vibrateDevice([20, 10, 20]);
+                    spawnFloatingHeart(btnEl, '❤️');
+                    if (btnEl) { btnEl.classList.remove('like-pop'); void btnEl.offsetWidth; btnEl.classList.add('like-pop'); }
                 }
             };
 
-            const toggleMemberLike = async (uid) => {
+            const toggleMemberLike = async (uid, btnEl) => {
                 if (!currentUser || uid === currentUser.uid) return;
                 const likeId = `${currentUser.uid}_member_${uid}`;
                 const ref = db.collection('artifacts').doc(appId).collection('likes').doc(likeId);
                 const existing = memberLikes[uid]?.likedByMe;
                 if (existing) {
                     await ref.delete();
+                    vibrateDevice([10]);
                 } else {
                     await ref.set({ type: 'member', targetId: uid, uid: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                    vibrateDevice([20, 10, 20]);
+                    spawnFloatingHeart(btnEl, '👍');
+                    if (btnEl) { btnEl.classList.remove('like-pop'); void btnEl.offsetWidth; btnEl.classList.add('like-pop'); }
                 }
             };
 
@@ -664,12 +706,22 @@
                                                     <div className="sans-font" style={{fontSize:'9px', color:'#9ca3af'}}>均值</div>
                                                 </div>
                                                 {/* ❤️ 鼓勵按鈕 */}
-                                                <button onClick={(e) => { e.stopPropagation(); toggleTeamLike(team.id); }}
-                                                    className="rounded-xl flex flex-col items-center justify-center active-press"
-                                                    style={{padding:'8px 10px', minWidth:'46px', background: teamLikes[team.id]?.likedByMe ? '#ffe4e4' : '#ffffff', border: teamLikes[team.id]?.likedByMe ? '1px solid #ff8787' : `1px solid ${accentColor}70`, transition:'all 0.15s'}}>
-                                                    <span style={{fontSize:'16px', lineHeight:'1.2'}}>{teamLikes[team.id]?.likedByMe ? '❤️' : '🤍'}</span>
-                                                    <div className="sans-font" style={{fontSize:'9px', color: teamLikes[team.id]?.likedByMe ? '#9b1c1c' : '#9ca3af'}}>{teamLikes[team.id]?.count || 0}</div>
-                                                </button>
+                                                {(() => {
+                                                    const liked = teamLikes[team.id]?.likedByMe;
+                                                    const count = teamLikes[team.id]?.count || 0;
+                                                    return (
+                                                        <button onClick={(e) => { e.stopPropagation(); toggleTeamLike(team.id, e.currentTarget); }}
+                                                            className="rounded-xl flex flex-col items-center justify-center active-press"
+                                                            style={{padding:'8px 10px', minWidth:'50px', position:'relative', overflow:'visible',
+                                                                background: liked ? 'linear-gradient(135deg,#ff8787,#ff6b6b)' : '#ffffff',
+                                                                border: liked ? '1.5px solid #ff6b6b' : `1.5px solid ${accentColor}70`,
+                                                                boxShadow: liked ? '0 2px 8px rgba(255,107,107,0.35)' : 'none',
+                                                                transition:'all 0.2s'}}>
+                                                            <span style={{fontSize:'18px', lineHeight:'1.1', filter: liked ? 'none' : 'grayscale(0.3)'}}>{liked ? '❤️' : '🤍'}</span>
+                                                            <div className="sans-font" style={{fontSize:'10px', fontWeight:'700', color: liked ? '#fff' : '#9ca3af', marginTop:'1px'}}>{count > 0 ? count : '鼓勵'}</div>
+                                                        </button>
+                                                    );
+                                                })()}
                                             </div>
                                         </div>
                                         {/* White body — members list */}
@@ -728,22 +780,33 @@
                                                 <div className="sans-font" style={{fontSize:'15px', fontWeight:'500', color:'#1f2937'}}>Lv.{m.lv}</div>
                                                 <div className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>{m.score} 點</div>
                                             </div>
-                                            {/* 👍 點讚按鈕（不能給自己點讚） */}
-                                            {!isMe && (
-                                                <button onClick={() => toggleMemberLike(m.uid)}
-                                                    className="flex flex-col items-center justify-center active-press r-btn"
-                                                    style={{padding:'6px 8px', background: memberLikes[m.uid]?.likedByMe ? '#ffe4e4' : '#f8fafc', border: memberLikes[m.uid]?.likedByMe ? '1px solid #ff8787' : '1px solid var(--c-border)', transition:'all 0.15s', minWidth:'38px'}}>
-                                                    <span style={{fontSize:'14px', lineHeight:1}}>{memberLikes[m.uid]?.likedByMe ? '👍' : '👍'}</span>
-                                                    <span className="sans-font" style={{fontSize:'9px', color: memberLikes[m.uid]?.likedByMe ? '#9b1c1c' : '#9ca3af', marginTop:'2px'}}>{memberLikes[m.uid]?.count || 0}</span>
-                                                </button>
-                                            )}
-                                            {isMe && memberLikes[m.uid]?.count > 0 && (
-                                                <div className="flex flex-col items-center justify-center r-btn"
-                                                    style={{padding:'6px 8px', background:'#fff0f0', border:'1px solid #ff8787', minWidth:'38px'}}>
-                                                    <span style={{fontSize:'14px', lineHeight:1}}>❤️</span>
-                                                    <span className="sans-font" style={{fontSize:'9px', color:'#9b1c1c', marginTop:'2px'}}>{memberLikes[m.uid]?.count}</span>
-                                                </div>
-                                            )}
+                                            {/* 👍 點讚按鈕 */}
+                                            {!isMe && (() => {
+                                                const liked = memberLikes[m.uid]?.likedByMe;
+                                                const count = memberLikes[m.uid]?.count || 0;
+                                                return (
+                                                    <button onClick={(e) => toggleMemberLike(m.uid, e.currentTarget)}
+                                                        className="flex flex-col items-center justify-center active-press r-btn"
+                                                        style={{padding:'7px 9px', minWidth:'44px',
+                                                            background: liked ? 'linear-gradient(135deg,#74c0fc,#4dabf7)' : '#f8fafc',
+                                                            border: liked ? '1.5px solid #4dabf7' : '1.5px solid var(--c-border)',
+                                                            boxShadow: liked ? '0 2px 6px rgba(116,192,252,0.4)' : 'none',
+                                                            transition:'all 0.2s'}}>
+                                                        <span style={{fontSize:'16px', lineHeight:1}}>{liked ? '👍' : '👍'}</span>
+                                                        <span className="sans-font" style={{fontSize:'9px', fontWeight:'700', color: liked ? '#fff' : '#9ca3af', marginTop:'2px'}}>{count > 0 ? count : '讚'}</span>
+                                                    </button>
+                                                );
+                                            })()}
+                                            {isMe && (() => {
+                                                const count = memberLikes[m.uid]?.count || 0;
+                                                return count > 0 ? (
+                                                    <div className="flex flex-col items-center justify-center r-btn"
+                                                        style={{padding:'7px 9px', minWidth:'44px', background:'linear-gradient(135deg,#ff8787,#ff6b6b)', border:'1.5px solid #ff6b6b', boxShadow:'0 2px 6px rgba(255,107,107,0.3)'}}>
+                                                        <span style={{fontSize:'16px', lineHeight:1}}>❤️</span>
+                                                        <span className="sans-font" style={{fontSize:'9px', fontWeight:'700', color:'#fff', marginTop:'2px'}}>{count}</span>
+                                                    </div>
+                                                ) : null;
+                                            })()}
                                         </div>
                                     </div>
                                 );
