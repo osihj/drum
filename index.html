@@ -369,7 +369,7 @@
                 await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).set({
                     teamId, teamName,
                     displayName: customName.trim() || user.displayName || user.email,
-                    email: user.email,
+                    email: user.email || (user.providerData && user.providerData[0] && user.providerData[0].email) || null,
                     photoURL: user.photoURL || '',
                     role: 'user',
                     active: true,
@@ -830,8 +830,7 @@
                                     console.log('[Auth] 無需更新');
                                 }
                             }
-                            // 將 authEmail 補回 user 物件，供 joinTeam 使用
-                            if (authEmail && !u.email) u.email = authEmail;
+
                         } catch (e) {
                             console.warn('[Auth] 無法讀取使用者狀態:', e.message);
                         }
