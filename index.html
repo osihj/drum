@@ -284,7 +284,8 @@
                 try {
                     // popup 優先（桌面 Chrome 最穩定）
                     const result = await auth.signInWithPopup(provider);
-                    console.log('[Popup 登入成功]', { uid: result.user?.uid, email: result.user?.email });
+                    const resolvedEmail = result.user?.email || result.user?.providerData?.[0]?.email;
+                    console.log('[Popup 登入成功]', { uid: result.user?.uid, email: resolvedEmail });
                 } catch (popupError) {
                     console.warn('[Popup 失敗]', popupError.code);
                     if (
@@ -828,6 +829,14 @@
             useEffect(() => {
                 return auth.onAuthStateChanged(async u => {
                     if (u) {
+                        // ── email 修補：providerData 一定有值，user.email 不一定 ──
+                        const resolvedEmail = u.email
+                            || u.providerData?.[0]?.email
+                            || null;
+                        // 把 email 注入回 u，讓後續 joinTeam 等地方拿到正確值
+                        if (resolvedEmail && !u.email) {
+                            try { Object.defineProperty(u, 'email', { value: resolvedEmail, writable: true, configurable: true }); } catch(_) {}
+                        }
                         try {
                             const userDoc = await db.collection('users').doc(u.uid).get();
                             if (userDoc.exists) {
@@ -839,13 +848,13 @@
                                     setAuthReady(true);
                                     return;
                                 }
-                                // 補回 email（含初次寫入就是 null 的情況）
-                                const authEmail = u.email || u.providerData?.[0]?.email || null;
-                                if (authEmail && !data.email) {
+                                // 補回 email：doc 存在但 email 是 null/空
+                                if (resolvedEmail && !data.email) {
                                     await db.collection('users').doc(u.uid)
-                                        .set({ email: authEmail }, { merge: true });
+                                        .set({ email: resolvedEmail }, { merge: true });
                                 }
                             }
+                            // doc 不存在的新用戶：等 joinTeam 建立
                         } catch (e) {
                             console.warn('[Auth] 讀取失敗:', e.message);
                         }
