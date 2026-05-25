@@ -267,17 +267,11 @@
                 setLoading(true);
                 setError('');
                 const provider = new firebase.auth.GoogleAuthProvider();
-                // ✅ 明確要求 email scope，避免 Google 不回傳 email
                 provider.addScope('email');
                 provider.addScope('profile');
                 provider.setCustomParameters({ prompt: 'select_account' });
                 try {
-                    const result = await auth.signInWithPopup(provider);
-                    console.log('[Login] popup 成功', {
-                        uid: result.user?.uid,
-                        email: result.user?.email,
-                        providerData: result.user?.providerData
-                    });
+                    await auth.signInWithPopup(provider);
                 } catch (popupError) {
                     if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/popup-closed-by-user') {
                         try {
@@ -294,17 +288,8 @@
             };
 
             useEffect(() => {
-                // ✅ 正確處理 redirect 登入結果，確保 user state 有完整 email
                 auth.getRedirectResult().then(result => {
-                    if (result?.user) {
-                        console.log('[Login] redirect 成功', {
-                            uid: result.user?.uid,
-                            email: result.user?.email,
-                            providerData: result.user?.providerData
-                        });
-                        setUser && setUser(result.user);
-                    }
-                    setLoading(false);
+                    if (result?.user) setLoading(false);
                 }).catch(() => setLoading(false));
             }, []);
 
@@ -375,6 +360,8 @@
                     displayName: customName.trim() || user.displayName || user.email,
                     email: user.email,
                     photoURL: user.photoURL || '',
+                    role: 'user',
+                    active: true,
                 }, { merge: true });
                 onJoinTeam(teamId, teamName);
             };
@@ -801,14 +788,24 @@
 
             // Auth state
             useEffect(() => {
-                return auth.onAuthStateChanged(u => {
+                return auth.onAuthStateChanged(async u => {
                     if (u) {
-                        // ✅ 防禦：記錄 email 狀態，方便診斷
-                        const googleProvider = u.providerData?.find(p => p.providerId === 'google.com');
-                        if (!u.email && googleProvider?.email) {
-                            console.warn('[Auth] user.email 為 null，providerData 有值:', googleProvider.email, '請重新登入以修復。');
+                        // ✅ 讀取 Firestore user 文件，檢查 active 狀態
+                        try {
+                            const userDoc = await db.collection('artifacts').doc(appId).collection('users').doc(u.uid).get();
+                            if (userDoc.exists) {
+                                const data = userDoc.data();
+                                if (data.active === false) {
+                                    await auth.signOut();
+                                    alert('此帳號已停用，請聯絡管理員。');
+                                    setUser(null);
+                                    setAuthReady(true);
+                                    return;
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('[Auth] 無法讀取使用者狀態:', e.message);
                         }
-                        console.log('[Auth] 狀態更新', { uid: u.uid, email: u.email, providerData: u.providerData });
                     }
                     setUser(u);
                     setAuthReady(true);
@@ -977,7 +974,8 @@
                 setUserProfile(prev => ({ ...prev, teamId, teamName }));
             };
 
-            const isAdmin = user?.email?.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase().trim();
+            // ✅ isAdmin 改讀 userProfile.role，不再硬編碼 email
+            const isAdmin = userProfile?.role === 'admin';
 
             const stats = useMemo(() => {
                 const startOfWeek = currentWeekDays[0];
@@ -2218,6 +2216,8 @@
             const [newTeamName, setNewTeamName] = useState('');
             const [creating, setCreating] = useState(false);
             const [tab, setTab] = useState('teams'); // 'teams' | 'users'
+            const [editingName, setEditingName] = useState(null); // { uid, value }
+            const [searchText, setSearchText] = useState('');
 
             useEffect(() => {
                 const unsubTeams = db.collection('artifacts').doc(appId).collection('teams')
@@ -2270,6 +2270,21 @@
                 if (!window.confirm('確定將此成員移出門派？')) return;
                 await db.collection('artifacts').doc(appId).collection('users').doc(uid)
                     .update({ teamId: firebase.firestore.FieldValue.delete(), teamName: firebase.firestore.FieldValue.delete() });
+            };
+
+            const toggleActive = async (uid, currentActive) => {
+                const next = currentActive === false ? true : false;
+                const label = next ? '啟用' : '停用';
+                if (!window.confirm(`確定要${label}此帳號？`)) return;
+                await db.collection('artifacts').doc(appId).collection('users').doc(uid)
+                    .update({ active: next });
+            };
+
+            const saveDisplayName = async (uid, newName) => {
+                if (!newName.trim()) return;
+                await db.collection('artifacts').doc(appId).collection('users').doc(uid)
+                    .update({ displayName: newName.trim() });
+                setEditingName(null);
             };
 
             const teamColors = ['pk-yellow','pk-blue','pk-pink','pk-green','pk-purple','pk-orange'];
@@ -2356,33 +2371,111 @@
                     {/* ── Users tab ── */}
                     {tab === 'users' && (
                         <div className="space-y-3">
+                            {/* 搜尋 */}
+                            <div className="bg-white px-3 py-2 r-card card-shadow flex items-center gap-2">
+                                <Icon name="Search" size={14} style={{color:'var(--c-muted)'}} />
+                                <input
+                                    type="text"
+                                    value={searchText}
+                                    onChange={e => setSearchText(e.target.value)}
+                                    placeholder="搜尋名稱或 Email..."
+                                    className="flex-1 text-xs sans-font focus:outline-none bg-transparent"
+                                    style={{color:'var(--c-text)'}}
+                                />
+                                {searchText && <button onClick={() => setSearchText('')} style={{color:'var(--c-muted)'}}><Icon name="X" size={13} /></button>}
+                            </div>
+
                             {loading && <p className="text-center text-xs sans-font py-4" style={{color:'var(--c-muted)'}}>載入中...</p>}
-                            {users.map(u => {
+
+                            {users
+                                .filter(u => {
+                                    const q = searchText.toLowerCase();
+                                    return !q || (u.displayName||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q);
+                                })
+                                .map(u => {
                                 const teamName = teams.find(t => t.id === u.teamId)?.name;
+                                const isActive = u.active !== false;
+                                const isEditingThisName = editingName?.uid === u.uid;
                                 return (
-                                    <div key={u.uid} className="bg-white p-4 r-card card-shadow">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex-1 min-w-0">
-                                                <p className="sans-font text-sm truncate" style={{color:'var(--c-text)'}}>{u.displayName || u.email}</p>
-                                                <p className="text-[10px] sans-font truncate" style={{color:'var(--c-muted)'}}>{u.email}</p>
-                                                {teamName
-                                                    ? <span className="text-[10px] pk-blue px-2 py-0.5 r-badge sans-font mt-1 inline-block" style={{color:'var(--c-primary-text)'}}>{teamName}</span>
-                                                    : <span className="text-[10px] px-2 py-0.5 r-badge sans-font mt-1 inline-block" style={{background:'var(--c-danger-bg)',color:'var(--c-danger-text)'}}>無門派</span>
-                                                }
-                                            </div>
-                                            <div className="flex gap-2 ml-2">
-                                                <button onClick={() => setMovingUser({ uid: u.uid, name: u.displayName || u.email })}
-                                                    className="px-3 py-1.5 bg-slate-100 r-btn text-[10px] sans-font active-press" style={{border:'1px solid var(--c-border)'}}>
-                                                    換組
-                                                </button>
-                                                {u.teamId && (
-                                                    <button onClick={() => removeUserFromTeam(u.uid)}
-                                                        className="w-8 h-8 r-btn flex items-center justify-center active-press"
-                                                        style={{background:'var(--c-danger-bg)',border:'1px solid var(--c-danger)'}}>
-                                                        <Icon name="UserMinus" size={13} style={{color:'var(--c-danger-text)'}} />
+                                    <div key={u.uid} className="bg-white p-4 r-card card-shadow"
+                                        style={{opacity: isActive ? 1 : 0.55, border: isActive ? '' : '1px solid var(--c-danger)'}}>
+
+                                        {/* 行1：名稱 + 停用標籤 */}
+                                        <div className="flex items-center gap-2 mb-1">
+                                            {isEditingThisName ? (
+                                                <input
+                                                    autoFocus
+                                                    className="flex-1 sans-font text-sm px-2 py-0.5 r-btn focus:outline-none"
+                                                    style={{border:'1.5px solid var(--c-primary)', color:'var(--c-text)'}}
+                                                    value={editingName.value}
+                                                    onChange={e => setEditingName(prev => ({...prev, value: e.target.value}))}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter') saveDisplayName(u.uid, editingName.value);
+                                                        if (e.key === 'Escape') setEditingName(null);
+                                                    }}
+                                                />
+                                            ) : (
+                                                <p className="flex-1 sans-font text-sm truncate" style={{color:'var(--c-text)'}}>{u.displayName || '（未設定）'}</p>
+                                            )}
+                                            {!isActive && <span className="text-[9px] px-2 py-0.5 r-badge sans-font" style={{background:'var(--c-danger-bg)',color:'var(--c-danger-text)'}}>已停用</span>}
+                                        </div>
+
+                                        {/* 行2：Email */}
+                                        <p className="text-[10px] sans-font truncate mb-1.5" style={{color:'var(--c-muted)'}}>{u.email || '（無 Email）'}</p>
+
+                                        {/* 行3：分組標籤 */}
+                                        {teamName
+                                            ? <span className="text-[10px] pk-blue px-2 py-0.5 r-badge sans-font inline-block" style={{color:'var(--c-primary-text)'}}>{teamName}</span>
+                                            : <span className="text-[10px] px-2 py-0.5 r-badge sans-font inline-block" style={{background:'var(--c-danger-bg)',color:'var(--c-danger-text)'}}>無門派</span>
+                                        }
+
+                                        {/* 行4：操作按鈕 */}
+                                        <div className="flex gap-2 mt-3 flex-wrap">
+                                            {/* 改名 */}
+                                            {isEditingThisName ? (
+                                                <>
+                                                    <button onClick={() => saveDisplayName(u.uid, editingName.value)}
+                                                        className="px-3 py-1.5 r-btn text-[10px] sans-font active-press"
+                                                        style={{background:'var(--c-primary)',color:'var(--c-primary-text)',border:'1px solid var(--c-primary)'}}>
+                                                        儲存
                                                     </button>
-                                                )}
-                                            </div>
+                                                    <button onClick={() => setEditingName(null)}
+                                                        className="px-3 py-1.5 bg-slate-100 r-btn text-[10px] sans-font active-press" style={{border:'1px solid var(--c-border)'}}>
+                                                        取消
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <button onClick={() => setEditingName({ uid: u.uid, value: u.displayName || '' })}
+                                                    className="px-3 py-1.5 bg-slate-100 r-btn text-[10px] sans-font active-press" style={{border:'1px solid var(--c-border)'}}>
+                                                    改名稱
+                                                </button>
+                                            )}
+
+                                            {/* 換組 */}
+                                            <button onClick={() => setMovingUser({ uid: u.uid, name: u.displayName || u.email })}
+                                                className="px-3 py-1.5 bg-slate-100 r-btn text-[10px] sans-font active-press" style={{border:'1px solid var(--c-border)'}}>
+                                                換組
+                                            </button>
+
+                                            {/* 移出門派 */}
+                                            {u.teamId && (
+                                                <button onClick={() => removeUserFromTeam(u.uid)}
+                                                    className="px-3 py-1.5 r-btn text-[10px] sans-font active-press"
+                                                    style={{background:'var(--c-danger-bg)',border:'1px solid var(--c-danger)',color:'var(--c-danger-text)'}}>
+                                                    移出門派
+                                                </button>
+                                            )}
+
+                                            {/* 啟用/停用 */}
+                                            <button onClick={() => toggleActive(u.uid, u.active)}
+                                                className="px-3 py-1.5 r-btn text-[10px] sans-font active-press ml-auto"
+                                                style={{
+                                                    background: isActive ? '#fff0f0' : '#f0fdf4',
+                                                    border: isActive ? '1px solid var(--c-danger)' : '1px solid var(--c-success)',
+                                                    color: isActive ? 'var(--c-danger-text)' : '#166534'
+                                                }}>
+                                                {isActive ? '停用帳號' : '重新啟用'}
+                                            </button>
                                         </div>
                                     </div>
                                 );
