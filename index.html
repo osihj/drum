@@ -267,8 +267,17 @@
                 setLoading(true);
                 setError('');
                 const provider = new firebase.auth.GoogleAuthProvider();
+                // ✅ 明確要求 email scope，避免 Google 不回傳 email
+                provider.addScope('email');
+                provider.addScope('profile');
+                provider.setCustomParameters({ prompt: 'select_account' });
                 try {
-                    await auth.signInWithPopup(provider);
+                    const result = await auth.signInWithPopup(provider);
+                    console.log('[Login] popup 成功', {
+                        uid: result.user?.uid,
+                        email: result.user?.email,
+                        providerData: result.user?.providerData
+                    });
                 } catch (popupError) {
                     if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/popup-closed-by-user') {
                         try {
@@ -285,8 +294,17 @@
             };
 
             useEffect(() => {
+                // ✅ 正確處理 redirect 登入結果，確保 user state 有完整 email
                 auth.getRedirectResult().then(result => {
-                    if (result?.user) setLoading(false);
+                    if (result?.user) {
+                        console.log('[Login] redirect 成功', {
+                            uid: result.user?.uid,
+                            email: result.user?.email,
+                            providerData: result.user?.providerData
+                        });
+                        setUser && setUser(result.user);
+                    }
+                    setLoading(false);
                 }).catch(() => setLoading(false));
             }, []);
 
@@ -784,6 +802,14 @@
             // Auth state
             useEffect(() => {
                 return auth.onAuthStateChanged(u => {
+                    if (u) {
+                        // ✅ 防禦：記錄 email 狀態，方便診斷
+                        const googleProvider = u.providerData?.find(p => p.providerId === 'google.com');
+                        if (!u.email && googleProvider?.email) {
+                            console.warn('[Auth] user.email 為 null，providerData 有值:', googleProvider.email, '請重新登入以修復。');
+                        }
+                        console.log('[Auth] 狀態更新', { uid: u.uid, email: u.email, providerData: u.providerData });
+                    }
                     setUser(u);
                     setAuthReady(true);
                 });
