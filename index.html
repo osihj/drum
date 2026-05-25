@@ -364,7 +364,8 @@
                     teamId, teamName,
                     displayName: customName.trim() || user.displayName || user.email,
                     email: user.email,
-                    photoURL: user.photoURL || '',\n                    role: 'user',
+                    photoURL: user.photoURL || '',
+                    role: 'user',
                 }, { merge: true });
                 onJoinTeam(teamId, teamName);
             };
@@ -1114,9 +1115,7 @@
                 setUserProfile(prev => ({ ...prev, teamId, teamName }));
             };
 
-            const isAdmin =
-                userProfile?.role === 'admin' ||
-                user?.email?.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase().trim();
+            const isAdmin = userProfile?.role === 'admin' || user?.email?.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase().trim();
 
             const stats = useMemo(() => {
                 const startOfWeek = currentWeekDays[0];
