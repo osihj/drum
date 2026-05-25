@@ -91,6 +91,17 @@
             .sans-normal      { font-family: 'Noto Sans TC', sans-serif; font-weight: 400; }
             .float-anim       { animation: float 3s ease-in-out infinite; }
             @keyframes float  { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+            @keyframes like-pop { 0% { transform: scale(1); } 25% { transform: scale(1.45); } 50% { transform: scale(0.88); } 75% { transform: scale(1.1); } 100% { transform: scale(1); } }
+            @keyframes heart-float { 0% { opacity:1; transform: translateY(0) scale(1); } 100% { opacity:0; transform: translateY(-70px) scale(0.6); } }
+            @keyframes svg-fill-in { 0% { stroke-dashoffset: 60; opacity:0.3; } 100% { stroke-dashoffset: 0; opacity:1; } }
+            @keyframes ripple-out { 0% { transform: scale(0.6); opacity:0.6; } 100% { transform: scale(2.2); opacity:0; } }
+            @keyframes particle-fly { 0% { transform: translate(0,0) scale(1); opacity:1; } 100% { transform: translate(var(--tx),var(--ty)) scale(0); opacity:0; } }
+            .like-pop { animation: like-pop 0.45s cubic-bezier(.36,.07,.19,.97) both; }
+            .vec-icon { display:block; pointer-events:none; }
+            .like-ripple { position:absolute; inset:0; border-radius:inherit; pointer-events:none; }
+            .like-ripple::after { content:''; position:absolute; inset:0; border-radius:inherit; animation: ripple-out 0.5s ease-out forwards; }
+            .heart-ripple::after { border: 2px solid #ff6b6b; }
+            .thumb-ripple::after { border: 2px solid #4dabf7; }
 
             /* 統一色塊 — 主色 / 輔色 / 強調 */
             .pk-blue   { background-color: var(--c-primary); }
@@ -271,9 +282,17 @@
                 provider.addScope('profile');
                 provider.setCustomParameters({ prompt: 'select_account' });
                 try {
-                    await auth.signInWithPopup(provider);
+                    // popup 優先（桌面 Chrome 最穩定）
+                    const result = await auth.signInWithPopup(provider);
+                    console.log('[Popup 登入成功]', { uid: result.user?.uid, email: result.user?.email });
                 } catch (popupError) {
-                    if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/popup-closed-by-user') {
+                    console.warn('[Popup 失敗]', popupError.code);
+                    if (
+                        popupError.code === 'auth/popup-blocked' ||
+                        popupError.code === 'auth/popup-closed-by-user' ||
+                        popupError.code === 'auth/cancelled-popup-request'
+                    ) {
+                        // popup 被封鎖才改用 redirect（行動裝置 Safari）
                         try {
                             await auth.signInWithRedirect(provider);
                         } catch (e) {
@@ -286,23 +305,6 @@
                     }
                 }
             };
-
-            useEffect(() => {
-                auth.getRedirectResult().then(result => {
-                    if (result?.user) {
-                        console.log('[Redirect Result]', {
-                            email: result.user.email,
-                            providerData: result.user.providerData
-                        });
-                    } else {
-                        console.log('[Redirect Result] 無 user（可能是 popup 登入或尚未 redirect）');
-                    }
-                    setLoading(false);
-                }).catch(e => {
-                    console.error('[Redirect Error]', e);
-                    setLoading(false);
-                });
-            }, []);
 
             return (
                 <div className="max-w-md mx-auto min-h-screen flex flex-col items-center justify-center p-8 gap-10">
@@ -369,10 +371,9 @@
                 await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).set({
                     teamId, teamName,
                     displayName: customName.trim() || user.displayName || user.email,
-                    email: user.email || (user.providerData && user.providerData[0] && user.providerData[0].email) || null,
+                    email: user.email,
                     photoURL: user.photoURL || '',
                     role: 'user',
-                    active: true,
                 }, { merge: true });
                 onJoinTeam(teamId, teamName);
             };
@@ -453,14 +454,14 @@
                         </div>
                         <h2 className="sans-font text-3xl tracking-tighter" style={{color:'var(--c-text)'}}>選擇陣營</h2>
                         <p className="text-xs sans-font mt-1" style={{color:'var(--c-muted)'}}>
-                            <span style={{color:'#374151', fontWeight:'500'}}>{customName}</span>，加入或創建你的修煉陣營
+                            <span style={{color:'#374151', fontWeight:'500'}}>{customName}</span>，加入或創建你的修煉門派
                         </p>
                     </div>
 
                     {/* Existing teams */}
                     <div className="space-y-3">
                         {teams.length === 0 && (
-                            <p className="text-center text-xs opacity-30 sans-font py-4">還沒有陣營，成為第一個創立者！</p>
+                            <p className="text-center text-xs opacity-30 sans-font py-4">還沒有門派，成為第一個創立者！</p>
                         )}
                         {teams.map(t => (
                             <button key={t.id} onClick={() => joinTeam(t.id, t.name)}
@@ -478,19 +479,19 @@
 
                     {/* Create new team */}
                     <div className="bg-white p-5 r-card card-shadow space-y-3">
-                        <p className="sans-font text-xs tracking-widest" style={{color:'var(--c-muted)'}}>創建新陣營</p>
+                        <p className="sans-font text-xs tracking-widest" style={{color:'var(--c-muted)'}}>創建新門派</p>
                         <input
                             type="text"
                             value={newTeamName}
                             onChange={e => setNewTeamName(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && createTeam()}
-                            placeholder="輸入陣營名稱..."
+                            placeholder="輸入門派名稱..."
                             className="w-full px-4 py-2.5 text-sm sans-font focus:outline-none bg-slate-50 neo-border-thin r-btn"
                             style={{border:'1px solid var(--c-border-strong)'}}
                         />
                         <button onClick={createTeam} disabled={creating || !newTeamName.trim()}
                             className="w-full pk-green py-3 r-btn neo-border sans-font text-base active-press disabled:opacity-30 neo-shadow-sm">
-                            {creating ? '創立中...' : '創立陣營'}
+                            {creating ? '創立中...' : '創立門派'}
                         </button>
                     </div>
 
@@ -610,10 +611,10 @@
 
                     {loading && <div className="text-center py-12 opacity-30 sans-font text-sm">載入中...</div>}
 
-                    {/* ── 陣營排名 tab ── */}
+                    {/* ── 門派排名 tab ── */}
                     {!loading && lbTab === 'teams' && (
                         <div className="space-y-3">
-                            {leaderboard.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有陣營資料</div>}
+                            {leaderboard.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有門派資料</div>}
                             {leaderboard.map((team, i) => {
                                 const isMyTeam = team.id === userTeamId;
                                 const accentColor = isMyTeam ? '#74d99f' : teamAccentColors[i % teamAccentColors.length];
@@ -626,11 +627,11 @@
                                         {/* Colored header strip */}
                                         <div className="flex items-center justify-between"
                                             style={{background: headerBg, padding:'12px 16px'}}>
-                                            <div className="flex items-center gap-2">
-                                                <p className="sans-font text-base" style={{color:'#374151'}}>{team.name}</p>
-                                                {isMyTeam && <span className="text-[10px] px-2 py-0.5 rounded-full sans-font" style={{background:'#74d99f', color:'#0a4a2a'}}>我的陣營</span>}
+                                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                <p className="sans-font text-base truncate" style={{color:'#374151'}}>{team.name}</p>
+                                                {isMyTeam && <span className="text-[10px] px-2 py-0.5 rounded-full sans-font flex-shrink-0" style={{background:'#74d99f', color:'#0a4a2a'}}>我的陣營</span>}
                                             </div>
-                                            <div className="flex items-stretch gap-2">
+                                            <div className="flex items-stretch gap-2 flex-shrink-0">
                                                 <div className="rounded-xl text-center flex flex-col items-center justify-center"
                                                     style={{padding:'8px 12px', minWidth:'54px', background:'#ffffff', border:`1px solid ${accentColor}70`}}>
                                                     <div className="sans-font text-lg" style={{lineHeight:'1.2', color:'#374151'}}>{team.total}</div>
@@ -640,6 +641,12 @@
                                                     style={{padding:'8px 12px', minWidth:'54px', background:'#ffffff', border:`1px solid ${accentColor}70`}}>
                                                     <div className="sans-font text-lg" style={{lineHeight:'1.2', color:'#374151'}}>{team.avg}</div>
                                                     <div className="sans-font" style={{fontSize:'9px', color:'#9ca3af'}}>均值</div>
+                                                </div>
+                                                {/* 成員人數 */}
+                                                <div className="rounded-xl text-center flex flex-col items-center justify-center"
+                                                    style={{padding:'8px 12px', minWidth:'54px', background:'#ffffff', border:`1px solid ${accentColor}70`}}>
+                                                    <div className="sans-font text-lg" style={{lineHeight:'1.2', color:'#374151'}}>{team.members.length}</div>
+                                                    <div className="sans-font" style={{fontSize:'9px', color:'#9ca3af'}}>人數</div>
                                                 </div>
                                             </div>
                                         </div>
@@ -664,7 +671,7 @@
                         </div>
                     )}
 
-                    {/* ── 陣營成員 tab ── */}
+                    {/* ── 門派成員 tab ── */}
                     {!loading && lbTab === 'members' && (
                         <div className="space-y-2">
                             {allMembers.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有成員資料</div>}
@@ -693,10 +700,12 @@
                                                 <span className="sans-font" style={{fontSize:'9px', color:'#9ca3af', flexShrink:0}}>活躍 {m.activeDays} 天</span>
                                             </div>
                                         </div>
-                                        {/* Level + score */}
-                                        <div style={{textAlign:'right', flexShrink:0}}>
-                                            <div className="sans-font" style={{fontSize:'15px', fontWeight:'500', color:'#1f2937'}}>Lv.{m.lv}</div>
-                                            <div className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>{m.score} 點</div>
+                                        {/* 等級分數顯示 */}
+                                        <div className="flex items-center gap-2" style={{flexShrink:0}}>
+                                            <div style={{textAlign:'right'}}>
+                                                <div className="sans-font" style={{fontSize:'15px', fontWeight:'500', color:'#1f2937'}}>Lv.{m.lv}</div>
+                                                <div className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>{m.score} 點</div>
+                                            </div>
                                         </div>
                                     </div>
                                 );
@@ -798,19 +807,27 @@
             const currentWeekDays = useMemo(() => getWeekDays(new Date()), []);
 
             // Auth state
+            // redirect 登入回來後取得結果（必須在 App 層執行）
+            useEffect(() => {
+                auth.getRedirectResult().then(result => {
+                    if (result?.user) {
+                        console.log('[Redirect 登入成功]', {
+                            uid: result.user.uid,
+                            email: result.user.email,
+                        });
+                    }
+                }).catch(e => {
+                    console.error('[Redirect 登入失敗]', e.message);
+                });
+            }, []);
+
             useEffect(() => {
                 return auth.onAuthStateChanged(async u => {
                     if (u) {
-                        // ✅ 讀取 Firestore user 文件，檢查 active 狀態
                         try {
-                            // u.email 有時為 null，從 providerData 補取
-                            const authEmail = u.email || (u.providerData && u.providerData[0] && u.providerData[0].email) || null;
-                            console.log('[Auth] uid=', u.uid, 'u.email=', u.email, 'authEmail=', authEmail, 'providerData=', JSON.stringify(u.providerData));
                             const userDoc = await db.collection('artifacts').doc(appId).collection('users').doc(u.uid).get();
-                            console.log('[Auth] userDoc.exists=', userDoc.exists);
                             if (userDoc.exists) {
                                 const data = userDoc.data();
-                                console.log('[Auth] Firestore email=', data.email);
                                 if (data.active === false) {
                                     await auth.signOut();
                                     alert('此帳號已停用，請聯絡管理員。');
@@ -818,21 +835,15 @@
                                     setAuthReady(true);
                                     return;
                                 }
-                                // 補寫 email / photoURL
-                                const patch = {};
-                                if (authEmail && (data.email !== authEmail)) patch.email = authEmail;
-                                if (u.photoURL && (data.photoURL !== u.photoURL)) patch.photoURL = u.photoURL;
-                                if (Object.keys(patch).length > 0) {
-                                    console.log('[Auth] 補寫欄位:', patch);
-                                    await db.collection('artifacts').doc(appId).collection('users').doc(u.uid).set(patch, { merge: true });
-                                    console.log('[Auth] ✅ 補寫完成');
-                                } else {
-                                    console.log('[Auth] 無需更新');
+                                // 補回 email
+                                const authEmail = u.email || u.providerData?.[0]?.email || null;
+                                if (authEmail && data.email !== authEmail) {
+                                    await db.collection('artifacts').doc(appId).collection('users').doc(u.uid)
+                                        .set({ email: authEmail }, { merge: true });
                                 }
                             }
-
                         } catch (e) {
-                            console.warn('[Auth] 無法讀取使用者狀態:', e.message);
+                            console.warn('[Auth] 讀取失敗:', e.message);
                         }
                     }
                     setUser(u);
@@ -1002,8 +1013,7 @@
                 setUserProfile(prev => ({ ...prev, teamId, teamName }));
             };
 
-            // ✅ isAdmin 改讀 userProfile.role，不再硬編碼 email
-            const isAdmin = userProfile?.role === 'admin';
+            const isAdmin = userProfile?.role === 'admin' || user?.email?.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase().trim();
 
             const stats = useMemo(() => {
                 const startOfWeek = currentWeekDays[0];
@@ -1255,6 +1265,7 @@
                         {activeTab === 'milestone' && <MilestoneView dailyLogs={dailyLogs} user={user} />}
                         {activeTab === 'profile' && <ProfileView dailyLogs={dailyLogs} isAdmin={isAdmin} user={user} userProfile={userProfile} />}
                         {activeTab === 'leaderboard' && <LeaderboardView currentUser={user} userTeamId={userProfile?.teamId} />}
+                        {activeTab === 'messageboard' && <MessageBoardView currentUser={user} userProfile={userProfile} />}
                     </main>
 
                     {isModalOpen && (
@@ -1294,6 +1305,7 @@
                         <div className="max-w-md mx-auto flex justify-around items-center" style={{padding:'4px 0 6px'}}>
                             <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} navIcon="mountain" label="修煉室" />
                             <NavBtn active={activeTab === 'leaderboard'} onClick={() => setActiveTab('leaderboard')} navIcon="scroll" label="風雲榜" />
+                            <NavBtn active={activeTab === 'messageboard'} onClick={() => setActiveTab('messageboard')} navIcon="message" label="留言板" />
                             <NavBtn active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} navIcon="calendar" label="行事曆" />
                             <NavBtn active={activeTab === 'milestone'} onClick={() => setActiveTab('milestone')} navIcon="milestone" label="里程碑" />
                             <NavBtn active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} navIcon="gate" label="小天地" />
@@ -2235,8 +2247,381 @@
             );
         };
 
-        // ─── Admin View ─────────────────────────────────────────────────
-        const AdminView = () => {
+
+        // ─── Message Board View ──────────────────────────────────────────
+        const MessageBoardView = ({ currentUser, userProfile }) => {
+            const [teams, setTeams] = useState([]);
+            const [selectedTeam, setSelectedTeam] = useState(null);
+            const [messages, setMessages] = useState([]);
+            const [messageText, setMessageText] = useState('');
+            const [sending, setSending] = useState(false);
+            const [onlineCounts, setOnlineCounts] = useState({}); // { teamId: count }
+            const [recentMsgCounts, setRecentMsgCounts] = useState({}); // { teamId: count in last 5 min }
+            const [msgLikes, setMsgLikes] = useState({}); // { msgId: { count, likedByMe } }
+            const messagesEndRef = React.useRef(null);
+            const presenceRefCleanup = React.useRef(null);
+
+            // ── 工具函數 ──
+            const formatTime = (ts) => {
+                if (!ts) return '';
+                const d = ts.toDate ? ts.toDate() : new Date(ts);
+                return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+            };
+
+            const spawnFloatingHeart = (el) => {
+                if (!el) return;
+                const rect = el.getBoundingClientRect();
+                const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+                const main = document.createElement('div');
+                main.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="#ff6b6b"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+                main.style.cssText = `position:fixed;left:${cx-9}px;top:${cy-9}px;pointer-events:none;z-index:9999;animation:heart-float 0.75s ease-out forwards;`;
+                document.body.appendChild(main);
+                setTimeout(() => main.remove(), 800);
+            };
+
+            // ── 7天訊息清理（進入聊天室時觸發，非管理端可靜默執行）──
+            const cleanupOldMessages = async (teamId) => {
+                try {
+                    const cutoff = new Date();
+                    cutoff.setDate(cutoff.getDate() - 7);
+                    const cutoffTs = firebase.firestore.Timestamp.fromDate(cutoff);
+                    const oldSnap = await db.collection('artifacts').doc(appId)
+                        .collection('messages').doc(teamId)
+                        .collection('chat')
+                        .where('createdAt', '<', cutoffTs)
+                        .limit(50).get();
+                    const batch = db.batch();
+                    oldSnap.forEach(d => batch.delete(d.ref));
+                    if (!oldSnap.empty) await batch.commit();
+                } catch(e) { /* 靜默忽略權限錯誤 */ }
+            };
+
+            // ── 載入所有門派 ──
+            useEffect(() => {
+                const unsub = db.collection('artifacts').doc(appId).collection('teams')
+                    .onSnapshot(snap => {
+                        const list = [];
+                        snap.forEach(doc => list.push({ id: doc.id, name: doc.data().name }));
+                        setTeams(list.sort((a,b) => a.name.localeCompare(b.name)));
+                    });
+                return () => unsub();
+            }, []);
+
+            // ── 監聽所有陣營在線人數 ──
+            useEffect(() => {
+                const unsub = db.collection('artifacts').doc(appId).collection('presence')
+                    .where('online', '==', true)
+                    .onSnapshot(snap => {
+                        const counts = {};
+                        snap.forEach(doc => {
+                            const data = doc.data();
+                            if (data.teamId) counts[data.teamId] = (counts[data.teamId] || 0) + 1;
+                        });
+                        setOnlineCounts(counts);
+                    });
+                return () => unsub();
+            }, []);
+
+            // ── 監聽各陣營最近5分鐘訊息數（熱線判定：≥5則）──
+            useEffect(() => {
+                if (teams.length === 0) return;
+                const cutoff = new Date(Date.now() - 5 * 60 * 1000);
+                const cutoffTs = firebase.firestore.Timestamp.fromDate(cutoff);
+                const unsubs = teams.map(team => {
+                    return db.collection('artifacts').doc(appId)
+                        .collection('messages').doc(team.id)
+                        .collection('chat')
+                        .where('createdAt', '>=', cutoffTs)
+                        .onSnapshot(snap => {
+                            setRecentMsgCounts(prev => ({ ...prev, [team.id]: snap.size }));
+                        });
+                });
+                return () => unsubs.forEach(u => u());
+            }, [teams.length]);
+
+            // ── Presence：進入聊天室時寫入，離開時清除 ──
+            useEffect(() => {
+                if (!selectedTeam || !currentUser) return;
+                cleanupOldMessages(selectedTeam.id);
+                const presenceRef = db.collection('artifacts').doc(appId)
+                    .collection('presence').doc(currentUser.uid);
+                const teamId = userProfile?.teamId || selectedTeam.id;
+                presenceRef.set({
+                    uid: currentUser.uid,
+                    displayName: userProfile?.displayName || currentUser.displayName || '道友',
+                    teamId,
+                    chatRoomId: selectedTeam.id,
+                    online: true,
+                    lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
+                }, { merge: true });
+                const cleanup = () => {
+                    presenceRef.set({ online: false, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+                };
+                presenceRefCleanup.current = cleanup;
+                window.addEventListener('beforeunload', cleanup);
+                return () => {
+                    cleanup();
+                    window.removeEventListener('beforeunload', cleanup);
+                    presenceRefCleanup.current = null;
+                };
+            }, [selectedTeam]);
+
+            // ── 離開聊天室時清除 presence ──
+            const handleBack = () => {
+                if (presenceRefCleanup.current) presenceRefCleanup.current();
+                setSelectedTeam(null);
+                setMessages([]);
+                setMsgLikes({});
+            };
+
+            // ── 載入訊息 ──
+            useEffect(() => {
+                if (!selectedTeam) return;
+                const unsub = db.collection('artifacts').doc(appId)
+                    .collection('messages').doc(selectedTeam.id)
+                    .collection('chat')
+                    .orderBy('createdAt', 'asc')
+                    .limitToLast(100)
+                    .onSnapshot(snap => {
+                        const list = [];
+                        snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+                        setMessages(list);
+                    });
+                return () => unsub();
+            }, [selectedTeam]);
+
+            // ── 監聽訊息愛心 ──
+            useEffect(() => {
+                if (!selectedTeam || messages.length === 0) return;
+                // 從訊息文件的 likes map 讀取
+                const newLikes = {};
+                messages.forEach(msg => {
+                    const likesMap = msg.likes || {};
+                    const count = Object.keys(likesMap).length;
+                    const likedByMe = currentUser ? !!likesMap[currentUser.uid] : false;
+                    newLikes[msg.id] = { count, likedByMe };
+                });
+                setMsgLikes(newLikes);
+            }, [messages]);
+
+            // ── 自動捲到底 ──
+            useEffect(() => {
+                if (messagesEndRef.current) messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+            }, [messages]);
+
+            // ── 送出訊息 ──
+            const sendMessage = async () => {
+                if (!messageText.trim() || !selectedTeam || sending) return;
+                setSending(true);
+                const text = messageText.trim();
+                setMessageText('');
+                try {
+                    await db.collection('artifacts').doc(appId)
+                        .collection('messages').doc(selectedTeam.id)
+                        .collection('chat').add({
+                            text,
+                            uid: currentUser.uid,
+                            displayName: userProfile?.displayName || currentUser.displayName || '道友',
+                            teamId: userProfile?.teamId || '',
+                            teamName: userProfile?.teamName || '',
+                            likes: {},
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        });
+                } catch (e) { console.error('發送失敗:', e); }
+                setSending(false);
+            };
+
+            // ── 切換訊息愛心 ──
+            const toggleMsgLike = async (msg, btnEl) => {
+                if (!currentUser) return;
+                const msgRef = db.collection('artifacts').doc(appId)
+                    .collection('messages').doc(selectedTeam.id)
+                    .collection('chat').doc(msg.id);
+                const liked = msgLikes[msg.id]?.likedByMe;
+                if (liked) {
+                    await msgRef.update({ [`likes.${currentUser.uid}`]: firebase.firestore.FieldValue.delete() });
+                    if ('vibrate' in navigator) navigator.vibrate([10]);
+                } else {
+                    await msgRef.update({ [`likes.${currentUser.uid}`]: true });
+                    if ('vibrate' in navigator) navigator.vibrate([20, 10, 20]);
+                    spawnFloatingHeart(btnEl);
+                    if (btnEl) { btnEl.classList.remove('like-pop'); void btnEl.offsetWidth; btnEl.classList.add('like-pop'); }
+                }
+            };
+
+            const teamAccentColors = ['#ffd43b','#74c0fc','#ff8787','#8ce99a','#b197fc','#ff922b'];
+            const teamBgColors = ['#fef3c7','#e0f2fe','#ffe4e4','#d1fae5','#ede9fe','#fff0e0'];
+
+            // ── 門派選擇畫面 ──
+            if (!selectedTeam) return (
+                <div className="space-y-4 animate-in fade-in duration-300" style={{paddingBottom:'2rem'}}>
+                    <div className="vibrant-card p-5 r-card float-anim" style={{boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
+                        <h2 className="sans-font text-2xl mb-1" style={{color:'var(--c-text)'}}>留言板</h2>
+                        <p className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>選擇陣營，進入聊天室</p>
+                    </div>
+                    <div className="space-y-3">
+                        {teams.length === 0 && <p className="text-center text-xs sans-font py-8" style={{color:'var(--c-muted)'}}>載入中...</p>}
+                        {teams.map((team, i) => {
+                            const isMyTeam = team.id === userProfile?.teamId;
+                            const accent = isMyTeam ? '#74d99f' : teamAccentColors[i % teamAccentColors.length];
+                            const bg = isMyTeam ? '#d1fae5' : teamBgColors[i % teamBgColors.length];
+                            const onlineCount = onlineCounts[team.id] || 0;
+                            const isHot = (recentMsgCounts[team.id] || 0) >= 5;
+                            return (
+                                <button key={team.id} onClick={() => setSelectedTeam(team)}
+                                    className="w-full r-card active-press flex items-center justify-between"
+                                    style={{padding:'14px 16px', background:'#fff', border:`1.5px solid ${accent}`}}>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 flex items-center justify-center r-btn flex-shrink-0"
+                                            style={{background: bg, border:`1px solid ${accent}50`}}>
+                                            <Icon name="MessageCircle" size={18} style={{color: accent === '#ffd43b' ? '#6b4f00' : '#374151'}} />
+                                        </div>
+                                        <div className="text-left">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <p className="sans-font text-sm" style={{color:'var(--c-text)'}}>{team.name}</p>
+                                                {isMyTeam && <span className="text-[9px] sans-font" style={{color:'#0a4a2a', background:'#74d99f', padding:'1px 6px', borderRadius:'99px'}}>我的陣營</span>}
+                                                {isHot && (
+                                                    <span className="text-[9px] sans-font flex items-center gap-0.5"
+                                                        style={{color:'#fff', background:'linear-gradient(135deg,#ff6b6b,#ff922b)', padding:'1px 7px', borderRadius:'99px', animation:'float 1.5s ease-in-out infinite'}}>
+                                                        🔥 熱線中
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-1 mt-0.5">
+                                                {onlineCount > 0 ? (
+                                                    <span className="text-[9px] sans-font flex items-center gap-1" style={{color:'#22c55e'}}>
+                                                        <span style={{display:'inline-block', width:'6px', height:'6px', borderRadius:'50%', background:'#22c55e'}}></span>
+                                                        {onlineCount} 人在線
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[9px] sans-font" style={{color:'var(--c-muted)'}}>目前無人在線</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <Icon name="ChevronRight" size={16} style={{color:'var(--c-muted)'}} />
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+
+            // ── 聊天室畫面 ──
+            const isMyTeam = selectedTeam.id === userProfile?.teamId;
+            const roomOnline = onlineCounts[selectedTeam.id] || 0;
+            const roomHot = (recentMsgCounts[selectedTeam.id] || 0) >= 5;
+            return (
+                <div className="flex flex-col" style={{height:'calc(100vh - 160px)'}}>
+                    {/* 聊天室 header */}
+                    <div className="flex items-center gap-3 pb-3 mb-3" style={{borderBottom:'1px solid var(--c-border)', flexShrink:0}}>
+                        <button onClick={handleBack}
+                            className="w-8 h-8 bg-slate-100 r-btn flex items-center justify-center active-press"
+                            style={{border:'1px solid var(--c-border)', flexShrink:0}}>
+                            <Icon name="ChevronLeft" size={16} />
+                        </button>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <p className="sans-font text-sm" style={{color:'var(--c-text)'}}>{selectedTeam.name}</p>
+                                {roomHot && (
+                                    <span className="text-[9px] sans-font" style={{color:'#fff', background:'linear-gradient(135deg,#ff6b6b,#ff922b)', padding:'1px 7px', borderRadius:'99px'}}>🔥 熱線中</span>
+                                )}
+                            </div>
+                            <p className="text-[10px] sans-font flex items-center gap-1" style={{color: roomOnline > 0 ? '#22c55e' : 'var(--c-muted)'}}>
+                                {roomOnline > 0 ? (
+                                    <><span style={{display:'inline-block', width:'5px', height:'5px', borderRadius:'50%', background:'#22c55e'}}></span>{roomOnline} 人在線</>
+                                ) : (isMyTeam ? '我的陣營' : '跨陣營交流')}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* 訊息列表 */}
+                    <div className="flex-1 overflow-y-auto space-y-2 pr-1" style={{minHeight:0}}>
+                        {messages.length === 0 && (
+                            <div className="text-center py-12">
+                                <p className="sans-font text-xs" style={{color:'var(--c-muted)'}}>還沒有訊息，率先發言！</p>
+                            </div>
+                        )}
+                        {messages.map((msg, i) => {
+                            const isMe = msg.uid === currentUser.uid;
+                            const showName = !isMe && (i === 0 || messages[i-1]?.uid !== msg.uid);
+                            const liked = msgLikes[msg.id]?.likedByMe;
+                            const likeCount = msgLikes[msg.id]?.count || 0;
+                            return (
+                                <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                                    {showName && (
+                                        <span className="sans-font text-[10px] mb-0.5 px-1" style={{color:'var(--c-muted)'}}>
+                                            {msg.displayName}
+                                            {msg.teamName && <span style={{color:'var(--c-primary-text)', marginLeft:'4px'}}>· {msg.teamName}</span>}
+                                        </span>
+                                    )}
+                                    <div className={`flex items-end gap-1.5 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                                        {/* 時間 */}
+                                        <span className="sans-font text-[9px]" style={{color:'var(--c-muted)', flexShrink:0, marginBottom:'2px'}}>{formatTime(msg.createdAt)}</span>
+                                        {/* 氣泡 */}
+                                        <div className="px-3 py-2 r-btn sans-normal text-sm"
+                                            style={{
+                                                maxWidth:'65%',
+                                                background: isMe ? 'var(--c-primary)' : '#fff',
+                                                color: isMe ? '#fff' : 'var(--c-text)',
+                                                border: isMe ? 'none' : '1px solid var(--c-border)',
+                                                wordBreak:'break-word', lineHeight:1.5,
+                                            }}>
+                                            {msg.text}
+                                        </div>
+                                        {/* ❤️ 愛心按鈕 */}
+                                        <button
+                                            onClick={e => toggleMsgLike(msg, e.currentTarget)}
+                                            className="flex flex-col items-center justify-center active-press"
+                                            style={{
+                                                flexShrink:0, position:'relative', overflow:'visible',
+                                                padding:'3px 5px', borderRadius:'99px', minWidth:'28px',
+                                                background: liked ? '#fff0f0' : 'transparent',
+                                                border: liked ? '1px solid #ffc9c9' : '1px solid transparent',
+                                                transition:'all 0.18s',
+                                            }}>
+                                            <svg width="14" height="14" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                {liked
+                                                    ? <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#ff6b6b"/>
+                                                    : <path d="M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z" fill="#d1d5db"/>
+                                                }
+                                            </svg>
+                                            {likeCount > 0 && (
+                                                <span className="sans-font" style={{fontSize:'8px', color: liked ? '#ff6b6b' : '#9ca3af', lineHeight:1}}>{likeCount}</span>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        <div ref={messagesEndRef} />
+                    </div>
+
+                    {/* 輸入框 */}
+                    <div className="flex gap-2 pt-3 mt-3" style={{borderTop:'1px solid var(--c-border)', flexShrink:0}}>
+                        <input
+                            type="text"
+                            value={messageText}
+                            onChange={e => setMessageText(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                            placeholder="輸入訊息..."
+                            className="flex-1 px-3 py-2.5 r-btn sans-normal text-sm focus:outline-none bg-white"
+                            style={{border:'1px solid var(--c-border)'}}
+                        />
+                        <button
+                            onClick={sendMessage}
+                            disabled={!messageText.trim() || sending}
+                            className="pk-blue px-4 py-2.5 r-btn neo-border-thin active-press disabled:opacity-30"
+                        >
+                            <Icon name="Send" size={16} className="text-white" />
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+  // ─── Admin View ─────────────────────────────────────────────────
+  const AdminView = () => {
             const [teams, setTeams] = useState([]);
             const [users, setUsers] = useState([]);
             const [loading, setLoading] = useState(true);
