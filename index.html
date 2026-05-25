@@ -2473,7 +2473,33 @@
                             const accent = isMyTeam ? '#74d99f' : teamAccentColors[i % teamAccentColors.length];
                             const bg = isMyTeam ? '#d1fae5' : teamBgColors[i % teamBgColors.length];
                             const onlineCount = onlineCounts[team.id] || 0;
-                            const isHot = (recentMsgCounts[team.id] || 0) >= 5;
+                            // 熱度：依在線人數分三級
+                            const heatLevel = onlineCount >= 5 ? 3 : onlineCount >= 3 ? 2 : onlineCount >= 2 ? 1 : 0;
+                            const FlameIcon = () => (
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M12 2C10 6 6 8 6 13a6 6 0 0 0 12 0c0-3-2-5-3-7-1 2-1.5 3-1.5 4a2.5 2.5 0 0 1-5 0C8.5 7 12 2 12 2z"/>
+                                </svg>
+                            );
+                            const heatBadge = heatLevel > 0 ? (
+                                <span className="inline-flex items-center gap-0.5 sans-font"
+                                    style={{
+                                        fontSize:'9px', fontWeight:'700', padding:'2px 7px', borderRadius:'99px',
+                                        color:'#fff',
+                                        background: heatLevel === 3
+                                            ? 'linear-gradient(135deg,#ff3d00,#ff6b00)'
+                                            : heatLevel === 2
+                                            ? 'linear-gradient(135deg,#ff6b6b,#ff922b)'
+                                            : 'linear-gradient(135deg,#ff8787,#ffb347)',
+                                        animation:'float 1.5s ease-in-out infinite',
+                                    }}>
+                                    {Array.from({length: heatLevel}).map((_, k) => (
+                                        <svg key={k} width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M12 2C10 6 6 8 6 13a6 6 0 0 0 12 0c0-3-2-5-3-7-1 2-1.5 3-1.5 4a2.5 2.5 0 0 1-5 0C8.5 7 12 2 12 2z"/>
+                                        </svg>
+                                    ))}
+                                    {heatLevel === 1 ? 'HOT' : heatLevel === 2 ? '熱門' : '爆滿'}
+                                </span>
+                            ) : null;
                             return (
                                 <button key={team.id} onClick={() => setSelectedTeam(team)}
                                     className="w-full r-card active-press flex items-center justify-between"
@@ -2484,20 +2510,15 @@
                                             <Icon name="MessageCircle" size={18} style={{color: accent === '#ffd43b' ? '#6b4f00' : '#374151'}} />
                                         </div>
                                         <div className="text-left">
-                                            <div className="flex items-center gap-2 flex-wrap">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
                                                 <p className="sans-font text-sm" style={{color:'var(--c-text)'}}>{team.name}</p>
                                                 {isMyTeam && <span className="text-[9px] sans-font" style={{color:'#0a4a2a', background:'#74d99f', padding:'1px 6px', borderRadius:'99px'}}>我的陣營</span>}
-                                                {isHot && (
-                                                    <span className="text-[9px] sans-font flex items-center gap-0.5"
-                                                        style={{color:'#fff', background:'linear-gradient(135deg,#ff6b6b,#ff922b)', padding:'1px 7px', borderRadius:'99px', animation:'float 1.5s ease-in-out infinite'}}>
-                                                        🔥 熱線中
-                                                    </span>
-                                                )}
+                                                {heatBadge}
                                             </div>
                                             <div className="flex items-center gap-1 mt-0.5">
                                                 {onlineCount > 0 ? (
                                                     <span className="text-[9px] sans-font flex items-center gap-1" style={{color:'#22c55e'}}>
-                                                        <span style={{display:'inline-block', width:'6px', height:'6px', borderRadius:'50%', background:'#22c55e'}}></span>
+                                                        <span style={{display:'inline-block', width:'6px', height:'6px', borderRadius:'50%', background:'#22c55e', flexShrink:0}}></span>
                                                         {onlineCount} 人在線
                                                     </span>
                                                 ) : (
@@ -2517,7 +2538,23 @@
             // ── 聊天室畫面 ──
             const isMyTeam = selectedTeam.id === userProfile?.teamId;
             const roomOnline = onlineCounts[selectedTeam.id] || 0;
-            const roomHot = (recentMsgCounts[selectedTeam.id] || 0) >= 5;
+            const roomHeatLevel = roomOnline >= 5 ? 3 : roomOnline >= 3 ? 2 : roomOnline >= 2 ? 1 : 0;
+            const RoomHeatBadge = roomHeatLevel > 0 ? (
+                <span className="inline-flex items-center gap-0.5 sans-font"
+                    style={{
+                        fontSize:'9px', fontWeight:'700', padding:'2px 7px', borderRadius:'99px', color:'#fff',
+                        background: roomHeatLevel === 3 ? 'linear-gradient(135deg,#ff3d00,#ff6b00)'
+                            : roomHeatLevel === 2 ? 'linear-gradient(135deg,#ff6b6b,#ff922b)'
+                            : 'linear-gradient(135deg,#ff8787,#ffb347)',
+                    }}>
+                    {Array.from({length: roomHeatLevel}).map((_,k) => (
+                        <svg key={k} width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C10 6 6 8 6 13a6 6 0 0 0 12 0c0-3-2-5-3-7-1 2-1.5 3-1.5 4a2.5 2.5 0 0 1-5 0C8.5 7 12 2 12 2z"/>
+                        </svg>
+                    ))}
+                    {roomHeatLevel === 1 ? 'HOT' : roomHeatLevel === 2 ? '熱門' : '爆滿'}
+                </span>
+            ) : null;
             return (
                 <div className="flex flex-col" style={{height:'calc(100vh - 160px)'}}>
                     {/* 聊天室 header */}
@@ -2528,15 +2565,13 @@
                             <Icon name="ChevronLeft" size={16} />
                         </button>
                         <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                                 <p className="sans-font text-sm" style={{color:'var(--c-text)'}}>{selectedTeam.name}</p>
-                                {roomHot && (
-                                    <span className="text-[9px] sans-font" style={{color:'#fff', background:'linear-gradient(135deg,#ff6b6b,#ff922b)', padding:'1px 7px', borderRadius:'99px'}}>🔥 熱線中</span>
-                                )}
+                                {RoomHeatBadge}
                             </div>
                             <p className="text-[10px] sans-font flex items-center gap-1" style={{color: roomOnline > 0 ? '#22c55e' : 'var(--c-muted)'}}>
                                 {roomOnline > 0 ? (
-                                    <><span style={{display:'inline-block', width:'5px', height:'5px', borderRadius:'50%', background:'#22c55e'}}></span>{roomOnline} 人在線</>
+                                    <><span style={{display:'inline-block', width:'5px', height:'5px', borderRadius:'50%', background:'#22c55e', flexShrink:0}}></span>{roomOnline} 人在線</>
                                 ) : (isMyTeam ? '我的陣營' : '跨陣營交流')}
                             </p>
                         </div>
@@ -2557,10 +2592,14 @@
                             return (
                                 <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                                     {showName && (
-                                        <span className="sans-font text-[10px] mb-0.5 px-1" style={{color:'var(--c-muted)'}}>
-                                            {msg.displayName}
-                                            {msg.teamName && <span style={{color:'var(--c-primary-text)', marginLeft:'4px'}}>· {msg.teamName}</span>}
-                                        </span>
+                                        <div className="flex items-center gap-1.5 mb-1 px-1">
+                                            <span className="sans-font text-xs" style={{color:'var(--c-text)', fontWeight:'700'}}>{msg.displayName}</span>
+                                            {msg.teamName && (
+                                                <span className="sans-font" style={{fontSize:'9px', color:'var(--c-primary-text)', background:'var(--c-primary-bg)', padding:'1px 5px', borderRadius:'4px', border:'1px solid var(--c-primary)30'}}>
+                                                    {msg.teamName}
+                                                </span>
+                                            )}
+                                        </div>
                                     )}
                                     <div className={`flex items-end gap-1.5 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
                                         {/* 時間 */}
