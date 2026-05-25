@@ -266,33 +266,40 @@
             const handleGoogleLogin = async () => {
                 setLoading(true);
                 setError('');
+                const provider = new firebase.auth.GoogleAuthProvider();
+                provider.addScope('email');
+                provider.addScope('profile');
+                provider.setCustomParameters({ prompt: 'select_account' });
                 try {
-                    const provider = new firebase.auth.GoogleAuthProvider();
-                    provider.addScope('email');
-                    provider.addScope('profile');
-                    provider.setCustomParameters({ prompt: 'select_account' });
-                    // ✅ 直接用 redirect，完全避免 COOP popup 問題
-                    await auth.signInWithRedirect(provider);
-                } catch (e) {
-                    setError('登入失敗，請再試一次');
-                    setLoading(false);
+                    await auth.signInWithPopup(provider);
+                } catch (popupError) {
+                    if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/popup-closed-by-user') {
+                        try {
+                            await auth.signInWithRedirect(provider);
+                        } catch (e) {
+                            setError('登入失敗，請再試一次');
+                            setLoading(false);
+                        }
+                    } else {
+                        setError('登入失敗：' + popupError.message);
+                        setLoading(false);
+                    }
                 }
             };
 
             useEffect(() => {
-                // ✅ redirect 回來後取得登入結果
                 auth.getRedirectResult().then(result => {
                     if (result?.user) {
-                        console.log('[Login 成功]', {
-                            uid: result.user.uid,
+                        console.log('[Redirect Result]', {
                             email: result.user.email,
                             providerData: result.user.providerData
                         });
+                    } else {
+                        console.log('[Redirect Result] 無 user（可能是 popup 登入或尚未 redirect）');
                     }
                     setLoading(false);
                 }).catch(e => {
-                    console.error('[Login 失敗]', e);
-                    setError('登入失敗：' + e.message);
+                    console.error('[Redirect Error]', e);
                     setLoading(false);
                 });
             }, []);
