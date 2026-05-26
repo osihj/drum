@@ -3422,24 +3422,25 @@
                                             await Promise.all(logPromises);
                                             
                                             // 發送留言板訊息給受影響的陣營
+                                            const now = new Date();
+                                            const timeStr = `${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
                                             const messageText = pizzaReason.trim() 
-                                                ? `🍕 管理員送出 Pizza 劵 ${pizzaSliceCount} 片！\n原因：${pizzaReason.trim()}`
-                                                : `🍕 管理員送出 Pizza 劵 ${pizzaSliceCount} 片給大家！`;
+                                                ? `🍕 管理員送出 Pizza 劵 ${pizzaSliceCount} 片！\n原因：${pizzaReason.trim()}\n（${timeStr}）`
+                                                : `🍕 管理員送出 Pizza 劵 ${pizzaSliceCount} 片給大家！\n（${timeStr}）`;
                                             
                                             for (const teamId of affectedTeamIds) {
                                                 try {
-                                                    const msgRef = db.collection('messages').doc(teamId);
-                                                    const snap = await msgRef.get();
-                                                    const existing = snap.data() || { msgs: [] };
-                                                    existing.msgs = existing.msgs || [];
-                                                    existing.msgs.push({
-                                                        uid: '[管理員]',
-                                                        displayName: '🛡️ 系統公告',
-                                                        text: messageText,
-                                                        sentAt: firebase.firestore.FieldValue.serverTimestamp(),
-                                                        isAdmin: true,
-                                                    });
-                                                    await msgRef.set(existing);
+                                                    await db.collection('messages').doc(teamId)
+                                                        .collection('chat').add({
+                                                            uid: 'system',
+                                                            displayName: '🛡️ 系統公告',
+                                                            text: messageText,
+                                                            teamId: teamId,
+                                                            teamName: '',
+                                                            likes: {},
+                                                            isAdmin: true,
+                                                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                                        });
                                                 } catch(err) {
                                                     console.warn('發送留言板訊息失敗:', err);
                                                 }
@@ -3612,7 +3613,7 @@
                                                     {log.reason ? <p className="sans-font mt-0.5" style={{fontSize:'10px', color:'var(--c-muted)'}}>{log.reason}</p> : null}
                                                 </div>
                                                 <span className="sans-font flex-shrink-0" style={{fontSize:'9px', color:'var(--c-muted)'}}>
-                                                    {log.createdAt?.toDate ? log.createdAt.toDate().toLocaleDateString('zh-TW',{month:'2-digit',day:'2-digit'}) : ''}
+                                                    {log.createdAt?.toDate ? (() => { const d = log.createdAt.toDate(); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; })() : ''}
                                                 </span>
                                             </div>
                                         );
