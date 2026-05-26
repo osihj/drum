@@ -676,6 +676,17 @@
                         <div className="space-y-2">
                             {allMembers.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有成員資料</div>}
                             {allMembers.map((m, i) => {
+                                // 計算排名：相同等級和點數的用戶顯示相同排名
+                                let rank = 1;
+                                for (let j = 0; j < i; j++) {
+                                    if (allMembers[j].lv !== m.lv || allMembers[j].score !== m.score) {
+                                        rank = j + 1;
+                                    }
+                                }
+                                if (i > 0 && (allMembers[i-1].lv !== m.lv || allMembers[i-1].score !== m.score)) {
+                                    rank = i + 1;
+                                }
+                                
                                 const isMe = m.uid === currentUser?.uid;
                                 const teamIdx = leaderboard.findIndex(t => t.id === m.teamId);
                                 const accentColor = teamAccentColors[teamIdx >= 0 ? teamIdx % teamAccentColors.length : 0];
@@ -686,7 +697,7 @@
                                         {/* 排名數字 */}
                                         <div style={{display:'flex', alignItems:'center', justifyContent:'center', 
                                             width:'32px', height:'32px', background:accentColor, borderRadius:'50%', flexShrink:0}}>
-                                            <span className="sans-font" style={{fontSize:'16px', fontWeight:'700', color:'white'}}>{i+1}</span>
+                                            <span className="sans-font" style={{fontSize:'16px', fontWeight:'700', color:'white'}}>{rank}</span>
                                         </div>
                                         {/* Name + team badge */}
                                         <div style={{flex:1, minWidth:0}}>
