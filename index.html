@@ -2530,7 +2530,9 @@
             // ── 載入訊息 ──
             useEffect(() => {
                 if (!selectedTeam) return;
-                const unsub = db.collection('messages').doc(selectedTeam.id)
+                const parentRef = db.collection('messages').doc(selectedTeam.id);
+                parentRef.set({ teamId: selectedTeam.id, initialized: true }, { merge: true }).catch(() => {});
+                const unsub = parentRef
                     .collection('chat')
                     .orderBy('createdAt', 'asc')
                     .limitToLast(100)
@@ -2538,7 +2540,7 @@
                         const list = [];
                         snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
                         setMessages(list);
-                    });
+                    }, err => { console.warn('訊息監聽錯誤:', err); });
                 return () => unsub();
             }, [selectedTeam]);
 
