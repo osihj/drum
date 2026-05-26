@@ -2568,8 +2568,10 @@
                 const text = messageText.trim();
                 setMessageText('');
                 try {
-                    await db.collection('messages').doc(selectedTeam.id)
-                        .collection('chat').add({
+                    const parentRef = db.collection('messages').doc(selectedTeam.id);
+                    // 確保父 document 存在，不存在就自動建立
+                    await parentRef.set({ teamId: selectedTeam.id, initialized: true }, { merge: true });
+                    await parentRef.collection('chat').add({
                             text,
                             uid: currentUser.uid,
                             displayName: userProfile?.displayName || currentUser.displayName || '道友',
@@ -3444,8 +3446,9 @@
                                                     const messageText = pizzaReason.trim()
                                                         ? `🍕 管理員送出 Pizza 劵 ${pizzaSliceCount} 片給 ${whoStr}！\n原因：${pizzaReason.trim()}\n（${timeStr}）`
                                                         : `🍕 管理員送出 Pizza 劵 ${pizzaSliceCount} 片給 ${whoStr}！\n（${timeStr}）`;
-                                                    await db.collection('messages').doc(teamId)
-                                                        .collection('chat').add({
+                                                    const parentRef = db.collection('messages').doc(teamId);
+                                                    await parentRef.set({ teamId, initialized: true }, { merge: true });
+                                                    await parentRef.collection('chat').add({
                                                             uid: 'system',
                                                             displayName: '🛡️ 系統公告',
                                                             text: messageText,
