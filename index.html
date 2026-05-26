@@ -616,10 +616,10 @@
 
                     {loading && <div className="text-center py-12 opacity-30 sans-font text-sm">載入中...</div>}
 
-                    {/* ── 門派排名 tab ── */}
+                    {/* ── 陣營排名 tab ── */}
                     {!loading && lbTab === 'teams' && (
                         <div className="space-y-3">
-                            {leaderboard.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有門派資料</div>}
+                            {leaderboard.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有陣營資料</div>}
                             {leaderboard.map((team, i) => {
                                 const isMyTeam = team.id === userTeamId;
                                 const accentColor = isMyTeam ? '#74d99f' : teamAccentColors[i % teamAccentColors.length];
@@ -671,7 +671,7 @@
                         </div>
                     )}
 
-                    {/* ── 門派成員 tab ── */}
+                    {/* ── 陣營成員 tab ── */}
                     {!loading && lbTab === 'members' && (
                         <div className="space-y-2">
                             {allMembers.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有成員資料</div>}
@@ -2451,7 +2451,7 @@
                 } catch(e) { /* 靜默忽略權限錯誤 */ }
             };
 
-            // ── 載入所有門派 ──
+            // ── 載入所有陣營 ──
             useEffect(() => {
                 const unsub = db.collection('teams')
                     .onSnapshot(snap => {
@@ -3426,7 +3426,7 @@
                                                             <span className="sans-font" style={{fontSize:'10px', color: done ? '#d97706':'var(--c-muted)', minWidth:'36px', textAlign:'right', fontWeight: done?'700':'400'}}>{done?'🍕':''}{slices}/{total}</span>
                                                             <button
                                                                 onClick={async () => {
-                                                                    if (!window.confirm('確定重置「' + (u.displayName||u.email) + '」的 Pizza 進度？')) return;
+                                                                    if (!window.confirm('確定回收「' + (u.displayName||u.email) + '」的 Pizza劵？')) return;
                                                                     await db.collection('users').doc(u.uid).update({ pizzaSlices: 0 });
                                                                 }}
                                                                 className="w-6 h-6 r-btn flex items-center justify-center active-press flex-shrink-0"
