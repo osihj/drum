@@ -2093,7 +2093,7 @@
                     </div>
 
 
-                    {/* 🍕 Pizza 成就 */}
+                    {/* 🍕 Pizza 劵 */}
                     {(() => {
                         const { slices, total } = pizzaData;
                         const isComplete = slices >= total;
@@ -2123,7 +2123,7 @@
                         const sliceColors = { base: '#f59e0b', crust: '#d97706', obtained: '#fbbf24', topping: '#ef4444' };
                         return (
                             <div style={{padding:'0 0.5rem'}}>
-                                <h3 className="sans-font" style={{fontSize:'13px', fontWeight:'500', color:'#6b7280', margin:'0 0 1rem 0', textTransform:'uppercase', letterSpacing:'0.5px'}}>🍕 Pizza 成就</h3>
+                                <h3 className="sans-font" style={{fontSize:'13px', fontWeight:'500', color:'#6b7280', margin:'0 0 1rem 0', textTransform:'uppercase', letterSpacing:'0.5px'}}>🍕 Pizza 劵</h3>
                                 <div className="bg-white r-card card-shadow" style={{padding:'20px 16px', display:'flex', flexDirection:'column', alignItems:'center', gap:'12px'}}>
                                     {/* SVG Pizza */}
                                     <div style={{position:'relative', width:'200px', height:'200px'}}>
@@ -2208,7 +2208,7 @@
                                         </div>
                                     </div>
                                     {slices === 0 && (
-                                        <p className="sans-font text-xs" style={{color:'var(--c-muted)', textAlign:'center'}}>完成挑戰即可獲得 Pizza 切片 🍕</p>
+                                        <p className="sans-font text-xs" style={{color:'var(--c-muted)', textAlign:'center'}}>完成挑戰即可獲得 🍕Pizza 劵 </p>
                                     )}
                                 </div>
                             </div>
@@ -3171,7 +3171,7 @@
 
                                 {/* Mode toggle */}
                                 <div className="flex r-btn overflow-hidden" style={{border:'1px solid var(--c-border)', padding:'2px', gap:'2px'}}>
-                                    {[{key:'team',label:'🏕️ 整個陣營'},{key:'member',label:'👤 個別成員'}].map(m => (
+                                    {[{key:'team',label:'整個陣營'},{key:'member',label:'個別成員'}].map(m => (
                                         <button key={m.key}
                                             onClick={() => { setPizzaSendMode(m.key); setPizzaSelectedTeamId(null); setPizzaSelectedUids([]); }}
                                             className="flex-1 py-1.5 r-btn sans-font text-xs transition-all"
@@ -3201,7 +3201,7 @@
                                                             background: sel ? '#fef9c3' : '#f8fafc',
                                                             border: sel ? '2px solid var(--c-accent)' : '1.5px solid var(--c-border)',
                                                         }}>
-                                                        <span style={{fontSize:'20px'}}>🏕️</span>
+                                                        <span style={{fontSize:'20px'}}></span>
                                                         <div style={{flex:1}}>
                                                             <p className="sans-font text-sm" style={{color:'var(--c-text)', fontWeight: sel ? '700':'400'}}>{t.name}</p>
                                                             <p className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)'}}>
@@ -3235,7 +3235,7 @@
                                             return (
                                                 <div key={t.id} className="mb-3">
                                                     <div className="flex items-center gap-2 mb-1.5">
-                                                        <p className="sans-font text-xs" style={{color:'var(--c-muted)'}}>🏕️ {t.name}</p>
+                                                        <p className="sans-font text-xs" style={{color:'var(--c-muted)'}}> {t.name}</p>
                                                         <button
                                                             onClick={() => {
                                                                 const ids = mems.map(u => u.uid);
@@ -3410,7 +3410,7 @@
                                     if (mems.length === 0) return null;
                                     return (
                                         <div key={t.id} className="mb-4">
-                                            <p className="sans-font text-xs mb-2" style={{color:'var(--c-muted)'}}>🏕️ {t.name}</p>
+                                            <p className="sans-font text-xs mb-2" style={{color:'var(--c-muted)'}}> {t.name}</p>
                                             <div className="space-y-2">
                                                 {mems.map(u => {
                                                     const slices = u.pizzaSlices || 0;
