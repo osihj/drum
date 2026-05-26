@@ -3161,6 +3161,342 @@
                             </div>
                         </div>
                     )}
+                    {/* ── Pizza tab ── */}
+                    {tab === 'pizza' && (
+                        <div className="space-y-4">
+
+                            {/* 發送卡片 */}
+                            <div className="bg-white p-4 r-card card-shadow space-y-4">
+                                <p className="sans-font text-xs tracking-widest" style={{color:'var(--c-muted)'}}>🍕 發送切片</p>
+
+                                {/* Mode toggle */}
+                                <div className="flex r-btn overflow-hidden" style={{border:'1px solid var(--c-border)', padding:'2px', gap:'2px'}}>
+                                    {[{key:'team',label:'🏕️ 整個陣營'},{key:'member',label:'👤 個別成員'}].map(m => (
+                                        <button key={m.key}
+                                            onClick={() => { setPizzaSendMode(m.key); setPizzaSelectedTeamId(null); setPizzaSelectedUids([]); }}
+                                            className="flex-1 py-1.5 r-btn sans-font text-xs transition-all"
+                                            style={{
+                                                background: pizzaSendMode === m.key ? 'var(--c-accent)' : 'transparent',
+                                                color: pizzaSendMode === m.key ? 'var(--c-accent-text)' : 'var(--c-muted)',
+                                                fontWeight: pizzaSendMode === m.key ? '700' : '400',
+                                            }}>
+                                            {m.label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Team mode: pick a team */}
+                                {pizzaSendMode === 'team' && (
+                                    <div>
+                                        <p className="sans-font text-xs mb-2" style={{color:'var(--c-text-sub)'}}>選擇陣營</p>
+                                        <div className="space-y-2">
+                                            {teams.map(t => {
+                                                const mems = users.filter(u => u.teamId === t.id);
+                                                const sel = pizzaSelectedTeamId === t.id;
+                                                return (
+                                                    <button key={t.id}
+                                                        onClick={() => setPizzaSelectedTeamId(sel ? null : t.id)}
+                                                        className="w-full flex items-center gap-3 px-3 py-2.5 r-btn active-press transition-all text-left"
+                                                        style={{
+                                                            background: sel ? '#fef9c3' : '#f8fafc',
+                                                            border: sel ? '2px solid var(--c-accent)' : '1.5px solid var(--c-border)',
+                                                        }}>
+                                                        <span style={{fontSize:'20px'}}>🏕️</span>
+                                                        <div style={{flex:1}}>
+                                                            <p className="sans-font text-sm" style={{color:'var(--c-text)', fontWeight: sel ? '700':'400'}}>{t.name}</p>
+                                                            <p className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)'}}>
+                                                                {mems.length} 位成員{mems.length > 0 ? '：' + mems.map(u => u.displayName||u.email).join('、') : ''}
+                                                            </p>
+                                                        </div>
+                                                        {sel && <span style={{color:'#d97706', fontSize:'16px'}}>✓</span>}
+                                                    </button>
+                                                );
+                                            })}
+                                            {teams.length === 0 && <p className="sans-font text-xs text-center py-3" style={{color:'var(--c-muted)'}}>尚無陣營</p>}
+                                        </div>
+                                        {pizzaSelectedTeamId && users.filter(u => u.teamId === pizzaSelectedTeamId).length === 0 && (
+                                            <p className="sans-font text-xs mt-2" style={{color:'#ef4444'}}>⚠️ 此陣營目前沒有成員</p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Member mode: pick individuals */}
+                                {pizzaSendMode === 'member' && (
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <p className="sans-font text-xs" style={{color:'var(--c-text-sub)'}}>選擇成員（可多選）</p>
+                                            {pizzaSelectedUids.length > 0 && (
+                                                <button onClick={() => setPizzaSelectedUids([])} className="sans-font text-xs" style={{color:'#ef4444'}}>清除全部</button>
+                                            )}
+                                        </div>
+                                        {teams.map(t => {
+                                            const mems = users.filter(u => u.teamId === t.id);
+                                            if (mems.length === 0) return null;
+                                            return (
+                                                <div key={t.id} className="mb-3">
+                                                    <div className="flex items-center gap-2 mb-1.5">
+                                                        <p className="sans-font text-xs" style={{color:'var(--c-muted)'}}>🏕️ {t.name}</p>
+                                                        <button
+                                                            onClick={() => {
+                                                                const ids = mems.map(u => u.uid);
+                                                                const allSel = ids.every(id => pizzaSelectedUids.includes(id));
+                                                                setPizzaSelectedUids(prev => allSel ? prev.filter(x => !ids.includes(x)) : [...new Set([...prev, ...ids])]);
+                                                            }}
+                                                            className="sans-font px-1.5 py-0.5 r-badge"
+                                                            style={{fontSize:'9px', background:'#f3f4f6', color:'var(--c-muted)', border:'1px solid var(--c-border)'}}>
+                                                            {mems.every(u => pizzaSelectedUids.includes(u.uid)) ? '取消全選' : '全選'}
+                                                        </button>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {mems.map(u => {
+                                                            const sel = pizzaSelectedUids.includes(u.uid);
+                                                            return (
+                                                                <button key={u.uid}
+                                                                    onClick={() => setPizzaSelectedUids(prev => prev.includes(u.uid) ? prev.filter(x => x !== u.uid) : [...prev, u.uid])}
+                                                                    className="px-2.5 py-1 r-badge sans-font text-xs active-press transition-all"
+                                                                    style={{
+                                                                        background: sel ? 'var(--c-accent)' : '#f3f4f6',
+                                                                        color: sel ? 'var(--c-accent-text)' : 'var(--c-text-sub)',
+                                                                        border: sel ? '1.5px solid #d97706' : '1px solid var(--c-border)',
+                                                                        fontWeight: sel ? '700' : '400',
+                                                                    }}>
+                                                                    {u.displayName || u.email}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                        {users.filter(u => !u.teamId).length > 0 && (
+                                            <div className="mb-3">
+                                                <p className="sans-font text-xs mb-1.5" style={{color:'var(--c-muted)'}}>無陣營</p>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {users.filter(u => !u.teamId).map(u => {
+                                                        const sel = pizzaSelectedUids.includes(u.uid);
+                                                        return (
+                                                            <button key={u.uid}
+                                                                onClick={() => setPizzaSelectedUids(prev => prev.includes(u.uid) ? prev.filter(x => x !== u.uid) : [...prev, u.uid])}
+                                                                className="px-2.5 py-1 r-badge sans-font text-xs active-press transition-all"
+                                                                style={{
+                                                                    background: sel ? 'var(--c-accent)' : '#f3f4f6',
+                                                                    color: sel ? 'var(--c-accent-text)' : 'var(--c-text-sub)',
+                                                                    border: sel ? '1.5px solid #d97706' : '1px solid var(--c-border)',
+                                                                    fontWeight: sel ? '700' : '400',
+                                                                }}>
+                                                                {u.displayName || u.email}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Preview banner */}
+                                {(() => {
+                                    const recipients = pizzaSendMode === 'team'
+                                        ? users.filter(u => u.teamId === pizzaSelectedTeamId)
+                                        : users.filter(u => pizzaSelectedUids.includes(u.uid));
+                                    if (recipients.length === 0) return null;
+                                    return (
+                                        <div className="px-3 py-2 r-btn" style={{background:'#fef9c3', border:'1px solid #fde68a'}}>
+                                            <p className="sans-font text-xs" style={{color:'#92400e'}}>
+                                                🍕 將發送給 <strong>{recipients.length} 人</strong>：{recipients.map(r => r.displayName||r.email).join('、')}
+                                            </p>
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* Slice count */}
+                                <div>
+                                    <p className="sans-font text-xs mb-2" style={{color:'var(--c-text-sub)'}}>每人獲得切片數</p>
+                                    <div className="flex items-center gap-3">
+                                        <button onClick={() => setPizzaSliceCount(Math.max(1, pizzaSliceCount-1))}
+                                            className="w-9 h-9 r-btn flex items-center justify-center sans-font text-xl active-press"
+                                            style={{background:'#f3f4f6', border:'1.5px solid var(--c-border)'}}>−</button>
+                                        <div className="flex flex-col items-center" style={{minWidth:'48px'}}>
+                                            <span className="sans-font" style={{fontSize:'28px', fontWeight:'700', color:'var(--c-text)', lineHeight:1}}>{pizzaSliceCount}</span>
+                                            <span className="sans-font text-xs" style={{color:'var(--c-muted)'}}>片</span>
+                                        </div>
+                                        <button onClick={() => setPizzaSliceCount(Math.min(8, pizzaSliceCount+1))}
+                                            className="w-9 h-9 r-btn flex items-center justify-center sans-font text-xl active-press"
+                                            style={{background:'#f3f4f6', border:'1.5px solid var(--c-border)'}}>+</button>
+                                        <div className="flex gap-1 ml-1">
+                                            {[1,2,3].map(n => (
+                                                <button key={n} onClick={() => setPizzaSliceCount(n)}
+                                                    className="w-7 h-7 r-badge sans-font active-press"
+                                                    style={{fontSize:'10px', background: pizzaSliceCount===n ? 'var(--c-accent)' : '#f3f4f6', color: pizzaSliceCount===n ? 'var(--c-accent-text)' : 'var(--c-muted)', border:'1px solid var(--c-border)'}}>
+                                                    {n}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Reason */}
+                                <div>
+                                    <p className="sans-font text-xs mb-1.5" style={{color:'var(--c-text-sub)'}}>原因（選填）</p>
+                                    <input type="text" value={pizzaReason} onChange={e => setPizzaReason(e.target.value)}
+                                        placeholder="例：本週全勤打卡！"
+                                        className="w-full px-3 py-2 text-sm sans-font focus:outline-none bg-slate-50 r-btn"
+                                        style={{border:'1px solid var(--c-border-strong)'}} />
+                                </div>
+
+                                {/* Send button */}
+                                {(() => {
+                                    const recipients = pizzaSendMode === 'team'
+                                        ? users.filter(u => u.teamId === pizzaSelectedTeamId)
+                                        : users.filter(u => pizzaSelectedUids.includes(u.uid));
+                                    const canSend = recipients.length > 0 && !pizzaSending;
+                                    const doSend = async () => {
+                                        if (!canSend) return;
+                                        setPizzaSending(true);
+                                        try {
+                                            const batch = db.batch();
+                                            const logPromises = [];
+                                            for (const u of recipients) {
+                                                const snap = await db.collection('users').doc(u.uid).get();
+                                                const cur = snap.data()?.pizzaSlices || 0;
+                                                const total = snap.data()?.pizzaTotal || 8;
+                                                const next = Math.min(cur + pizzaSliceCount, total);
+                                                batch.update(db.collection('users').doc(u.uid), { pizzaSlices: next });
+                                                logPromises.push(db.collection('pizzaLogs').add({
+                                                    uid: u.uid,
+                                                    displayName: u.displayName || u.email || '',
+                                                    teamId: u.teamId || null,
+                                                    teamName: u.teamName || null,
+                                                    slices: pizzaSliceCount,
+                                                    reason: pizzaReason.trim(),
+                                                    sendMode: pizzaSendMode,
+                                                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                                }));
+                                            }
+                                            await batch.commit();
+                                            await Promise.all(logPromises);
+                                            db.collection('pizzaLogs').orderBy('createdAt','desc').limit(30).get().then(snap2 => {
+                                                const logs = []; snap2.forEach(d => logs.push({id:d.id,...d.data()})); setPizzaLogs(logs);
+                                            });
+                                            const cnt = recipients.length;
+                                            const sliceSent = pizzaSliceCount;
+                                            setPizzaSliceCount(1); setPizzaReason(''); setPizzaSending(false);
+                                            setPizzaSelectedTeamId(null); setPizzaSelectedUids([]);
+                                            alert('🍕 已發送 ' + sliceSent + ' 片給 ' + cnt + ' 位成員！');
+                                        } catch(e) {
+                                            alert('發送失敗：' + e.message);
+                                            setPizzaSending(false);
+                                        }
+                                    };
+                                    return (
+                                        <button onClick={doSend} disabled={!canSend}
+                                            className="w-full py-3 r-btn neo-border-thin sans-font active-press disabled:opacity-40 transition-all"
+                                            style={{background: canSend ? 'var(--c-accent)' : '#f3f4f6', color: canSend ? 'var(--c-accent-text)' : 'var(--c-muted)', fontWeight:'700', fontSize:'15px'}}>
+                                            {pizzaSending
+                                                ? '發送中...'
+                                                : recipients.length > 0
+                                                    ? '🍕 確認發送 ' + pizzaSliceCount + ' 片 × ' + recipients.length + ' 人'
+                                                    : '請先選擇' + (pizzaSendMode === 'team' ? '陣營' : '成員')}
+                                        </button>
+                                    );
+                                })()}
+                            </div>
+
+                            {/* 成員 Pizza 狀態 */}
+                            <div className="bg-white p-4 r-card card-shadow">
+                                <p className="sans-font text-xs tracking-widest mb-3" style={{color:'var(--c-muted)'}}>成員 Pizza 狀態</p>
+                                {teams.map(t => {
+                                    const mems = users.filter(u => u.teamId === t.id);
+                                    if (mems.length === 0) return null;
+                                    return (
+                                        <div key={t.id} className="mb-4">
+                                            <p className="sans-font text-xs mb-2" style={{color:'var(--c-muted)'}}>🏕️ {t.name}</p>
+                                            <div className="space-y-2">
+                                                {mems.map(u => {
+                                                    const slices = u.pizzaSlices || 0;
+                                                    const total = u.pizzaTotal || 8;
+                                                    const pct = Math.round(slices/total*100);
+                                                    const done = slices >= total;
+                                                    return (
+                                                        <div key={u.uid} className="flex items-center gap-2">
+                                                            <span className="sans-font text-xs truncate" style={{width:'72px', color: done ? '#d97706' : 'var(--c-text)', fontWeight: done ? '700':'400'}}>{u.displayName||u.email}</span>
+                                                            <div style={{flex:1, height:'8px', background:'#f3f4f6', borderRadius:'4px', overflow:'hidden'}}>
+                                                                <div style={{height:'100%', width:`${pct}%`, background: done ? 'linear-gradient(90deg,#fbbf24,#f59e0b)' : 'linear-gradient(90deg,#fde68a,#fbbf24)', borderRadius:'4px', transition:'width 0.5s'}}></div>
+                                                            </div>
+                                                            <span className="sans-font" style={{fontSize:'10px', color: done ? '#d97706':'var(--c-muted)', minWidth:'36px', textAlign:'right', fontWeight: done?'700':'400'}}>{done?'🍕':''}{slices}/{total}</span>
+                                                            <button
+                                                                onClick={async () => {
+                                                                    if (!window.confirm('確定重置「' + (u.displayName||u.email) + '」的 Pizza 進度？')) return;
+                                                                    await db.collection('users').doc(u.uid).update({ pizzaSlices: 0 });
+                                                                }}
+                                                                className="w-6 h-6 r-btn flex items-center justify-center active-press flex-shrink-0"
+                                                                style={{border:'1px solid var(--c-border)'}}>
+                                                                <Icon name="RotateCcw" size={10} style={{color:'var(--c-muted)'}} />
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {users.filter(u => !u.teamId).length > 0 && (
+                                    <div>
+                                        <p className="sans-font text-xs mb-2" style={{color:'var(--c-muted)'}}>無陣營</p>
+                                        <div className="space-y-2">
+                                            {users.filter(u => !u.teamId).map(u => {
+                                                const slices=u.pizzaSlices||0, total=u.pizzaTotal||8, pct=Math.round(slices/total*100), done=slices>=total;
+                                                return (
+                                                    <div key={u.uid} className="flex items-center gap-2">
+                                                        <span className="sans-font text-xs truncate" style={{width:'72px',color:'var(--c-text)'}}>{u.displayName||u.email}</span>
+                                                        <div style={{flex:1,height:'8px',background:'#f3f4f6',borderRadius:'4px',overflow:'hidden'}}>
+                                                            <div style={{height:'100%',width:`${pct}%`,background:'linear-gradient(90deg,#fde68a,#fbbf24)',borderRadius:'4px',transition:'width 0.5s'}}></div>
+                                                        </div>
+                                                        <span className="sans-font" style={{fontSize:'10px',color:done?'#d97706':'var(--c-muted)',minWidth:'36px',textAlign:'right'}}>{slices}/{total}</span>
+                                                        <button
+                                                            onClick={async () => {
+                                                                if (!window.confirm('確定重置？')) return;
+                                                                await db.collection('users').doc(u.uid).update({ pizzaSlices: 0 });
+                                                            }}
+                                                            className="w-6 h-6 r-btn flex items-center justify-center active-press flex-shrink-0"
+                                                            style={{border:'1px solid var(--c-border)'}}>
+                                                            <Icon name="RotateCcw" size={10} style={{color:'var(--c-muted)'}} />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 發送紀錄 */}
+                            <div className="bg-white p-4 r-card card-shadow">
+                                <p className="sans-font text-xs tracking-widest mb-3" style={{color:'var(--c-muted)'}}>發送紀錄</p>
+                                {pizzaLogsLoading && <p className="text-xs sans-font text-center py-3" style={{color:'var(--c-muted)'}}>載入中...</p>}
+                                {!pizzaLogsLoading && pizzaLogs.length === 0 && <p className="text-xs sans-font text-center py-3" style={{color:'var(--c-muted)'}}>尚無紀錄</p>}
+                                <div>
+                                    {pizzaLogs.map(log => (
+                                        <div key={log.id} className="flex items-start gap-2 py-2.5" style={{borderBottom:'1px solid #f9fafb'}}>
+                                            <span style={{fontSize:'15px', flexShrink:0}}>🍕</span>
+                                            <div style={{flex:1, minWidth:0}}>
+                                                <p className="sans-font text-xs" style={{color:'var(--c-text)'}}>
+                                                    {log.teamName ? <span style={{color:'var(--c-muted)'}}>【{log.teamName}】</span> : null}
+                                                    {log.displayName}
+                                                    <span style={{color:'#d97706', fontWeight:'700'}}> +{log.slices} 片</span>
+                                                </p>
+                                                {log.reason ? <p className="sans-font mt-0.5" style={{fontSize:'10px', color:'var(--c-muted)'}}>{log.reason}</p> : null}
+                                            </div>
+                                            <span className="sans-font flex-shrink-0" style={{fontSize:'9px', color:'var(--c-muted)'}}>
+                                                {log.createdAt?.toDate ? log.createdAt.toDate().toLocaleDateString('zh-TW',{month:'2-digit',day:'2-digit'}) : ''}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                        </div>
+                    )}
                 </div>
             );
         };
