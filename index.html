@@ -2671,6 +2671,7 @@
             const [creating, setCreating] = useState(false);
             const [tab, setTab] = useState('teams'); // 'teams' | 'users'
             const [editingName, setEditingName] = useState(null); // { uid, value }
+            const [editingTeamName, setEditingTeamName] = useState(null); // { id, value }
             const [searchText, setSearchText] = useState('');
 
             useEffect(() => {
@@ -2700,6 +2701,17 @@
                 });
                 batch.delete(db.collection('teams').doc(team.id));
                 await batch.commit();
+            };
+
+            const renameTeam = async (id, newName) => {
+                if (!newName.trim()) return;
+                const batch = db.batch();
+                batch.update(db.collection('teams').doc(id), { name: newName.trim() });
+                users.filter(u => u.teamId === id).forEach(u => {
+                    batch.update(db.collection('users').doc(u.uid), { teamName: newName.trim() });
+                });
+                await batch.commit();
+                setEditingTeamName(null);
             };
 
             const createTeam = async () => {
@@ -2787,21 +2799,56 @@
                                 const color = teamColors[i % teamColors.length];
                                 return (
                                     <div key={team.id} className="bg-white p-4 r-card card-shadow">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`w-9 h-9 ${color} neo-border-thin r-btn flex items-center justify-center`}>
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                <div className={`w-9 h-9 flex-shrink-0 ${color} neo-border-thin r-btn flex items-center justify-center`}>
                                                     <Icon name="Sword" size={16} style={{color:'var(--c-text)'}} />
                                                 </div>
-                                                <div>
-                                                    <p className="sans-font text-sm" style={{color:'var(--c-text)'}}>{team.name}</p>
+                                                <div className="flex-1 min-w-0">
+                                                    {editingTeamName?.id === team.id ? (
+                                                        <div className="flex gap-1.5 items-center">
+                                                            <input
+                                                                autoFocus
+                                                                className="flex-1 sans-font text-sm px-2 py-0.5 r-btn focus:outline-none min-w-0"
+                                                                style={{border:'1.5px solid var(--c-primary)', color:'var(--c-text)'}}
+                                                                value={editingTeamName.value}
+                                                                onChange={e => setEditingTeamName(prev => ({...prev, value: e.target.value}))}
+                                                                onKeyDown={e => {
+                                                                    if (e.key === 'Enter') renameTeam(team.id, editingTeamName.value);
+                                                                    if (e.key === 'Escape') setEditingTeamName(null);
+                                                                }}
+                                                            />
+                                                            <button onClick={() => renameTeam(team.id, editingTeamName.value)}
+                                                                className="px-2 py-1 r-btn text-[10px] sans-font active-press flex-shrink-0"
+                                                                style={{background:'var(--c-primary)', color:'var(--c-primary-text)', border:'1px solid var(--c-primary)'}}>
+                                                                儲存
+                                                            </button>
+                                                            <button onClick={() => setEditingTeamName(null)}
+                                                                className="px-2 py-1 bg-slate-100 r-btn text-[10px] sans-font active-press flex-shrink-0"
+                                                                style={{border:'1px solid var(--c-border)'}}>
+                                                                取消
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <p className="sans-font text-sm truncate" style={{color:'var(--c-text)'}}>{team.name}</p>
+                                                    )}
                                                     <p className="text-[10px] sans-font" style={{color:'var(--c-muted)'}}>{memberCount} 位成員</p>
                                                 </div>
                                             </div>
-                                            <button onClick={() => deleteTeam(team)}
-                                                className="w-8 h-8 r-btn flex items-center justify-center active-press hover:bg-red-50"
-                                                style={{border:'1px solid var(--c-border)'}}>
-                                                <Icon name="Trash2" size={14} style={{color:'var(--c-danger-text)'}} />
-                                            </button>
+                                            {editingTeamName?.id !== team.id && (
+                                                <div className="flex gap-1.5 flex-shrink-0">
+                                                    <button onClick={() => setEditingTeamName({ id: team.id, value: team.name })}
+                                                        className="w-8 h-8 r-btn flex items-center justify-center active-press hover:bg-blue-50"
+                                                        style={{border:'1px solid var(--c-border)'}}>
+                                                        <Icon name="Pencil" size={14} style={{color:'var(--c-primary-text)'}} />
+                                                    </button>
+                                                    <button onClick={() => deleteTeam(team)}
+                                                        className="w-8 h-8 r-btn flex items-center justify-center active-press hover:bg-red-50"
+                                                        style={{border:'1px solid var(--c-border)'}}>
+                                                        <Icon name="Trash2" size={14} style={{color:'var(--c-danger-text)'}} />
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                         {memberCount > 0 && (
                                             <div className="mt-3 flex flex-wrap gap-1 pl-12">
