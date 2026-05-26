@@ -1914,6 +1914,30 @@
         };
 
         const ProfileView = ({ dailyLogs, isAdmin, user, userProfile }) => {
+            const [pizzaData, setPizzaData] = React.useState({ slices: 0, total: 8 });
+            const [pizzaAnimSlice, setPizzaAnimSlice] = React.useState(null); // index being animated
+
+            React.useEffect(() => {
+                if (!user?.uid) return;
+                const unsub = db.collection('users').doc(user.uid)
+                    .onSnapshot(snap => {
+                        const d = snap.data() || {};
+                        const newSlices = d.pizzaSlices || 0;
+                        const total = d.pizzaTotal || 8;
+                        setPizzaData(prev => {
+                            if (newSlices > prev.slices) {
+                                // Animate newly gained slices
+                                for (let i = prev.slices; i < newSlices; i++) {
+                                    setTimeout(() => setPizzaAnimSlice(i), (i - prev.slices) * 400);
+                                }
+                                setTimeout(() => setPizzaAnimSlice(null), (newSlices - prev.slices) * 400 + 800);
+                            }
+                            return { slices: newSlices, total };
+                        });
+                    });
+                return () => unsub();
+            }, [user?.uid]);
+
             const mStats = useMemo(() => {
                 const now = new Date();
                 const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -2067,6 +2091,129 @@
                             })}
                         </div>
                     </div>
+
+
+                    {/* 🍕 Pizza 成就 */}
+                    {(() => {
+                        const { slices, total } = pizzaData;
+                        const isComplete = slices >= total;
+                        // Generate SVG pie slices
+                        const cx = 100, cy = 100, r = 85, innerR = 14;
+                        const sliceAngle = 360 / total;
+                        const toRad = deg => (deg - 90) * Math.PI / 180;
+                        const slicePath = (i) => {
+                            const startDeg = i * sliceAngle;
+                            const endDeg = startDeg + sliceAngle - 2; // 2deg gap
+                            const x1 = cx + r * Math.cos(toRad(startDeg));
+                            const y1 = cy + r * Math.sin(toRad(startDeg));
+                            const x2 = cx + r * Math.cos(toRad(endDeg));
+                            const y2 = cy + r * Math.sin(toRad(endDeg));
+                            const xi1 = cx + innerR * Math.cos(toRad(startDeg));
+                            const yi1 = cy + innerR * Math.sin(toRad(startDeg));
+                            const xi2 = cx + innerR * Math.cos(toRad(endDeg));
+                            const yi2 = cy + innerR * Math.sin(toRad(endDeg));
+                            return `M ${xi1} ${yi1} L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} L ${xi2} ${yi2} A ${innerR} ${innerR} 0 0 0 ${xi1} ${yi1} Z`;
+                        };
+                        // Topping dot positions
+                        const toppingPos = (i) => {
+                            const midDeg = (i + 0.5) * sliceAngle;
+                            const tr = r * 0.6;
+                            return { x: cx + tr * Math.cos(toRad(midDeg)), y: cy + tr * Math.sin(toRad(midDeg)) };
+                        };
+                        const sliceColors = { base: '#f59e0b', crust: '#d97706', obtained: '#fbbf24', topping: '#ef4444' };
+                        return (
+                            <div style={{padding:'0 0.5rem'}}>
+                                <h3 className="sans-font" style={{fontSize:'13px', fontWeight:'500', color:'#6b7280', margin:'0 0 1rem 0', textTransform:'uppercase', letterSpacing:'0.5px'}}>🍕 Pizza 成就</h3>
+                                <div className="bg-white r-card card-shadow" style={{padding:'20px 16px', display:'flex', flexDirection:'column', alignItems:'center', gap:'12px'}}>
+                                    {/* SVG Pizza */}
+                                    <div style={{position:'relative', width:'200px', height:'200px'}}>
+                                        <style>{`
+                                            @keyframes slice-pop { 0%{transform:scale(0.4) rotate(-30deg);opacity:0} 60%{transform:scale(1.18) rotate(4deg);opacity:1} 80%{transform:scale(0.94)} 100%{transform:scale(1) rotate(0deg);opacity:1} }
+                                            @keyframes slice-glow { 0%,100%{filter:drop-shadow(0 0 4px #fbbf24aa)} 50%{filter:drop-shadow(0 0 12px #f59e0bff)} }
+                                            @keyframes pizza-spin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+                                            @keyframes pizza-complete { 0%{filter:drop-shadow(0 0 0px #fbbf24)} 50%{filter:drop-shadow(0 0 20px #fbbf24)} 100%{filter:drop-shadow(0 0 8px #f59e0b)} }
+                                            .slice-obtained { animation: slice-glow 2.5s ease-in-out infinite; }
+                                            .slice-new { animation: slice-pop 0.5s cubic-bezier(.36,.07,.19,.97) both, slice-glow 2.5s 0.5s ease-in-out infinite; }
+                                            .pizza-done { animation: pizza-complete 2s ease-in-out infinite; }
+                                        `}</style>
+                                        <svg viewBox="0 0 200 200" width="200" height="200"
+                                            style={{display:'block', transition:'transform 0.6s', transform: isComplete ? 'rotate(360deg)' : 'none'}}>
+                                            {/* Shadow circle */}
+                                            <circle cx={cx} cy={cy} r={r+2} fill="rgba(0,0,0,0.07)" />
+                                            {/* Pizza base plate */}
+                                            <circle cx={cx} cy={cy} r={r} fill="#fef3c7" />
+                                            {/* Slices */}
+                                            {Array.from({length: total}, (_, i) => {
+                                                const owned = i < slices;
+                                                const isNew = i === pizzaAnimSlice;
+                                                const tp = toppingPos(i);
+                                                return (
+                                                    <g key={i} className={isNew ? 'slice-new' : owned ? 'slice-obtained' : ''}
+                                                       style={{transformOrigin:`${cx}px ${cy}px`}}>
+                                                        {/* Slice body */}
+                                                        <path d={slicePath(i)}
+                                                            fill={owned ? sliceColors.obtained : '#e5e7eb'}
+                                                            stroke={owned ? sliceColors.crust : '#d1d5db'}
+                                                            strokeWidth="1.5"
+                                                            opacity={owned ? 1 : 0.5}
+                                                        />
+                                                        {/* Crust arc highlight */}
+                                                        {owned && (
+                                                            <path d={(() => {
+                                                                const startDeg = i * sliceAngle + 1;
+                                                                const endDeg = startDeg + sliceAngle - 4;
+                                                                const cr = r - 6;
+                                                                return `M ${cx + cr * Math.cos(toRad(startDeg))} ${cy + cr * Math.sin(toRad(startDeg))} A ${cr} ${cr} 0 0 1 ${cx + cr * Math.cos(toRad(endDeg))} ${cy + cr * Math.sin(toRad(endDeg))}`;
+                                                            })()}
+                                                                fill="none" stroke="#fde68a" strokeWidth="3" strokeLinecap="round" opacity="0.7"
+                                                            />
+                                                        )}
+                                                        {/* Topping dot */}
+                                                        {owned && <circle cx={tp.x} cy={tp.y} r={4} fill={sliceColors.topping} opacity="0.9" />}
+                                                        {/* Slice number (unowned) */}
+                                                        {!owned && (
+                                                            <text x={tp.x} y={tp.y + 1} textAnchor="middle" dominantBaseline="middle"
+                                                                style={{fontSize:'9px', fill:'#9ca3af', fontFamily:'sans-serif', fontWeight:'bold', pointerEvents:'none'}}>
+                                                                {i+1}
+                                                            </text>
+                                                        )}
+                                                    </g>
+                                                );
+                                            })}
+                                            {/* Center circle */}
+                                            <circle cx={cx} cy={cy} r={innerR} fill={isComplete ? '#fbbf24' : '#f3f4f6'} stroke={isComplete ? '#d97706' : '#e5e7eb'} strokeWidth="1.5" />
+                                            {isComplete && <text x={cx} y={cy+1} textAnchor="middle" dominantBaseline="middle" style={{fontSize:'12px'}}>🍕</text>}
+                                        </svg>
+                                        {/* Complete badge */}
+                                        {isComplete && (
+                                            <div style={{position:'absolute', top:'-8px', right:'-8px', background:'#fbbf24', borderRadius:'50%', width:'32px', height:'32px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'16px', boxShadow:'0 2px 8px rgba(251,191,36,0.6)', border:'2px solid white'}}>
+                                                ✨
+                                            </div>
+                                        )}
+                                    </div>
+                                    {/* Status text */}
+                                    <div style={{textAlign:'center'}}>
+                                        {isComplete ? (
+                                            <p className="sans-font text-sm" style={{color:'#d97706', fontWeight:'700'}}>🎉 Pizza 完整了！太棒了！</p>
+                                        ) : (
+                                            <p className="sans-font text-sm" style={{color:'var(--c-text-sub)'}}>
+                                                已收集 <span style={{color:'#d97706', fontWeight:'700', fontSize:'16px'}}>{slices}</span> / {total} 片
+                                            </p>
+                                        )}
+                                        {/* Slice dots */}
+                                        <div style={{display:'flex', gap:'6px', marginTop:'8px', justifyContent:'center', flexWrap:'wrap'}}>
+                                            {Array.from({length: total}, (_, i) => (
+                                                <div key={i} style={{width:'10px', height:'10px', borderRadius:'50%', background: i < slices ? '#fbbf24' : '#e5e7eb', border: i < slices ? '1.5px solid #d97706' : '1.5px solid #d1d5db', transition:'all 0.3s'}} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                    {slices === 0 && (
+                                        <p className="sans-font text-xs" style={{color:'var(--c-muted)', textAlign:'center'}}>完成挑戰即可獲得 Pizza 切片 🍕</p>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {/* 修煉足跡 */}
                     {(() => {
@@ -2251,6 +2398,137 @@
                             </div>
                         )
                     }
+
+                    {/* ── Pizza tab ── */}
+                    {tab === 'pizza' && (() => {
+                        const sendPizza = async () => {
+                            if (!pizzaSendTarget || pizzaSliceCount < 1) return;
+                            setPizzaSending(true);
+                            const ref = db.collection('users').doc(pizzaSendTarget.uid);
+                            const snap = await ref.get();
+                            const cur = snap.data()?.pizzaSlices || 0;
+                            const total = snap.data()?.pizzaTotal || 8;
+                            const next = Math.min(cur + pizzaSliceCount, total);
+                            await ref.update({ pizzaSlices: next });
+                            await db.collection('pizzaLogs').add({
+                                uid: pizzaSendTarget.uid,
+                                displayName: pizzaSendTarget.displayName,
+                                slices: pizzaSliceCount,
+                                reason: pizzaReason.trim(),
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            });
+                            // Refresh logs
+                            db.collection('pizzaLogs').orderBy('createdAt','desc').limit(30).get().then(snap2 => {
+                                const logs = []; snap2.forEach(d => logs.push({id:d.id,...d.data()})); setPizzaLogs(logs);
+                            });
+                            setPizzaSendTarget(null); setPizzaSliceCount(1); setPizzaReason(''); setPizzaSending(false);
+                        };
+                        const resetPizza = async (uid) => {
+                            if (!window.confirm('確定重置此用戶的 Pizza？')) return;
+                            await db.collection('users').doc(uid).update({ pizzaSlices: 0 });
+                        };
+                        return (
+                            <div className="space-y-4">
+                                {/* Send Pizza card */}
+                                <div className="bg-white p-4 r-card card-shadow space-y-3">
+                                    <p className="sans-font text-xs tracking-widest" style={{color:'var(--c-muted)'}}>🍕 發送切片</p>
+                                    {/* Target picker */}
+                                    <div>
+                                        <p className="sans-font text-xs mb-1.5" style={{color:'var(--c-text-sub)'}}>選擇成員</p>
+                                        <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                                            {users.map(u => (
+                                                <button key={u.uid}
+                                                    onClick={() => setPizzaSendTarget(pizzaSendTarget?.uid === u.uid ? null : {uid:u.uid, displayName:u.displayName||u.email})}
+                                                    className="px-2.5 py-1 r-badge sans-font text-xs active-press transition-all"
+                                                    style={{
+                                                        background: pizzaSendTarget?.uid === u.uid ? 'var(--c-accent)' : '#f3f4f6',
+                                                        color: pizzaSendTarget?.uid === u.uid ? 'var(--c-accent-text)' : 'var(--c-text-sub)',
+                                                        border: pizzaSendTarget?.uid === u.uid ? '1.5px solid var(--c-accent-text)30' : '1px solid var(--c-border)',
+                                                        fontWeight: pizzaSendTarget?.uid === u.uid ? '700' : '400',
+                                                    }}>
+                                                    {u.displayName || u.email}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    {/* Slice count */}
+                                    <div>
+                                        <p className="sans-font text-xs mb-1.5" style={{color:'var(--c-text-sub)'}}>切片數量</p>
+                                        <div className="flex items-center gap-3">
+                                            <button onClick={() => setPizzaSliceCount(Math.max(1, pizzaSliceCount-1))}
+                                                className="w-8 h-8 r-btn flex items-center justify-center sans-font text-lg active-press"
+                                                style={{background:'#f3f4f6', border:'1px solid var(--c-border)'}}>−</button>
+                                            <span className="sans-font text-xl" style={{minWidth:'32px', textAlign:'center', color:'var(--c-text)'}}>{pizzaSliceCount}</span>
+                                            <button onClick={() => setPizzaSliceCount(Math.min(8, pizzaSliceCount+1))}
+                                                className="w-8 h-8 r-btn flex items-center justify-center sans-font text-lg active-press"
+                                                style={{background:'#f3f4f6', border:'1px solid var(--c-border)'}}>+</button>
+                                            <span className="sans-font text-xs" style={{color:'var(--c-muted)'}}>片</span>
+                                        </div>
+                                    </div>
+                                    {/* Reason */}
+                                    <div>
+                                        <p className="sans-font text-xs mb-1.5" style={{color:'var(--c-text-sub)'}}>原因（選填）</p>
+                                        <input type="text" value={pizzaReason} onChange={e => setPizzaReason(e.target.value)}
+                                            placeholder="例：本週全勤打卡！"
+                                            className="w-full px-3 py-2 text-sm sans-font focus:outline-none bg-slate-50 r-btn"
+                                            style={{border:'1px solid var(--c-border-strong)'}} />
+                                    </div>
+                                    <button onClick={sendPizza} disabled={!pizzaSendTarget || pizzaSending}
+                                        className="w-full py-2.5 r-btn neo-border-thin sans-font text-sm active-press disabled:opacity-30"
+                                        style={{background:'var(--c-accent)', color:'var(--c-accent-text)', fontWeight:'700'}}>
+                                        {pizzaSending ? '發送中...' : `🍕 發送 ${pizzaSliceCount} 片給 ${pizzaSendTarget?.displayName || '（請選擇）'}`}
+                                    </button>
+                                </div>
+
+                                {/* Current pizza status */}
+                                <div className="bg-white p-4 r-card card-shadow">
+                                    <p className="sans-font text-xs tracking-widest mb-3" style={{color:'var(--c-muted)'}}>成員 Pizza 狀態</p>
+                                    <div className="space-y-2">
+                                        {users.map(u => {
+                                            const slices = u.pizzaSlices || 0;
+                                            const total = u.pizzaTotal || 8;
+                                            const pct = Math.round(slices/total*100);
+                                            return (
+                                                <div key={u.uid} className="flex items-center gap-3">
+                                                    <span className="sans-font text-xs truncate" style={{width:'80px', color:'var(--c-text)'}}>{u.displayName||u.email}</span>
+                                                    <div style={{flex:1, height:'8px', background:'#f3f4f6', borderRadius:'4px', overflow:'hidden'}}>
+                                                        <div style={{height:'100%', width:`${pct}%`, background:'linear-gradient(90deg,#ffd43b,#ff922b)', borderRadius:'4px', transition:'width 0.4s'}}></div>
+                                                    </div>
+                                                    <span className="sans-font text-xs" style={{color:'var(--c-muted)', minWidth:'40px', textAlign:'right'}}>{slices}/{total}</span>
+                                                    <button onClick={() => resetPizza(u.uid)}
+                                                        className="w-6 h-6 r-btn flex items-center justify-center active-press"
+                                                        style={{border:'1px solid var(--c-border)'}}>
+                                                        <Icon name="RotateCcw" size={10} style={{color:'var(--c-muted)'}} />
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Logs */}
+                                <div className="bg-white p-4 r-card card-shadow">
+                                    <p className="sans-font text-xs tracking-widest mb-3" style={{color:'var(--c-muted)'}}>發送紀錄</p>
+                                    {pizzaLogsLoading && <p className="text-xs sans-font text-center py-3" style={{color:'var(--c-muted)'}}>載入中...</p>}
+                                    {!pizzaLogsLoading && pizzaLogs.length === 0 && <p className="text-xs sans-font text-center py-3" style={{color:'var(--c-muted)'}}>尚無紀錄</p>}
+                                    <div className="space-y-2">
+                                        {pizzaLogs.map(log => (
+                                            <div key={log.id} className="flex items-start gap-2 py-2" style={{borderBottom:'1px solid #f3f4f6'}}>
+                                                <span style={{fontSize:'16px'}}>🍕</span>
+                                                <div style={{flex:1}}>
+                                                    <p className="sans-font text-xs" style={{color:'var(--c-text)'}}>{log.displayName} <span style={{color:'var(--c-accent-text)', fontWeight:'700'}}>+{log.slices} 片</span></p>
+                                                    {log.reason && <p className="sans-font text-xs mt-0.5" style={{color:'var(--c-muted)'}}>{log.reason}</p>}
+                                                </div>
+                                                <span className="sans-font" style={{fontSize:'9px', color:'var(--c-muted)', flexShrink:0}}>
+                                                    {log.createdAt?.toDate ? log.createdAt.toDate().toLocaleDateString('zh-TW',{month:'2-digit',day:'2-digit'}) : ''}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
                 </div>
             );
         };
@@ -2673,6 +2951,13 @@
             const [editingName, setEditingName] = useState(null); // { uid, value }
             const [editingTeamName, setEditingTeamName] = useState(null); // { id, value }
             const [searchText, setSearchText] = useState('');
+            // Pizza state
+            const [pizzaSendTarget, setPizzaSendTarget] = useState(null); // { uid, displayName }
+            const [pizzaSliceCount, setPizzaSliceCount] = useState(1);
+            const [pizzaReason, setPizzaReason] = useState('');
+            const [pizzaSending, setPizzaSending] = useState(false);
+            const [pizzaLogs, setPizzaLogs] = useState([]);
+            const [pizzaLogsLoading, setPizzaLogsLoading] = useState(false);
 
             useEffect(() => {
                 const unsubTeams = db.collection('teams')
@@ -2768,6 +3053,8 @@
                             style={{color: tab === 'teams' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>陣營管理</button>
                         <button onClick={() => setTab('users')} className={`flex-1 sans-font text-xs r-btn transition-all ${tab === 'users' ? 'pk-blue' : ''}`}
                             style={{color: tab === 'users' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>成員管理</button>
+                        <button onClick={() => { setTab('pizza'); setPizzaLogsLoading(true); db.collection('pizzaLogs').orderBy('createdAt','desc').limit(30).get().then(snap => { const logs = []; snap.forEach(d => logs.push({id:d.id,...d.data()})); setPizzaLogs(logs); setPizzaLogsLoading(false); }); }} className={`flex-1 sans-font text-xs r-btn transition-all ${tab === 'pizza' ? 'pk-yellow' : ''}`}
+                            style={{color: tab === 'pizza' ? 'var(--c-accent-text)' : 'var(--c-muted)', padding:'6px 0'}}>🍕 Pizza</button>
                     </div>
 
                     {/* ── Teams tab ── */}
