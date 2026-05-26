@@ -188,6 +188,15 @@
             return `${y}-${m}-${d}`;
         };
 
+        // 凌晨 00:00–01:59 仍算前一天（每日以凌晨 2:00 為界）
+        const getLogicalDate = () => {
+            const now = new Date();
+            if (now.getHours() < 2) {
+                now.setDate(now.getDate() - 1);
+            }
+            return now;
+        };
+
         const getWeekDays = (baseDate = new Date()) => {
             const start = new Date(baseDate);
             const day = start.getDay();
@@ -214,7 +223,7 @@
         };
 
         const calcScore = (logs) => {
-            const now = new Date();
+            const now = getLogicalDate();
             const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
             let mActiveDays = 0, mExMins = 0, mStretchMins = 0, mPracCount = 0;
             Object.entries(logs || {}).forEach(([key, val]) => {
@@ -681,8 +690,8 @@
                                 let rank = 1;
                                 allMembers.forEach((m, i) => {
                                     if (i === 0 || allMembers[i-1].lv !== m.lv || allMembers[i-1].score !== m.score) {
-                                        // 新的一組，排名 = 前一組排名 + 1（密集排名，並列不佔名次）
-                                        rank = groups.length + 1;
+                                        // 新的一組，排名 = 當前 index + 1
+                                        rank = i + 1;
                                         groups.push({ rank, members: [m] });
                                     } else {
                                         // 同分同級，加入前一組
@@ -799,7 +808,7 @@
             
             if (thisWeekEvents.length === 0) return null;
             
-            const todayKey = formatDateKey(new Date());
+            const todayKey = formatDateKey(getLogicalDate());
             const weekDayNames = ['日','一','二','三','四','五','六'];
             
             return (
@@ -849,8 +858,8 @@
             const [globalActivities, setGlobalActivities] = useState([]);
             const [activitiesLoaded, setActivitiesLoaded] = useState(false);
             
-            const todayKey = useMemo(() => formatDateKey(new Date()), []);
-            const currentWeekDays = useMemo(() => getWeekDays(new Date()), []);
+            const todayKey = useMemo(() => formatDateKey(getLogicalDate()), []);
+            const currentWeekDays = useMemo(() => getWeekDays(getLogicalDate()), []);
 
             // Auth state
             // redirect 登入回來後取得結果（必須在 App 層執行）
@@ -1177,11 +1186,11 @@
 
                                 {/* 今日四格：日期 header + stat strip */}
                                 {(() => {
-                                    const now = new Date();
+                                    const now = getLogicalDate();
                                     const weekDays = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
                                     
                                     // 如果有選擇的日期，則顯示該日期，否則顯示今天
-                                    let displayDate = new Date();
+                                    let displayDate = getLogicalDate();
                                     let displayKey = todayKey;
                                     if (selectedDateKey) {
                                         const [y, m, d] = selectedDateKey.split('-').map(Number);
@@ -1203,7 +1212,7 @@
                                         { label:'拉筋',   val: stre, border:'#34d399' },
                                     ];
 
-                                    // 本週日～六 7 天
+                                    // 本週日～六 7 天（以邏輯日期為基準）
                                     const todayIdx = now.getDay(); // 0=日
                                     const weekBarDays = Array.from({length:7}, (_, i) => {
                                         const d = new Date(now);
@@ -1374,7 +1383,7 @@
                 {days.map((date, i) => {
                     const key = formatDateKey(date);
                     const isDone = (logs[key]?.[type] || 0) > 0;
-                    const isToday = key === formatDateKey(new Date());
+                    const isToday = key === formatDateKey(getLogicalDate());
                     return (
                         <div key={i} className="flex flex-col items-center gap-1.5">
                             <div className={`w-8 h-8 r-btn flex items-center justify-center transition-all ${isDone ? color : 'bg-slate-100'} ${isToday ? 'ring-2 ring-offset-1' : ''}`}
@@ -1413,7 +1422,7 @@
             const customRefs = useRef({});
 
             // 本週 key（週日 00:00 更新，週六 23:59 截止）
-            const thisWeekKey = useMemo(() => getWeekKey(new Date()), []);
+            const thisWeekKey = useMemo(() => getWeekKey(getLogicalDate()), []);
 
             // Load goals from Firestore — 只讀取本週 key 的目標，舊週自動視為空
             useEffect(() => {
@@ -1462,7 +1471,7 @@
 
             // Calc this week's actual values
             const weekActuals = useMemo(() => {
-                const days = getWeekDays(new Date());
+                const days = getWeekDays(getLogicalDate());
                 const totals = { practice: 0, fiveMin: 0, exerciseTime: 0, stretchTime: 0 };
                 days.forEach(d => {
                     const data = dailyLogs[formatDateKey(d)] || {};
@@ -1473,7 +1482,7 @@
 
             // 今日實際值
             const todayActuals = useMemo(() => {
-                const data = dailyLogs[formatDateKey(new Date())] || {};
+                const data = dailyLogs[formatDateKey(getLogicalDate())] || {};
                 return {
                     practice: Number(data.practice) || 0,
                     fiveMin: Number(data.fiveMin) || 0,
@@ -1622,7 +1631,7 @@
                 <div className="animate-in fade-in duration-300" style={{paddingBottom:'2rem'}}>
                     {/* Header */}
                     {(() => {
-                        const weekDays = getWeekDays(new Date());
+                        const weekDays = getWeekDays(getLogicalDate());
                         const satDate = weekDays[6];
                         const sunDate = weekDays[0];
                         const weekRangeStr = `${sunDate.getMonth()+1}/${sunDate.getDate()} – ${satDate.getMonth()+1}/${satDate.getDate()}`;
@@ -1728,7 +1737,7 @@
                                     if (!date) return <div key={i} />;
                                     const key = formatDateKey(date);
                                     const hasLog = dailyLogs[key] && Object.values(dailyLogs[key]).some(v => v > 0);
-                                    const isToday = key === formatDateKey(new Date());
+                                    const isToday = key === formatDateKey(getLogicalDate());
                                     const dayActivities = activities.filter(a => a.date === key);
                                     const hasEvent = dayActivities.length > 0;
                                     const isSelected = selectedEventDate === key;
@@ -1916,7 +1925,7 @@
                                 const data = dailyLogs[key] || {};
                                 const totalEx = (Number(data.exerciseTime) || 0) + (Number(data.stretchTime) || 0);
                                 const hasActivity = totalEx > 0 || data.practice > 0 || data.fiveMin > 0;
-                                const isToday = key === formatDateKey(new Date());
+                                const isToday = key === formatDateKey(getLogicalDate());
                                 const dayActivities = activities.filter(a => a.date === key);
                                 const isWeekend = date.getDay() === 0 || date.getDay() === 6;
                                 const hasEvent = dayActivities.length > 0;
@@ -1985,7 +1994,7 @@
             }, [user?.uid]);
 
             const mStats = useMemo(() => {
-                const now = new Date();
+                const now = getLogicalDate();
                 const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
                 let mActiveDays = 0, mExMins = 0, mStretchMins = 0, mPracCount = 0, mFiveCount = 0;
                 // All-time totals for level
@@ -2010,7 +2019,7 @@
                 const displayLevel = calcLevel(atScore);
                 // 週資料計算
                 const getWeekPrefix = (offset) => {
-                    const d = new Date(); d.setDate(d.getDate() - d.getDay() + offset * 7);
+                    const d = getLogicalDate(); d.setDate(d.getDate() - d.getDay() + offset * 7);
                     return Array.from({length:7}, (_,i) => { const dd = new Date(d); dd.setDate(d.getDate()+i); return formatDateKey(dd); });
                 };
                 const thisDays = getWeekPrefix(0); const lastDays = getWeekPrefix(-1);
