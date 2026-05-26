@@ -681,8 +681,8 @@
                                 let rank = 1;
                                 allMembers.forEach((m, i) => {
                                     if (i === 0 || allMembers[i-1].lv !== m.lv || allMembers[i-1].score !== m.score) {
-                                        // 新的一組，排名 = 當前 index + 1
-                                        rank = i + 1;
+                                        // 新的一組，排名 = 前一組排名 + 1（密集排名，並列不佔名次）
+                                        rank = groups.length + 1;
                                         groups.push({ rank, members: [m] });
                                     } else {
                                         // 同分同級，加入前一組
