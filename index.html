@@ -677,13 +677,17 @@
                             {allMembers.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有成員資料</div>}
                             {allMembers.map((m, i) => {
                                 const isMe = m.uid === currentUser?.uid;
-                                // find team color
                                 const teamIdx = leaderboard.findIndex(t => t.id === m.teamId);
                                 const accentColor = teamAccentColors[teamIdx >= 0 ? teamIdx % teamAccentColors.length : 0];
                                 return (
                                     <div key={m.uid} className="bg-white r-card flex items-center gap-3"
                                         style={{padding:'12px 16px', border: isMe ? '1.5px solid var(--c-primary)' : '1px solid var(--c-border)',
                                             boxShadow: isMe ? '0 0 0 3px rgba(116,192,252,0.15)' : '0 1px 3px rgba(0,0,0,0.04)'}}>
+                                        {/* 排名數字 */}
+                                        <div style={{display:'flex', alignItems:'center', justifyContent:'center', 
+                                            width:'32px', height:'32px', background:accentColor, borderRadius:'50%', flexShrink:0}}>
+                                            <span className="sans-font" style={{fontSize:'16px', fontWeight:'700', color:'white'}}>{i+1}</span>
+                                        </div>
                                         {/* Name + team badge */}
                                         <div style={{flex:1, minWidth:0}}>
                                             <div className="flex items-center gap-2 flex-wrap">
@@ -1354,8 +1358,8 @@
         const DAILY_OPTIONS = {
             practice:     [1, 2],
             fiveMin:      [1, 2],
-            exerciseTime: [10, 20, 30, 60],
-            stretchTime:  [10, 20, 30, 60],
+            exerciseTime: [10, 15, 20, 25, 30],
+            stretchTime:  [10, 15, 20, 25, 30],
         };
 
         const MilestoneView = ({ dailyLogs, user }) => {
@@ -2362,7 +2366,7 @@
 
         const TimeActionCard = ({ label, onSelect, onCancel, bgColor, tapped, selectedMins }) => {
             const [open, setOpen] = React.useState(false);
-            const options = [10, 20, 30, 60];
+            const options = [10, 15, 20, 25, 30];
             return (
                 <div className="aspect-square r-card flex flex-col items-center justify-center gap-2 neo-shadow-sm relative"
                     onClick={tapped ? onCancel : undefined}
@@ -2530,9 +2534,7 @@
             // ── 載入訊息 ──
             useEffect(() => {
                 if (!selectedTeam) return;
-                const parentRef = db.collection('messages').doc(selectedTeam.id);
-                parentRef.set({ teamId: selectedTeam.id, initialized: true }, { merge: true }).catch(() => {});
-                const unsub = parentRef
+                const unsub = db.collection('messages').doc(selectedTeam.id)
                     .collection('chat')
                     .orderBy('createdAt', 'asc')
                     .limitToLast(100)
@@ -2540,7 +2542,7 @@
                         const list = [];
                         snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
                         setMessages(list);
-                    }, err => { console.warn('訊息監聽錯誤:', err); });
+                    });
                 return () => unsub();
             }, [selectedTeam]);
 
@@ -2570,10 +2572,8 @@
                 const text = messageText.trim();
                 setMessageText('');
                 try {
-                    const parentRef = db.collection('messages').doc(selectedTeam.id);
-                    // 確保父 document 存在，不存在就自動建立
-                    await parentRef.set({ teamId: selectedTeam.id, initialized: true }, { merge: true });
-                    await parentRef.collection('chat').add({
+                    await db.collection('messages').doc(selectedTeam.id)
+                        .collection('chat').add({
                             text,
                             uid: currentUser.uid,
                             displayName: userProfile?.displayName || currentUser.displayName || '道友',
@@ -3426,40 +3426,24 @@
                                             await Promise.all(logPromises);
                                             
                                             // 發送留言板訊息給受影響的陣營
-                                            const now = new Date();
-                                            const timeStr = `${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-                                            
-                                            // 建立每個陣營的收件人名單
-                                            const teamRecipientMap = {};
-                                            for (const u of recipients) {
-                                                if (!u.teamId) continue;
-                                                if (!teamRecipientMap[u.teamId]) teamRecipientMap[u.teamId] = [];
-                                                teamRecipientMap[u.teamId].push(u.displayName || u.email || '成員');
-                                            }
+                                            const messageText = pizzaReason.trim() 
+                                                ? `🍕 管理員送出 Pizza 劵 ${pizzaSliceCount} 片！\n原因：${pizzaReason.trim()}`
+                                                : `🍕 管理員送出 Pizza 劵 ${pizzaSliceCount} 片給大家！`;
                                             
                                             for (const teamId of affectedTeamIds) {
                                                 try {
-                                                    const names = teamRecipientMap[teamId] || [];
-                                                    const whoStr = names.length === 1
-                                                        ? names[0]
-                                                        : names.length > 1
-                                                            ? `${names.slice(0,-1).join('、')} 和 ${names[names.length-1]}`
-                                                            : '大家';
-                                                    const messageText = pizzaReason.trim()
-                                                        ? `🍕 管理員送出 Pizza 劵 ${pizzaSliceCount} 片給 ${whoStr}！\n原因：${pizzaReason.trim()}\n（${timeStr}）`
-                                                        : `🍕 管理員送出 Pizza 劵 ${pizzaSliceCount} 片給 ${whoStr}！\n（${timeStr}）`;
-                                                    const parentRef = db.collection('messages').doc(teamId);
-                                                    await parentRef.set({ teamId, initialized: true }, { merge: true });
-                                                    await parentRef.collection('chat').add({
-                                                            uid: 'system',
-                                                            displayName: '🛡️ 系統公告',
-                                                            text: messageText,
-                                                            teamId: teamId,
-                                                            teamName: '',
-                                                            likes: {},
-                                                            isAdmin: true,
-                                                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                                                        });
+                                                    const msgRef = db.collection('messages').doc(teamId);
+                                                    const snap = await msgRef.get();
+                                                    const existing = snap.data() || { msgs: [] };
+                                                    existing.msgs = existing.msgs || [];
+                                                    existing.msgs.push({
+                                                        uid: '[管理員]',
+                                                        displayName: '🛡️ 系統公告',
+                                                        text: messageText,
+                                                        sentAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                                        isAdmin: true,
+                                                    });
+                                                    await msgRef.set(existing);
                                                 } catch(err) {
                                                     console.warn('發送留言板訊息失敗:', err);
                                                 }
@@ -3632,7 +3616,7 @@
                                                     {log.reason ? <p className="sans-font mt-0.5" style={{fontSize:'10px', color:'var(--c-muted)'}}>{log.reason}</p> : null}
                                                 </div>
                                                 <span className="sans-font flex-shrink-0" style={{fontSize:'9px', color:'var(--c-muted)'}}>
-                                                    {log.createdAt?.toDate ? (() => { const d = log.createdAt.toDate(); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; })() : ''}
+                                                    {log.createdAt?.toDate ? log.createdAt.toDate().toLocaleDateString('zh-TW',{month:'2-digit',day:'2-digit'}) : ''}
                                                 </span>
                                             </div>
                                         );
@@ -3703,12 +3687,12 @@
         const NavBtn = ({ active, onClick, navIcon, label }) => (
             <button onClick={onClick}
                 className="flex flex-col items-center py-1 r-btn transition-all relative"
-                style={{color: active ? 'var(--c-primary-text)' : 'var(--c-muted)', flex:1, minWidth:0, padding:'4px 2px 2px'}}>
-                {active && <span style={{position:'absolute',bottom:0,left:'50%',transform:'translateX(-50%)',width:'20px',height:'3px',background:'var(--c-primary)',borderRadius:'2px 2px 0 0'}}></span>}
-                <span className="inline-flex items-center justify-center" style={{width:'22px',height:'22px',flexShrink:0}}>
+                style={{color: active ? 'var(--c-primary-text)' : 'var(--c-muted)', flex:1, minWidth:0, padding:'6px 3px 3px'}}>
+                {active && <span style={{position:'absolute',bottom:0,left:'50%',transform:'translateX(-50%)',width:'24px',height:'3px',background:'var(--c-primary)',borderRadius:'2px 2px 0 0'}}></span>}
+                <span className="inline-flex items-center justify-center" style={{width:'28px',height:'28px',flexShrink:0}}>
                     {NavIcons[navIcon]}
                 </span>
-                <span className="sans-font" style={{fontSize:'9px',marginTop:'2px',whiteSpace:'nowrap'}}>{label}</span>
+                <span className="sans-font" style={{fontSize:'11px',marginTop:'3px',whiteSpace:'nowrap',fontWeight:'500'}}>{label}</span>
             </button>
         );
 
