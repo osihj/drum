@@ -710,13 +710,13 @@
                                                 const isMe = m.uid === currentUser?.uid;
                                                 const mTeamIdx = leaderboard.findIndex(t => t.id === m.teamId);
                                                 const accentColor = teamAccentColors[mTeamIdx >= 0 ? mTeamIdx % teamAccentColors.length : 0];
-                                                // 固定金銀銅，4名以後統一深灰
+                                                // 固定顏色：1紅 2黃 3藍，4名以後統一深灰
                                                 const rankCircleStyle = rank === 1
-                                                    ? { bg: 'linear-gradient(135deg,#f6c442 0%,#e8a000 100%)', color: '#7a4a00', shadow: '0 2px 6px rgba(230,160,0,0.45)' }
+                                                    ? { bg: '#ff8787', color: 'white', shadow: 'none' }
                                                     : rank === 2
-                                                    ? { bg: 'linear-gradient(135deg,#d0d8e0 0%,#a8b4c0 100%)', color: '#3a4a58', shadow: '0 2px 6px rgba(140,160,180,0.40)' }
+                                                    ? { bg: '#ffd43b', color: 'white', shadow: 'none' }
                                                     : rank === 3
-                                                    ? { bg: 'linear-gradient(135deg,#e8a87c 0%,#c07040 100%)', color: '#5a2800', shadow: '0 2px 6px rgba(180,100,50,0.38)' }
+                                                    ? { bg: '#74c0fc', color: 'white', shadow: 'none' }
                                                     : { bg: '#e5e7eb', color: '#6b7280', shadow: 'none' };
                                                 return (
                                                     <div key={m.uid}
@@ -741,8 +741,7 @@
                                                             <div className="flex items-center gap-2 flex-wrap">
                                                                 <span className="sans-font text-sm" style={{color: isMe ? 'var(--c-primary-text)' : '#1f2937', fontWeight: isMe ? '700' : '400'}}>{m.name}</span>
                                                                 {isMe && (
-                                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#f6c442" stroke="#d49a00" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0, filter:'drop-shadow(0 1px 2px rgba(220,160,0,0.5))'}}>
-                                                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#f6c442" stroke="#d49a00" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>                                                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
                                                                     </svg>
                                                                 )}
                                                                 <span className="sans-font" style={{fontSize:'9px', padding:'1px 7px', borderRadius:'99px', background:`${accentColor}28`, color: accentColor === '#ffd43b' ? '#6b4f00' : '#374151', border:`1px solid ${accentColor}60`}}>
