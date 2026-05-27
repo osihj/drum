@@ -694,13 +694,16 @@
                                     const sampleMember = members[0];
                                     const teamIdx = leaderboard.findIndex(t => t.id === sampleMember.teamId);
                                     const sampleAccent = teamAccentColors[teamIdx >= 0 ? teamIdx % teamAccentColors.length : 0];
-                                    return (
+                                    const hasMe = members.some(m => m.uid === currentUser?.uid);
+                                return (
                                         <div key={`rank-${rank}`}
                                             style={{
                                                 background: '#fff',
                                                 borderRadius: '14px',
-                                                border: '1px solid var(--c-border)',
-                                                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                                                border: hasMe ? '2.5px solid var(--c-primary)' : '1px solid var(--c-border)',
+                                                boxShadow: hasMe
+                                                    ? '0 0 0 3px rgba(116,192,252,0.25), 0 2px 8px rgba(116,192,252,0.2)'
+                                                    : '0 1px 3px rgba(0,0,0,0.04)',
                                                 overflow: 'hidden'
                                             }}>
                                             {members.map((m, mi) => {
@@ -713,9 +716,7 @@
                                                             display:'flex', alignItems:'center', gap:'12px',
                                                             padding:'12px 16px',
                                                             borderTop: mi > 0 ? '1px solid #f3f4f6' : 'none',
-                                                            background: isMe ? 'rgba(116,192,252,0.07)' : 'transparent',
-                                                            outline: isMe ? '1.5px solid var(--c-primary)' : 'none',
-                                                            outlineOffset: isMe ? '-1.5px' : '0',
+                                                            background: isMe ? 'rgba(116,192,252,0.10)' : 'transparent',
                                                         }}>
                                                         {/* 排名數字 — 只有每組第一行顯示，其餘顯示空白佔位 */}
                                                         <div style={{display:'flex', alignItems:'center', justifyContent:'center',
@@ -728,7 +729,10 @@
                                                         {/* Name + team badge */}
                                                         <div style={{flex:1, minWidth:0}}>
                                                             <div className="flex items-center gap-2 flex-wrap">
-                                                                <span className="sans-font text-sm" style={{color:'#1f2937'}}>{m.name}</span>
+                                                                <span className="sans-font text-sm" style={{color: isMe ? 'var(--c-primary-text)' : '#1f2937', fontWeight: isMe ? '700' : '400'}}>{m.name}</span>
+                                                                {isMe && (
+                                                                    <span className="sans-font" style={{fontSize:'9px', padding:'1px 6px', borderRadius:'99px', background:'var(--c-primary)', color:'white', fontWeight:'700', letterSpacing:'0.05em'}}>你</span>
+                                                                )}
                                                                 <span className="sans-font" style={{fontSize:'9px', padding:'1px 7px', borderRadius:'99px', background:`${accentColor}28`, color: accentColor === '#ffd43b' ? '#6b4f00' : '#374151', border:`1px solid ${accentColor}60`}}>
                                                                     {m.teamName}
                                                                 </span>
