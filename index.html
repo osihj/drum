@@ -2660,8 +2660,30 @@
                 }
             };
 
-            const teamAccentColors = ['#ffd43b','#74c0fc','#ff8787','#8ce99a','#b197fc','#ff922b'];
-            const teamBgColors = ['#fef3c7','#e0f2fe','#ffe4e4','#d1fae5','#ede9fe','#fff0e0'];
+            // ── 確定性 hash：將 teamId 映射到固定顏色，避免重複或因排序改變顏色 ──
+            const PALETTE = [
+                { accent:'#ffd43b', bg:'#fef9c3', dark:'#6b4f00' },  // 黃
+                { accent:'#74c0fc', bg:'#e0f2fe', dark:'#1e3a5f' },  // 藍
+                { accent:'#ff8787', bg:'#ffe4e4', dark:'#7a1e1e' },  // 紅
+                { accent:'#b197fc', bg:'#ede9fe', dark:'#4a2e8a' },  // 紫
+                { accent:'#ff922b', bg:'#fff0e0', dark:'#7a3500' },  // 橘
+                { accent:'#20c997', bg:'#d0fdf4', dark:'#0a4a35' },  // 青
+                { accent:'#f06595', bg:'#ffe0ec', dark:'#7a0a35' },  // 粉
+                { accent:'#4dabf7', bg:'#dbeafe', dark:'#1e3a8a' },  // 天藍
+            ];
+            const hashTeamColor = (id) => {
+                let h = 0;
+                for (let c of (id || '')) h = (Math.imul(31, h) + c.charCodeAt(0)) | 0;
+                return PALETTE[Math.abs(h) % PALETTE.length];
+            };
+
+            // ── 新訊息判斷：用 localStorage 記錄每次進入聊天室的時間 ──
+            const getLastRead = (teamId) => {
+                try { return parseInt(localStorage.getItem(`lastRead_${teamId}`) || '0', 10); } catch { return 0; }
+            };
+            const setLastRead = (teamId) => {
+                try { localStorage.setItem(`lastRead_${teamId}`, Date.now().toString()); } catch {}
+            };
 
             // ── 門派選擇畫面 ──
             if (!selectedTeam) return (
@@ -2674,16 +2696,14 @@
                         {teams.length === 0 && <p className="text-center text-xs sans-font py-8" style={{color:'var(--c-muted)'}}>載入中...</p>}
                         {teams.map((team, i) => {
                             const isMyTeam = team.id === userProfile?.teamId;
-                            const accent = isMyTeam ? '#74d99f' : teamAccentColors[i % teamAccentColors.length];
-                            const bg = isMyTeam ? '#d1fae5' : teamBgColors[i % teamBgColors.length];
+                            const { accent, bg } = isMyTeam
+                                ? { accent:'#74d99f', bg:'#d1fae5' }
+                                : hashTeamColor(team.id);
+                            const iconColor = accent === '#ffd43b' ? '#6b4f00' : '#374151';
                             const onlineCount = onlineCounts[team.id] || 0;
+
                             // 熱度：依在線人數分三級
                             const heatLevel = onlineCount >= 5 ? 3 : onlineCount >= 3 ? 2 : onlineCount >= 2 ? 1 : 0;
-                            const FlameIcon = () => (
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M12 2C10 6 6 8 6 13a6 6 0 0 0 12 0c0-3-2-5-3-7-1 2-1.5 3-1.5 4a2.5 2.5 0 0 1-5 0C8.5 7 12 2 12 2z"/>
-                                </svg>
-                            );
                             const heatBadge = heatLevel > 0 ? (
                                 <span className="inline-flex items-center gap-0.5 sans-font"
                                     style={{
@@ -2704,14 +2724,35 @@
                                     {heatLevel === 1 ? 'HOT' : heatLevel === 2 ? '熱門' : '爆滿'}
                                 </span>
                             ) : null;
+
+                            // 新訊息判斷：5分鐘內有訊息 且 上次讀取時間早於最近訊息
+                            const recentCount = recentMsgCounts[team.id] || 0;
+                            const lastReadTs = getLastRead(team.id);
+                            const hasNewMsg = recentCount > 0 && (Date.now() - lastReadTs > 60 * 1000);
+
                             return (
-                                <button key={team.id} onClick={() => setSelectedTeam(team)}
+                                <button key={team.id} onClick={() => { setLastRead(team.id); setSelectedTeam(team); }}
                                     className="w-full r-card active-press flex items-center justify-between"
-                                    style={{padding:'14px 16px', background:'#fff', border:`1.5px solid ${accent}`}}>
+                                    style={{
+                                        padding:'14px 16px', background:'#fff',
+                                        border:`1.5px solid ${accent}`,
+                                        boxShadow: hasNewMsg ? `0 0 0 3px ${accent}40` : 'none',
+                                    }}>
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 flex items-center justify-center r-btn flex-shrink-0"
-                                            style={{background: bg, border:`1px solid ${accent}50`}}>
-                                            <Icon name="MessageCircle" size={18} style={{color: accent === '#ffd43b' ? '#6b4f00' : '#374151'}} />
+                                        {/* 圖示 + 紅點 */}
+                                        <div style={{position:'relative', flexShrink:0}}>
+                                            <div className="w-10 h-10 flex items-center justify-center r-btn"
+                                                style={{background: bg, border:`1px solid ${accent}50`}}>
+                                                <Icon name="MessageCircle" size={18} style={{color: iconColor}} />
+                                            </div>
+                                            {hasNewMsg && (
+                                                <span style={{
+                                                    position:'absolute', top:'-3px', right:'-3px',
+                                                    width:'10px', height:'10px', borderRadius:'50%',
+                                                    background:'#ef4444', border:'2px solid #fff',
+                                                    display:'block',
+                                                }}></span>
+                                            )}
                                         </div>
                                         <div className="text-left">
                                             <div className="flex items-center gap-1.5 flex-wrap">
@@ -2719,7 +2760,7 @@
                                                 {isMyTeam && <span className="text-[9px] sans-font" style={{color:'#0a4a2a', background:'#74d99f', padding:'1px 6px', borderRadius:'99px'}}>我的陣營</span>}
                                                 {heatBadge}
                                             </div>
-                                            <div className="flex items-center gap-1 mt-0.5">
+                                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                                 {onlineCount > 0 ? (
                                                     <span className="text-[9px] sans-font flex items-center gap-1" style={{color:'#22c55e'}}>
                                                         <span style={{display:'inline-block', width:'6px', height:'6px', borderRadius:'50%', background:'#22c55e', flexShrink:0}}></span>
@@ -2727,6 +2768,13 @@
                                                     </span>
                                                 ) : (
                                                     <span className="text-[9px] sans-font" style={{color:'var(--c-muted)'}}>目前無人在線</span>
+                                                )}
+                                                {hasNewMsg && (
+                                                    <span className="text-[9px] sans-font inline-flex items-center gap-0.5"
+                                                        style={{color:'#ef4444', fontWeight:'700'}}>
+                                                        <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><rect x="11" y="7" width="2" height="6" rx="1" fill="white"/><rect x="11" y="15" width="2" height="2" rx="1" fill="white"/></svg>
+                                                        有新訊息！
+                                                    </span>
                                                 )}
                                             </div>
                                         </div>
