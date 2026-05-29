@@ -1580,7 +1580,7 @@
 
                     {/* ── nav：在 flex column 裡排最下方，不用 fixed，自然不穿透 ── */}
                     <nav className="flex-shrink-0 bg-white" style={{borderTop:'1px solid var(--c-border)', zIndex:40}}>
-                        <div className="max-w-md mx-auto" style={{display:'grid', gridTemplateColumns:'repeat(5,1fr)', alignItems:'center', paddingTop:'10px', paddingLeft:'8px', paddingRight:'8px', paddingBottom:'calc(env(safe-area-inset-bottom, 0px) + 10px)'}}>
+                        <div className="max-w-md mx-auto" style={{display:'grid', gridTemplateColumns:'repeat(5,1fr)', alignItems:'center', paddingTop:'8px', paddingLeft:'8px', paddingRight:'8px', paddingBottom:'calc(env(safe-area-inset-bottom, 0px) + 12px)'}}>
                             <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} navIcon="mountain" label="修煉室" />
                             <NavBtn active={activeTab === 'leaderboard'} onClick={() => setActiveTab('leaderboard')} navIcon="scroll" label="風雲榜" />
                             <NavBtn active={activeTab === 'messageboard'} onClick={() => setActiveTab('messageboard')} navIcon="message" label="留言板" showDot={activeTab !== 'messageboard' && Object.values(globalUnreadCounts).some(c => c > 0)} />
