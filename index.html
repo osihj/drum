@@ -589,10 +589,10 @@
                             const avg = t.members.length ? Math.round(total / t.members.length) : 0;
                             const avgLv = t.members.length ? Math.round(t.members.reduce((s, m) => s + m.lv, 0) / t.members.length) : 0;
                             return { ...t, total, avg, avgLv };
-                        }).sort((a, b) => b.avgLv - a.avgLv);
+                        }).sort((a, b) => b.total - a.total);
 
                         setLeaderboard(result);
-                        setAllMembers(membersFlat.sort((a, b) => b.lv - a.lv));
+                        setAllMembers(membersFlat.sort((a, b) => b.score - a.score || b.lv - a.lv));
                         setLoading(false);
                     });
                 return () => unsubTeams();
@@ -646,7 +646,7 @@
                                 const accentColor = isMyTeam ? '#74d99f' : teamAccentColors[i % teamAccentColors.length];
                                 const headerBg = isMyTeam ? '#d1fae5' : teamBgColors[i % teamBgColors.length];
                                 const visibleMembers = team.members
-                                    .sort((a,b) => b.lv - a.lv);
+                                    .sort((a,b) => b.score - a.score || b.lv - a.lv);
                                 return (
                                     <div key={team.id} className="rounded-[1.5rem] overflow-hidden"
                                         style={{border:`1.5px solid ${accentColor}`, background:'#ffffff'}}>
@@ -701,7 +701,7 @@
                                 const groups = [];
                                 let rank = 1;
                                 allMembers.forEach((m, i) => {
-                                    if (i === 0 || allMembers[i-1].lv !== m.lv || allMembers[i-1].score !== m.score) {
+                                    if (i === 0 || allMembers[i-1].score !== m.score) {
                                         // 新的一組，排名 = 前一組排名 + 1（密集排名，並列不佔名次）
                                         rank = groups.length + 1;
                                         groups.push({ rank, members: [m] });
@@ -3616,9 +3616,10 @@
                                             await Promise.all(logPromises);
                                             
                                             // 發送留言板訊息給受影響的陣營
+                                            const recipientNames = recipients.map(r => r.displayName || r.email).join('、');
                                             const messageText = pizzaReason.trim() 
-                                                ? `🍕 管理員送出 Pizza 劵 ${pizzaSliceCount} 片！\n原因：${pizzaReason.trim()}`
-                                                : `🍕 管理員送出 Pizza 劵 ${pizzaSliceCount} 片給大家！`;
+                                                ? `🍕 管理員送出 Pizza 劵 ${pizzaSliceCount} 片給：${recipientNames}！\n原因：${pizzaReason.trim()}`
+                                                : `🍕 管理員送出 Pizza 劵 ${pizzaSliceCount} 片給：${recipientNames}！`;
                                             
                                             for (const teamId of affectedTeamIds) {
                                                 try {
@@ -3630,7 +3631,7 @@
                                                         uid: '[管理員]',
                                                         displayName: '🛡️ 系統公告',
                                                         text: messageText,
-                                                        sentAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                                        sentAt: new Date().toISOString(),
                                                         isAdmin: true,
                                                     });
                                                     await msgRef.set(existing);
