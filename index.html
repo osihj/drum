@@ -1319,7 +1319,7 @@
 
                     {/* ── main：佔剩餘高度，自己 overflow-y scroll，捲動不影響 header ── */}
                     <main className="flex-1 overflow-y-auto" style={{overscrollBehavior:'contain'}}>
-                    <div className="space-y-4 max-w-md mx-auto w-full" style={{padding:'var(--sp-page)', paddingBottom:'calc(72px + env(safe-area-inset-bottom, 0px))'}}>
+                    <div className="space-y-4 max-w-md mx-auto w-full" style={{padding:'var(--sp-page)', paddingBottom:'calc(env(safe-area-inset-bottom, 0px) + 80px)'}}>
                         {activeTab === 'dashboard' && (
                             <>
                                 {/* 英雄卡：保留原有樣式，道心值改 Lv */}
@@ -1579,8 +1579,8 @@
                     )}
 
                     {/* ── nav：在 flex column 裡排最下方，不用 fixed，自然不穿透 ── */}
-                    <nav className="flex-shrink-0 bg-white" style={{borderTop:'1px solid var(--c-border)', zIndex:40, paddingBottom:'env(safe-area-inset-bottom, 0px)'}}>
-                        <div className="max-w-md mx-auto" style={{display:'grid', gridTemplateColumns:'repeat(5,1fr)', alignItems:'center', padding:'8px 8px 6px'}}>
+                    <nav className="flex-shrink-0 bg-white" style={{borderTop:'1px solid var(--c-border)', zIndex:40}}>
+                        <div className="max-w-md mx-auto" style={{display:'grid', gridTemplateColumns:'repeat(5,1fr)', alignItems:'center', paddingTop:'8px', paddingLeft:'8px', paddingRight:'8px', paddingBottom:'calc(env(safe-area-inset-bottom, 0px) + 6px)'}}>
                             <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} navIcon="mountain" label="修煉室" />
                             <NavBtn active={activeTab === 'leaderboard'} onClick={() => setActiveTab('leaderboard')} navIcon="scroll" label="風雲榜" />
                             <NavBtn active={activeTab === 'messageboard'} onClick={() => setActiveTab('messageboard')} navIcon="message" label="留言板" showDot={activeTab !== 'messageboard' && Object.values(globalUnreadCounts).some(c => c > 0)} />
