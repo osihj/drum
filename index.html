@@ -3623,18 +3623,17 @@
                                             
                                             for (const teamId of affectedTeamIds) {
                                                 try {
-                                                    const msgRef = db.collection('messages').doc(teamId);
-                                                    const snap = await msgRef.get();
-                                                    const existing = snap.data() || { msgs: [] };
-                                                    existing.msgs = existing.msgs || [];
-                                                    existing.msgs.push({
-                                                        uid: '[管理員]',
-                                                        displayName: '🛡️ 系統公告',
-                                                        text: messageText,
-                                                        sentAt: new Date().toISOString(),
-                                                        isAdmin: true,
-                                                    });
-                                                    await msgRef.set(existing);
+                                                    await db.collection('messages').doc(teamId)
+                                                        .collection('chat').add({
+                                                            uid: '[管理員]',
+                                                            displayName: '🛡️ 系統公告',
+                                                            text: messageText,
+                                                            teamId: teamId,
+                                                            teamName: '',
+                                                            likes: {},
+                                                            isAdmin: true,
+                                                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                                        });
                                                 } catch(err) {
                                                     console.warn('發送留言板訊息失敗:', err);
                                                 }
