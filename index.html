@@ -888,6 +888,10 @@
             // 🔴 全局新訊息追蹤
             const [globalUnreadCounts, setGlobalUnreadCounts] = useState({});
             
+            // 📅 行事曆紅點：有新活動發佈時顯示
+            const [calendarHasNew, setCalendarHasNew] = useState(false);
+            const lastSeenCalendarKey = useRef(null);
+            
             const todayKey = useMemo(() => formatDateKey(new Date()), []);
             const currentWeekDays = useMemo(() => getWeekDays(new Date()), []);
 
@@ -971,6 +975,19 @@
                                     note:       s.note       || '',
                                 }))
                                 .sort((a, b) => a.date.localeCompare(b.date));
+                            
+                            // 📅 偵測是否有新活動：用 sessions 數量+最新日期組成 key，有變化就亮紅點
+                            const updatedAt = snap.data()?.updatedAt || '';
+                            const newKey = `${raw.length}_${updatedAt}`;
+                            if (lastSeenCalendarKey.current === null) {
+                                // 首次載入：記錄但不亮紅點
+                                lastSeenCalendarKey.current = newKey;
+                            } else if (newKey !== lastSeenCalendarKey.current) {
+                                // 資料有變化：亮紅點
+                                lastSeenCalendarKey.current = newKey;
+                                setCalendarHasNew(true);
+                            }
+                            
                             setGlobalActivities(processed);
                             setActivitiesLoaded(true);
                         },
@@ -1465,7 +1482,7 @@
                             <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} navIcon="mountain" label="修煉室" />
                             <NavBtn active={activeTab === 'leaderboard'} onClick={() => setActiveTab('leaderboard')} navIcon="scroll" label="風雲榜" />
                             <NavBtn active={activeTab === 'messageboard'} onClick={() => setActiveTab('messageboard')} navIcon="message" label="留言板" showDot={activeTab !== 'messageboard' && Object.values(globalUnreadCounts).some(c => c > 0)} />
-                            <NavBtn active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} navIcon="calendar" label="行事曆" />
+                            <NavBtn active={activeTab === 'calendar'} onClick={() => { setActiveTab('calendar'); setCalendarHasNew(false); }} navIcon="calendar" label="行事曆" showDot={activeTab !== 'calendar' && calendarHasNew} />
                             <NavBtn active={activeTab === 'milestone'} onClick={() => setActiveTab('milestone')} navIcon="milestone" label="里程碑" />
                             <NavBtn active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} navIcon="gate" label="小天地" />
                         </div>
@@ -1838,6 +1855,7 @@
                                     const hasEvent = dayActivities.length > 0;
                                     const isSelected = selectedEventDate === key;
                                     const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                                    const isPast = !isToday && date < new Date(new Date().setHours(0,0,0,0));
 
                                     // 背景邏輯：選中 > 今天 > 有活動（週末/平日）> 有打卡 > 空白
                                     let bg = 'transparent';
@@ -1862,6 +1880,10 @@
                                         bg = 'rgba(0,0,0,0.04)';
                                         fgColor = isWeekend ? 'var(--c-danger)' : 'var(--c-text)';
                                     }
+                                    
+                                    // 過去日期：若無活動、非選中，套用半透明灰
+                                    const pastOpacity = isPast && !isSelected ? 0.32 : 1;
+                                    const pastFilter  = isPast && !isSelected ? 'grayscale(0.4)' : 'none';
 
                                     // 笑臉 SVG
                                     const SmileSvg = ({color}) => (
@@ -1888,6 +1910,8 @@
                                                 outlineOffset: '-2px',
                                                 cursor: hasEvent ? 'pointer' : 'default',
                                                 transition: 'all 150ms',
+                                                opacity: pastOpacity,
+                                                filter: pastFilter,
                                             }}>
                                             {/* 內容：有打卡顯示笑臉，否則顯示日期數字 */}
                                             {hasLog
