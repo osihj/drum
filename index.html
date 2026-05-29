@@ -240,15 +240,36 @@
             return Math.round((activeDays * 10) + totalHours + (pracCount * 5));
         };
 
+        // 等級門檻（指數型，讓前期快速升等、後期需長期累積）
+        const LEVEL_THRESHOLDS = [
+            { score:     0, base:  1 },   // 1–9    新手村
+            { score:    50, base: 10 },   // 10–19  入門
+            { score:   300, base: 20 },   // 20–29  進階
+            { score:  1500, base: 30 },   // 30–49  熟練
+            { score:  5000, base: 50 },   // 50–69  精通
+            { score: 15000, base: 70 },   // 70–89  傳說
+            { score: 40000, base: 90 },   // 90–99  神話
+        ];
+
+        // 升等 pizza 獎勵門檻（跨越這些等級時自動送 1 片）
+        const PIZZA_LEVEL_MILESTONES = [20, 30, 50, 70, 90];
+
         const calcLevel = (allTimeScore) => {
-            let realm = { level: 1 };
-            if (allTimeScore >= 600) realm = { level: 90 };
-            else if (allTimeScore >= 350) realm = { level: 70 };
-            else if (allTimeScore >= 150) realm = { level: 30 };
-            else if (allTimeScore >= 50) realm = { level: 10 };
-            let displayLevel = realm.level + Math.floor((allTimeScore % 100) / 10);
-            if (allTimeScore >= 600) displayLevel = 90 + Math.min(9, Math.floor((allTimeScore - 600) / 50));
-            return displayLevel;
+            if (!allTimeScore || allTimeScore <= 0) return 1;
+            let tier = LEVEL_THRESHOLDS[0];
+            for (const t of LEVEL_THRESHOLDS) {
+                if (allTimeScore >= t.score) tier = t;
+                else break;
+            }
+            const idx = LEVEL_THRESHOLDS.indexOf(tier);
+            const next = LEVEL_THRESHOLDS[idx + 1];
+            if (!next) {
+                // 90 等以後：每 500 分 +1，上限 99
+                return Math.min(99, 90 + Math.floor((allTimeScore - 40000) / 500));
+            }
+            const span = next.score - tier.score;
+            const lvSpan = next.base - tier.base;
+            return tier.base + Math.floor(((allTimeScore - tier.score) / span) * lvSpan);
         };
 
         const Icon = ({ name, size = 24, className = "", strokeWidth = 3 }) => {
@@ -1121,13 +1142,57 @@
                     setIsModalOpen(false);
                     return;
                 }
+
+                // 1. 記錄本次操作前的等級
+                const levelBefore = calcLevel(calcAllTimeScore(dailyLogs));
+
+                // 2. 寫入今日紀錄
                 const updates = {};
                 Object.entries(pendingTaps).forEach(([field, val]) => {
                     updates[field] = firebase.firestore.FieldValue.increment(val);
                 });
                 await db.collection('users').doc(user.uid)
                     .collection('dailyLogs').doc(todayKey).set(updates, { merge: true });
-                window.confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, colors: ['#74c0fc', '#ffd43b', '#ff8787'] });
+
+                // 3. 重新計算新等級（從 Firestore 最新資料）
+                const newLogsSnap = await db.collection('users').doc(user.uid)
+                    .collection('dailyLogs').get();
+                const newLogs = {};
+                newLogsSnap.forEach(d => { newLogs[d.id] = d.data(); });
+                const levelAfter = calcLevel(calcAllTimeScore(newLogs));
+
+                // 4. 偵測是否跨越 pizza 里程碑等級，若有則自動贈送 1 片
+                const crossedMilestones = PIZZA_LEVEL_MILESTONES.filter(
+                    lv => levelBefore < lv && levelAfter >= lv
+                );
+                if (crossedMilestones.length > 0) {
+                    const userSnap = await db.collection('users').doc(user.uid).get();
+                    const curSlices = userSnap.data()?.pizzaSlices || 0;
+                    const pizzaTotal = userSnap.data()?.pizzaTotal || 8;
+                    const earnedSlices = crossedMilestones.length; // 每個跨越的里程碑給 1 片
+                    const nextSlices = curSlices + earnedSlices; // 不設上限，讓餘片累積
+                    await db.collection('users').doc(user.uid).update({ pizzaSlices: nextSlices });
+                    // 寫入 pizzaLog
+                    for (const lv of crossedMilestones) {
+                        await db.collection('pizzaLogs').add({
+                            uid: user.uid,
+                            displayName: userProfile?.displayName || user.email || '',
+                            teamId: userProfile?.teamId || null,
+                            teamName: userProfile?.teamName || null,
+                            slices: 1,
+                            reason: `🎉 升上 Lv.${lv} 自動獎勵`,
+                            sendMode: 'levelup',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        });
+                    }
+                    // 升等 confetti 慶祝
+                    window.confetti({ particleCount: 250, spread: 100, origin: { y: 0.5 }, colors: ['#ffd43b', '#ff922b', '#ff6b6b', '#74c0fc'] });
+                    const milestoneText = crossedMilestones.map(lv => `Lv.${lv}`).join('、');
+                    setTimeout(() => alert(`🎉 恭喜突破 ${milestoneText}！\n自動獲得 ${earnedSlices} 片 Pizza 券！`), 300);
+                } else {
+                    window.confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, colors: ['#74c0fc', '#ffd43b', '#ff8787'] });
+                }
+
                 setPendingTaps({});
                 setSelectedDateKey(null);
                 setIsModalOpen(false);
@@ -2157,7 +2222,11 @@
                     {/* 🍕 Pizza 劵 */}
                     {(() => {
                         const { slices, total } = pizzaData;
-                        const isComplete = slices >= total;
+                        // 支援超過一輪：計算本輪進度與已完成輪次
+                        const completedRounds = Math.floor(slices / total);
+                        const currentSlices = slices % total;
+                        const isComplete = currentSlices === 0 && slices > 0;
+                        const displaySlices = isComplete ? total : currentSlices;
                         // Generate SVG pie slices
                         const cx = 100, cy = 100, r = 85, innerR = 14;
                         const sliceAngle = 360 / total;
@@ -2205,7 +2274,7 @@
                                             <circle cx={cx} cy={cy} r={r} fill="#fef3c7" />
                                             {/* Slices */}
                                             {Array.from({length: total}, (_, i) => {
-                                                const owned = i < slices;
+                                                const owned = i < displaySlices;
                                                 const isNew = i === pizzaAnimSlice;
                                                 const tp = toppingPos(i);
                                                 return (
@@ -2255,16 +2324,28 @@
                                     {/* Status text */}
                                     <div style={{textAlign:'center'}}>
                                         {isComplete ? (
-                                            <p className="sans-font text-sm" style={{color:'#d97706', fontWeight:'700'}}>🎉 Pizza 完整了！太棒了！</p>
+                                            <>
+                                                <p className="sans-font text-sm" style={{color:'#d97706', fontWeight:'700'}}>🎉 Pizza 集滿了！快去找管理員兌換！</p>
+                                                {completedRounds > 1 && (
+                                                    <p className="sans-font" style={{fontSize:'11px', color:'#9ca3af', marginTop:'4px'}}>已累積第 {completedRounds} 個 Pizza</p>
+                                                )}
+                                            </>
                                         ) : (
-                                            <p className="sans-font text-sm" style={{color:'var(--c-text-sub)'}}>
-                                                已收集 <span style={{color:'#d97706', fontWeight:'700', fontSize:'16px'}}>{slices}</span> / {total} 片
-                                            </p>
+                                            <>
+                                                <p className="sans-font text-sm" style={{color:'var(--c-text-sub)'}}>
+                                                    已收集 <span style={{color:'#d97706', fontWeight:'700', fontSize:'16px'}}>{displaySlices}</span> / {total} 片
+                                                </p>
+                                                {completedRounds > 0 && (
+                                                    <p className="sans-font" style={{fontSize:'11px', color:'#d97706', marginTop:'4px'}}>
+                                                        🍕 ×{completedRounds} 待兌換，請聯絡管理員
+                                                    </p>
+                                                )}
+                                            </>
                                         )}
                                         {/* Slice dots */}
                                         <div style={{display:'flex', gap:'6px', marginTop:'8px', justifyContent:'center', flexWrap:'wrap'}}>
                                             {Array.from({length: total}, (_, i) => (
-                                                <div key={i} style={{width:'10px', height:'10px', borderRadius:'50%', background: i < slices ? '#fbbf24' : '#e5e7eb', border: i < slices ? '1.5px solid #d97706' : '1.5px solid #d1d5db', transition:'all 0.3s'}} />
+                                                <div key={i} style={{width:'10px', height:'10px', borderRadius:'50%', background: i < displaySlices ? '#fbbf24' : '#e5e7eb', border: i < displaySlices ? '1.5px solid #d97706' : '1.5px solid #d1d5db', transition:'all 0.3s'}} />
                                             ))}
                                         </div>
                                     </div>
@@ -3511,7 +3592,7 @@
                                                 const snap = await db.collection('users').doc(u.uid).get();
                                                 const cur = snap.data()?.pizzaSlices || 0;
                                                 const total = snap.data()?.pizzaTotal || 8;
-                                                const next = Math.min(cur + pizzaSliceCount, total);
+                                                const next = cur + pizzaSliceCount; // 不設上限，餘片累積到下一輪
                                                 batch.update(db.collection('users').doc(u.uid), { pizzaSlices: next });
                                                 logPromises.push(db.collection('pizzaLogs').add({
                                                     uid: u.uid,
@@ -3594,15 +3675,21 @@
                                                 {mems.map(u => {
                                                     const slices = u.pizzaSlices || 0;
                                                     const total = u.pizzaTotal || 8;
-                                                    const pct = Math.round(slices/total*100);
-                                                    const done = slices >= total;
+                                                    const completedR = Math.floor(slices / total);
+                                                    const curSlicesR = slices % total;
+                                                    const displayS = (curSlicesR === 0 && slices > 0) ? total : curSlicesR;
+                                                    const pct = Math.round(displayS/total*100);
+                                                    const done = curSlicesR === 0 && slices > 0;
                                                     return (
                                                         <div key={u.uid} className="flex items-center gap-2">
                                                             <span className="sans-font text-xs truncate" style={{width:'72px', color: done ? '#d97706' : 'var(--c-text)', fontWeight: done ? '700':'400'}}>{u.displayName||u.email}</span>
                                                             <div style={{flex:1, height:'8px', background:'#f3f4f6', borderRadius:'4px', overflow:'hidden'}}>
                                                                 <div style={{height:'100%', width:`${pct}%`, background: done ? 'linear-gradient(90deg,#fbbf24,#f59e0b)' : 'linear-gradient(90deg,#fde68a,#fbbf24)', borderRadius:'4px', transition:'width 0.5s'}}></div>
                                                             </div>
-                                                            <span className="sans-font" style={{fontSize:'10px', color: done ? '#d97706':'var(--c-muted)', minWidth:'36px', textAlign:'right', fontWeight: done?'700':'400'}}>{done?'🍕':''}{slices}/{total}</span>
+                                                            <span className="sans-font" style={{fontSize:'10px', color: done ? '#d97706':'var(--c-muted)', minWidth:'48px', textAlign:'right', fontWeight: done?'700':'400'}}>
+                                                                {done?'🍕 待兌換':''}
+                                                                {completedR > 0 && !done ? `×${completedR}+` : ''}{displayS}/{total}
+                                                            </span>
                                                             <button
                                                                 onClick={async () => {
                                                                     const userName = u.displayName||u.email;
@@ -3643,14 +3730,20 @@
                                         <p className="sans-font text-xs mb-2" style={{color:'var(--c-muted)'}}>無陣營</p>
                                         <div className="space-y-2">
                                             {users.filter(u => !u.teamId).map(u => {
-                                                const slices=u.pizzaSlices||0, total=u.pizzaTotal||8, pct=Math.round(slices/total*100), done=slices>=total;
+                                                const slices=u.pizzaSlices||0, total=u.pizzaTotal||8;
+                                                const completedR=Math.floor(slices/total), curS=slices%total;
+                                                const displayS=(curS===0&&slices>0)?total:curS;
+                                                const pct=Math.round(displayS/total*100), done=curS===0&&slices>0;
                                                 return (
                                                     <div key={u.uid} className="flex items-center gap-2">
                                                         <span className="sans-font text-xs truncate" style={{width:'72px',color:'var(--c-text)'}}>{u.displayName||u.email}</span>
                                                         <div style={{flex:1,height:'8px',background:'#f3f4f6',borderRadius:'4px',overflow:'hidden'}}>
-                                                            <div style={{height:'100%',width:`${pct}%`,background:'linear-gradient(90deg,#fde68a,#fbbf24)',borderRadius:'4px',transition:'width 0.5s'}}></div>
+                                                            <div style={{height:'100%',width:`${pct}%`,background: done?'linear-gradient(90deg,#fbbf24,#f59e0b)':'linear-gradient(90deg,#fde68a,#fbbf24)',borderRadius:'4px',transition:'width 0.5s'}}></div>
                                                         </div>
-                                                        <span className="sans-font" style={{fontSize:'10px',color:done?'#d97706':'var(--c-muted)',minWidth:'36px',textAlign:'right'}}>{slices}/{total}</span>
+                                                        <span className="sans-font" style={{fontSize:'10px',color:done?'#d97706':'var(--c-muted)',minWidth:'48px',textAlign:'right'}}>
+                                                            {done?'🍕 待兌換':''}
+                                                            {completedR>0&&!done?`×${completedR}+`:''}{displayS}/{total}
+                                                        </span>
                                                         <button
                                                             onClick={async () => {
                                                                 const userName = u.displayName||u.email;
