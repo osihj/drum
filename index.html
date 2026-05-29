@@ -885,6 +885,9 @@
             const [globalActivities, setGlobalActivities] = useState([]);
             const [activitiesLoaded, setActivitiesLoaded] = useState(false);
             
+            // 🔴 全局新訊息追蹤（所有頁面持續監聽）
+            const [globalUnreadCounts, setGlobalUnreadCounts] = useState({});
+            
             const todayKey = useMemo(() => formatDateKey(new Date()), []);
             const currentWeekDays = useMemo(() => getWeekDays(new Date()), []);
 
@@ -986,6 +989,28 @@
                     unsubscribe();
                 };
             }, []);  // 空依賴陣列，確保只初始化一次
+
+            // 🔴 全局新訊息監聽（不限頁面，app 啟動即追蹤所有陣營）
+            useEffect(() => {
+                let teamUnsubs = [];
+                const unsubTeams = db.collection('teams').onSnapshot(teamSnap => {
+                    teamUnsubs.forEach(u => u());
+                    teamUnsubs = [];
+                    const cutoff = new Date(Date.now() - 5 * 60 * 1000);
+                    const cutoffTs = firebase.firestore.Timestamp.fromDate(cutoff);
+                    teamSnap.forEach(doc => {
+                        const teamId = doc.id;
+                        const u = db.collection('messages').doc(teamId)
+                            .collection('chat')
+                            .where('createdAt', '>=', cutoffTs)
+                            .onSnapshot(snap => {
+                                setGlobalUnreadCounts(prev => ({ ...prev, [teamId]: snap.size }));
+                            }, () => {});
+                        teamUnsubs.push(u);
+                    });
+                });
+                return () => { unsubTeams(); teamUnsubs.forEach(u => u()); };
+            }, []);
 
             // 🔔 監聽臨時通知（來自管理員的即時推播）
             useEffect(() => {
@@ -1399,7 +1424,7 @@
                         {activeTab === 'milestone' && <MilestoneView dailyLogs={dailyLogs} user={user} />}
                         {activeTab === 'profile' && <ProfileView dailyLogs={dailyLogs} isAdmin={isAdmin} user={user} userProfile={userProfile} />}
                         {activeTab === 'leaderboard' && <LeaderboardView currentUser={user} userTeamId={userProfile?.teamId} />}
-                        {activeTab === 'messageboard' && <MessageBoardView currentUser={user} userProfile={userProfile} />}
+                        {activeTab === 'messageboard' && <MessageBoardView currentUser={user} userProfile={userProfile} globalUnreadCounts={globalUnreadCounts} />}
                     </main>
 
                     {isModalOpen && (
@@ -1439,7 +1464,7 @@
                         <div className="max-w-md mx-auto" style={{display:'grid', gridTemplateColumns:'repeat(6,1fr)', alignItems:'end', padding:'4px 0 6px'}}>
                             <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} navIcon="mountain" label="修煉室" />
                             <NavBtn active={activeTab === 'leaderboard'} onClick={() => setActiveTab('leaderboard')} navIcon="scroll" label="風雲榜" />
-                            <NavBtn active={activeTab === 'messageboard'} onClick={() => setActiveTab('messageboard')} navIcon="message" label="留言板" />
+                            <NavBtn active={activeTab === 'messageboard'} onClick={() => setActiveTab('messageboard')} navIcon="message" label="留言板" showDot={activeTab !== 'messageboard' && Object.values(globalUnreadCounts).some(c => c > 0)} />
                             <NavBtn active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} navIcon="calendar" label="行事曆" />
                             <NavBtn active={activeTab === 'milestone'} onClick={() => setActiveTab('milestone')} navIcon="milestone" label="里程碑" />
                             <NavBtn active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} navIcon="gate" label="小天地" />
@@ -2551,14 +2576,13 @@
 
 
         // ─── Message Board View ──────────────────────────────────────────
-        const MessageBoardView = ({ currentUser, userProfile }) => {
+        const MessageBoardView = ({ currentUser, userProfile, globalUnreadCounts = {} }) => {
             const [teams, setTeams] = useState([]);
             const [selectedTeam, setSelectedTeam] = useState(null);
             const [messages, setMessages] = useState([]);
             const [messageText, setMessageText] = useState('');
             const [sending, setSending] = useState(false);
             const [onlineCounts, setOnlineCounts] = useState({}); // { teamId: count }
-            const [recentMsgCounts, setRecentMsgCounts] = useState({}); // { teamId: count in last 5 min }
             const [msgLikes, setMsgLikes] = useState({}); // { msgId: { count, likedByMe } }
             const messagesEndRef = React.useRef(null);
             const presenceRefCleanup = React.useRef(null);
@@ -2622,22 +2646,6 @@
                     });
                 return () => unsub();
             }, []);
-
-            // ── 監聽各陣營最近5分鐘訊息數（熱線判定：≥5則）──
-            useEffect(() => {
-                if (teams.length === 0) return;
-                const cutoff = new Date(Date.now() - 5 * 60 * 1000);
-                const cutoffTs = firebase.firestore.Timestamp.fromDate(cutoff);
-                const unsubs = teams.map(team => {
-                    return db.collection('messages').doc(team.id)
-                        .collection('chat')
-                        .where('createdAt', '>=', cutoffTs)
-                        .onSnapshot(snap => {
-                            setRecentMsgCounts(prev => ({ ...prev, [team.id]: snap.size }));
-                        });
-                });
-                return () => unsubs.forEach(u => u());
-            }, [teams.length]);
 
             // ── Presence：進入聊天室時寫入，離開時清除 ──
             useEffect(() => {
@@ -2810,8 +2818,8 @@
                                 </span>
                             ) : null;
 
-                            // 新訊息判斷：5分鐘內有訊息 且 上次讀取時間早於最近訊息
-                            const recentCount = recentMsgCounts[team.id] || 0;
+                            // 新訊息判斷：全局監聽到有新訊息 且 上次讀取時間早於1分鐘前
+                            const recentCount = globalUnreadCounts[team.id] || 0;
                             const lastReadTs = getLastRead(team.id);
                             const hasNewMsg = recentCount > 0 && (Date.now() - lastReadTs > 60 * 1000);
 
@@ -2923,58 +2931,99 @@
                         )}
                         {messages.map((msg, i) => {
                             const isMe = msg.uid === currentUser.uid;
-                            const showName = !isMe && (i === 0 || messages[i-1]?.uid !== msg.uid);
+                            const isAdmin = msg.isAdmin === true;
+                            const showName = !isMe && !isAdmin && (i === 0 || messages[i-1]?.uid !== msg.uid);
                             const liked = msgLikes[msg.id]?.likedByMe;
                             const likeCount = msgLikes[msg.id]?.count || 0;
+
+                            // 日期分隔線：比較這則和前一則的日期
+                            const getDateLabel = (ts) => {
+                                if (!ts) return null;
+                                const d = ts.toDate ? ts.toDate() : new Date(ts);
+                                const now = new Date();
+                                const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                                const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+                                const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                                if (msgDay.getTime() === today.getTime()) return '今天';
+                                if (msgDay.getTime() === yesterday.getTime()) return '昨天';
+                                return `${d.getMonth()+1}/${d.getDate()}`;
+                            };
+                            const thisDateLabel = getDateLabel(msg.createdAt);
+                            const prevDateLabel = i > 0 ? getDateLabel(messages[i-1].createdAt) : null;
+                            const showDateSep = thisDateLabel && thisDateLabel !== prevDateLabel;
+
                             return (
-                                <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                                    {showName && (
-                                        <div className="flex items-center gap-1.5 mb-1 px-1">
-                                            <span className="sans-font text-xs" style={{color:'var(--c-text)', fontWeight:'700'}}>{msg.displayName}</span>
-                                            {msg.teamName && (
-                                                <span className="sans-font" style={{fontSize:'9px', color:'var(--c-primary-text)', background:'var(--c-primary-bg)', padding:'1px 5px', borderRadius:'4px', border:'1px solid var(--c-primary)30'}}>
-                                                    {msg.teamName}
-                                                </span>
-                                            )}
+                                <React.Fragment key={msg.id}>
+                                    {showDateSep && (
+                                        <div style={{display:'flex', alignItems:'center', gap:'8px', margin:'8px 0 4px'}}>
+                                            <div style={{flex:1, height:'1px', background:'var(--c-border)'}}></div>
+                                            <span className="sans-font" style={{fontSize:'10px', color:'var(--c-muted)', background:'var(--c-surface)', padding:'0 8px', flexShrink:0}}>{thisDateLabel}</span>
+                                            <div style={{flex:1, height:'1px', background:'var(--c-border)'}}></div>
                                         </div>
                                     )}
-                                    <div className={`flex items-end gap-1.5 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-                                        {/* 時間 */}
-                                        <span className="sans-font text-[9px]" style={{color:'var(--c-muted)', flexShrink:0, marginBottom:'2px'}}>{formatTime(msg.createdAt)}</span>
-                                        {/* 氣泡 */}
-                                        <div className="px-3 py-2 r-btn sans-normal text-sm"
-                                            style={{
-                                                maxWidth:'85%',
-                                                background: isMe ? 'var(--c-primary)' : '#fff',
-                                                color: isMe ? '#fff' : 'var(--c-text)',
-                                                border: isMe ? 'none' : '1px solid var(--c-border)',
-                                                wordBreak:'break-word', lineHeight:1.5,
+                                    {/* 系統公告（Pizza / 管理員）：置中顯示 */}
+                                    {isAdmin ? (
+                                        <div style={{display:'flex', justifyContent:'center', margin:'4px 0'}}>
+                                            <div className="sans-normal text-xs" style={{
+                                                background:'#fef9c3', border:'1px solid #fde68a',
+                                                borderRadius:'99px', padding:'5px 14px',
+                                                color:'#92400e', maxWidth:'90%', textAlign:'center',
+                                                whiteSpace:'pre-line', lineHeight:1.5,
                                             }}>
-                                            {msg.text}
+                                                {msg.text}
+                                            </div>
                                         </div>
-                                        {/* ❤️ 愛心按鈕 */}
-                                        <button
-                                            onClick={e => toggleMsgLike(msg, e.currentTarget)}
-                                            className="flex flex-col items-center justify-center active-press"
-                                            style={{
-                                                flexShrink:0, position:'relative', overflow:'visible',
-                                                padding:'3px 5px', borderRadius:'99px', minWidth:'28px',
-                                                background: liked ? '#fff0f0' : 'transparent',
-                                                border: liked ? '1px solid #ffc9c9' : '1px solid transparent',
-                                                transition:'all 0.18s',
-                                            }}>
-                                            <svg width="14" height="14" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                {liked
-                                                    ? <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#ff6b6b"/>
-                                                    : <path d="M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z" fill="#d1d5db"/>
-                                                }
-                                            </svg>
-                                            {likeCount > 0 && (
-                                                <span className="sans-font" style={{fontSize:'8px', color: liked ? '#ff6b6b' : '#9ca3af', lineHeight:1}}>{likeCount}</span>
+                                    ) : (
+                                        <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                                            {showName && (
+                                                <div className="flex items-center gap-1.5 mb-1 px-1">
+                                                    <span className="sans-font text-xs" style={{color:'var(--c-text)', fontWeight:'700'}}>{msg.displayName}</span>
+                                                    {msg.teamName && (
+                                                        <span className="sans-font" style={{fontSize:'9px', color:'var(--c-primary-text)', background:'var(--c-primary-bg)', padding:'1px 5px', borderRadius:'4px', border:'1px solid var(--c-primary)30'}}>
+                                                            {msg.teamName}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             )}
-                                        </button>
-                                    </div>
-                                </div>
+                                            <div className={`flex items-end gap-1.5 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                                                {/* 時間 */}
+                                                <span className="sans-font text-[9px]" style={{color:'var(--c-muted)', flexShrink:0, marginBottom:'2px'}}>{formatTime(msg.createdAt)}</span>
+                                                {/* 氣泡 */}
+                                                <div className="px-3 py-2 r-btn sans-normal text-sm"
+                                                    style={{
+                                                        maxWidth:'85%',
+                                                        background: isMe ? 'var(--c-primary)' : '#fff',
+                                                        color: isMe ? '#fff' : 'var(--c-text)',
+                                                        border: isMe ? 'none' : '1px solid var(--c-border)',
+                                                        wordBreak:'break-word', lineHeight:1.5,
+                                                    }}>
+                                                    {msg.text}
+                                                </div>
+                                                {/* ❤️ 愛心按鈕 */}
+                                                <button
+                                                    onClick={e => toggleMsgLike(msg, e.currentTarget)}
+                                                    className="flex flex-col items-center justify-center active-press"
+                                                    style={{
+                                                        flexShrink:0, position:'relative', overflow:'visible',
+                                                        padding:'3px 5px', borderRadius:'99px', minWidth:'28px',
+                                                        background: liked ? '#fff0f0' : 'transparent',
+                                                        border: liked ? '1px solid #ffc9c9' : '1px solid transparent',
+                                                        transition:'all 0.18s',
+                                                    }}>
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                        {liked
+                                                            ? <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#ff6b6b"/>
+                                                            : <path d="M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z" fill="#d1d5db"/>
+                                                        }
+                                                    </svg>
+                                                    {likeCount > 0 && (
+                                                        <span className="sans-font" style={{fontSize:'8px', color: liked ? '#ff6b6b' : '#9ca3af', lineHeight:1}}>{likeCount}</span>
+                                                    )}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </React.Fragment>
                             );
                         })}
                         <div ref={messagesEndRef} />
@@ -3617,17 +3666,23 @@
                                             
                                             // 發送留言板訊息給受影響的陣營
                                             const recipientNames = recipients.map(r => r.displayName || r.email).join('、');
-                                            const messageText = pizzaReason.trim() 
+                                            const pizzaMsgText = pizzaReason.trim() 
                                                 ? `🍕 管理員送出 Pizza 劵 ${pizzaSliceCount} 片給：${recipientNames}！\n原因：${pizzaReason.trim()}`
                                                 : `🍕 管理員送出 Pizza 劵 ${pizzaSliceCount} 片給：${recipientNames}！`;
                                             
-                                            for (const teamId of affectedTeamIds) {
+                                            // 若以陣營模式發送且 affectedTeamIds 為空（理論上不會），補回
+                                            const teamsToNotify = new Set(affectedTeamIds);
+                                            if (pizzaSendMode === 'team' && pizzaSelectedTeamId) {
+                                                teamsToNotify.add(pizzaSelectedTeamId);
+                                            }
+
+                                            for (const teamId of teamsToNotify) {
                                                 try {
                                                     await db.collection('messages').doc(teamId)
                                                         .collection('chat').add({
                                                             uid: '[管理員]',
                                                             displayName: '🛡️ 系統公告',
-                                                            text: messageText,
+                                                            text: pizzaMsgText,
                                                             teamId: teamId,
                                                             teamName: '',
                                                             likes: {},
@@ -3886,13 +3941,14 @@
             ),
         };
 
-        const NavBtn = ({ active, onClick, navIcon, label }) => (
+        const NavBtn = ({ active, onClick, navIcon, label, showDot }) => (
             <button onClick={onClick}
                 className="flex flex-col items-center py-1 r-btn transition-all relative"
                 style={{color: active ? 'var(--c-primary-text)' : 'var(--c-muted)', flex:1, minWidth:0, padding:'6px 3px 3px'}}>
                 {active && <span style={{position:'absolute',bottom:0,left:'50%',transform:'translateX(-50%)',width:'24px',height:'3px',background:'var(--c-primary)',borderRadius:'2px 2px 0 0'}}></span>}
-                <span className="inline-flex items-center justify-center" style={{width:'28px',height:'28px',flexShrink:0}}>
+                <span className="inline-flex items-center justify-center" style={{width:'28px',height:'28px',flexShrink:0,position:'relative'}}>
                     {NavIcons[navIcon]}
+                    {showDot && <span style={{position:'absolute',top:'-2px',right:'-2px',width:'8px',height:'8px',borderRadius:'50%',background:'#ef4444',border:'2px solid #fff',display:'block'}}></span>}
                 </span>
                 <span className="sans-font" style={{fontSize:'11px',marginTop:'3px',whiteSpace:'nowrap',fontWeight:'500'}}>{label}</span>
             </button>
