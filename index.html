@@ -2052,9 +2052,10 @@
                         const total = d.pizzaTotal || 8;
                         setPizzaData(prev => {
                             if (newSlices > prev.slices) {
-                                // Animate newly gained slices
+                                // 動畫：用 % total 換算到目前這輪的 index（跨輪時正確對應）
                                 for (let i = prev.slices; i < newSlices; i++) {
-                                    setTimeout(() => setPizzaAnimSlice(i), (i - prev.slices) * 400);
+                                    const animIdx = i % total;
+                                    setTimeout(() => setPizzaAnimSlice(animIdx), (i - prev.slices) * 400);
                                 }
                                 setTimeout(() => setPizzaAnimSlice(null), (newSlices - prev.slices) * 400 + 800);
                             }
@@ -2222,11 +2223,14 @@
                     {/* 🍕 Pizza 劵 */}
                     {(() => {
                         const { slices, total } = pizzaData;
-                        // 支援超過一輪：計算本輪進度與已完成輪次
                         const completedRounds = Math.floor(slices / total);
                         const currentSlices = slices % total;
+                        // isComplete：本輪剛好集滿（8、16、24...）
                         const isComplete = currentSlices === 0 && slices > 0;
+                        // pizza 圖顯示：滿輪顯示全8片，否則顯示本輪進度
                         const displaySlices = isComplete ? total : currentSlices;
+                        // 待兌換數：滿輪時 = completedRounds，未滿時 = completedRounds（已積累的完整輪）
+                        const pendingRedemption = isComplete ? completedRounds : completedRounds;
                         // Generate SVG pie slices
                         const cx = 100, cy = 100, r = 85, innerR = 14;
                         const sliceAngle = 360 / total;
@@ -2255,7 +2259,7 @@
                             <div style={{padding:'0 0.5rem'}}>
                                 <h3 className="sans-font" style={{fontSize:'13px', fontWeight:'500', color:'#6b7280', margin:'0 0 1rem 0', textTransform:'uppercase', letterSpacing:'0.5px'}}>🍕 Pizza 劵</h3>
                                 <div className="bg-white r-card card-shadow" style={{padding:'20px 16px', display:'flex', flexDirection:'column', alignItems:'center', gap:'12px'}}>
-                                    {/* SVG Pizza */}
+                                    {/* SVG Pizza + 待兌換 badge */}
                                     <div style={{position:'relative', width:'200px', height:'200px'}}>
                                         <style>{`
                                             @keyframes slice-pop { 0%{transform:scale(0.4) rotate(-30deg);opacity:0} 60%{transform:scale(1.18) rotate(4deg);opacity:1} 80%{transform:scale(0.94)} 100%{transform:scale(1) rotate(0deg);opacity:1} }
