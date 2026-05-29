@@ -91,6 +91,9 @@
             .sans-normal      { font-family: 'Noto Sans TC', sans-serif; font-weight: 400; }
             .float-anim       { animation: float 3s ease-in-out infinite; }
             @keyframes float  { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+            .dot-float-l      { animation: dot-float 2.4s ease-in-out infinite; }
+            .dot-float-r      { animation: dot-float 2.4s ease-in-out infinite 1.2s; }
+            @keyframes dot-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
             @keyframes like-pop { 0% { transform: scale(1); } 25% { transform: scale(1.45); } 50% { transform: scale(0.88); } 75% { transform: scale(1.1); } 100% { transform: scale(1); } }
             @keyframes heart-float { 0% { opacity:1; transform: translateY(0) scale(1); } 100% { opacity:0; transform: translateY(-70px) scale(0.6); } }
             @keyframes svg-fill-in { 0% { stroke-dashoffset: 60; opacity:0.3; } 100% { stroke-dashoffset: 0; opacity:1; } }
@@ -1301,9 +1304,9 @@
                     <header className="bg-white flex-shrink-0 flex justify-center items-center" style={{borderBottom:'1px solid var(--c-border)', zIndex:50, paddingTop:'calc(env(safe-area-inset-top, 0px) + 14px)', paddingBottom:'14px'}}>
                         <div className="max-w-md w-full mx-auto px-5 flex justify-center items-center relative">
                             <div className="flex items-center space-x-3 justify-center">
-                                <div className="w-2 h-2 rounded-full pk-blue"></div>
+                                <div className="w-2 h-2 rounded-full pk-blue dot-float-l"></div>
                                 <span className="sans-font text-xl" style={{color:'var(--c-text)', letterSpacing:'0.1em'}}>自律動起來</span>
-                                <div className="w-2 h-2 rounded-full pk-blue"></div>
+                                <div className="w-2 h-2 rounded-full pk-blue dot-float-r"></div>
                             </div>
                             <div className="absolute right-5 flex items-center gap-2">
                                 {isAdmin && <span className="text-[9px] px-2 py-0.5 rounded-full sans-font" style={{background:'var(--c-text)',color:'#fff'}}>管理員</span>}
