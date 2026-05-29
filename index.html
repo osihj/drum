@@ -1292,10 +1292,13 @@
             if (!userProfile?.teamId) return <TeamSelectScreen user={user} onJoinTeam={handleJoinTeam} existingName={userProfile?.displayName || ''} />;
 
             // ── Main UI ───────────────────────────
+            // header 高度常數（fixed 定位，main 需對應 padding-top）
+            const HEADER_H = 57; // px，約 py-14px*2 + text行高
+
             return (
-                <div className="min-h-screen relative flex flex-col" style={{background:'var(--c-surface)'}}>
-                    {/* 全寬 fixed header，z:40 杜絕頁面穿透 */}
-                    <header className="bg-white fixed top-0 left-0 right-0 flex justify-center items-center" style={{borderBottom:'1px solid var(--c-border)', zIndex:40, paddingTop:'calc(env(safe-area-inset-top, 0px) + 14px)', paddingBottom:'14px'}}>
+                <div style={{position:'fixed', inset:0, display:'flex', flexDirection:'column', background:'var(--c-surface)', overflow:'hidden'}}>
+                    {/* ── header：固定在最頂，z:50，內容永遠不會穿透 ── */}
+                    <header className="bg-white flex-shrink-0 flex justify-center items-center" style={{borderBottom:'1px solid var(--c-border)', zIndex:50, paddingTop:'calc(env(safe-area-inset-top, 0px) + 14px)', paddingBottom:'14px'}}>
                         <div className="max-w-md w-full mx-auto px-5 flex justify-center items-center relative">
                             <div className="flex items-center space-x-3 justify-center">
                                 <div className="w-2 h-2 rounded-full pk-blue"></div>
@@ -1311,7 +1314,9 @@
                         </div>
                     </header>
 
-                    <main className="flex-1 space-y-4 max-w-md mx-auto w-full" style={{padding:'var(--sp-page)', paddingTop:'calc(env(safe-area-inset-top, 0px) + 70px)', paddingBottom:'calc(80px + env(safe-area-inset-bottom, 0px))'}}>
+                    {/* ── main：佔剩餘高度，自己 overflow-y scroll，捲動不影響 header ── */}
+                    <main className="flex-1 overflow-y-auto" style={{overscrollBehavior:'contain'}}>
+                    <div className="space-y-4 max-w-md mx-auto w-full" style={{padding:'var(--sp-page)', paddingBottom:'calc(72px + env(safe-area-inset-bottom, 0px))'}}>
                         {activeTab === 'dashboard' && (
                             <>
                                 {/* 英雄卡：保留原有樣式，道心值改 Lv */}
@@ -1519,6 +1524,7 @@
                         {activeTab === 'profile' && <ProfileView dailyLogs={dailyLogs} isAdmin={isAdmin} user={user} userProfile={userProfile} />}
                         {activeTab === 'leaderboard' && <LeaderboardView currentUser={user} userTeamId={userProfile?.teamId} />}
                         {activeTab === 'messageboard' && <MessageBoardView currentUser={user} userProfile={userProfile} globalUnreadCounts={globalUnreadCounts} />}
+                    </div>
                     </main>
 
                     {isModalOpen && (
@@ -1569,8 +1575,9 @@
                         />
                     )}
 
-                    <nav className="fixed bottom-0 left-0 right-0 bg-white" style={{borderTop:'1px solid var(--c-border)', zIndex:40, paddingBottom:'env(safe-area-inset-bottom, 0px)'}}>
-                        <div className="max-w-md mx-auto" style={{display:'grid', gridTemplateColumns:'repeat(5,1fr)', alignItems:'end', padding:'6px 8px 4px'}}>
+                    {/* ── nav：在 flex column 裡排最下方，不用 fixed，自然不穿透 ── */}
+                    <nav className="flex-shrink-0 bg-white" style={{borderTop:'1px solid var(--c-border)', zIndex:40, paddingBottom:'env(safe-area-inset-bottom, 0px)'}}>
+                        <div className="max-w-md mx-auto" style={{display:'grid', gridTemplateColumns:'repeat(5,1fr)', alignItems:'center', padding:'8px 8px 6px'}}>
                             <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} navIcon="mountain" label="修煉室" />
                             <NavBtn active={activeTab === 'leaderboard'} onClick={() => setActiveTab('leaderboard')} navIcon="scroll" label="風雲榜" />
                             <NavBtn active={activeTab === 'messageboard'} onClick={() => setActiveTab('messageboard')} navIcon="message" label="留言板" showDot={activeTab !== 'messageboard' && Object.values(globalUnreadCounts).some(c => c > 0)} />
@@ -4212,8 +4219,8 @@
         const NavBtn = ({ active, onClick, navIcon, label, showDot }) => (
             <button onClick={onClick}
                 className="flex flex-col items-center r-btn transition-all relative"
-                style={{color: active ? 'var(--c-primary-text)' : 'var(--c-muted)', flex:1, minWidth:0, padding:'6px 4px 2px'}}>
-                {active && <span style={{position:'absolute',bottom:0,left:'50%',transform:'translateX(-50%)',width:'20px',height:'2.5px',background:'var(--c-primary)',borderRadius:'2px 2px 0 0'}}></span>}
+                style={{color: active ? 'var(--c-primary-text)' : 'var(--c-muted)', flex:1, minWidth:0, padding:'4px 4px 2px'}}>
+                {active && <span style={{position:'absolute',top:0,left:'50%',transform:'translateX(-50%)',width:'20px',height:'2.5px',background:'var(--c-primary)',borderRadius:'0 0 2px 2px'}}></span>}
                 <span className="inline-flex items-center justify-center" style={{width:'30px',height:'30px',flexShrink:0,position:'relative'}}>
                     {NavIcons[navIcon]}
                     {showDot && <span style={{position:'absolute',top:'0px',right:'-1px',width:'7px',height:'7px',borderRadius:'50%',background:'#ef4444',border:'1.5px solid #fff',display:'block'}}></span>}
