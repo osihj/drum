@@ -812,17 +812,11 @@
                                                                             display:'flex', alignItems:'center', justifyContent:'center',
                                                                             fontSize:'10px', fontWeight:'700',
                                                                             fontFamily:"'Noto Sans TC',sans-serif",
-                                                                            outline: isToday ? '2px solid #16a34a' : 'none',
+                                                                            outline: isToday ? '1px solid #86efac' : 'none',
                                                                             outlineOffset:'-1px', flexShrink:0,
                                                                         }}>{d.getDate()}</div>
                                                                     );
                                                                 })}
-                                                                {/* 圖例色塊 */}
-                                                                <div style={{display:'flex', gap:'2px', marginLeft:'4px'}}>
-                                                                    {['#f3f4f6','#dcfce7','#bbf7d0','#4ade80'].map((c,ci) => (
-                                                                        <div key={ci} style={{width:'6px', height:'6px', borderRadius:'2px', background:c, border: ci===0 ? '0.5px solid #e5e7eb' : 'none'}}></div>
-                                                                    ))}
-                                                                </div>
                                                             </div>
                                                         </div>
                                                         {/* 右側：Lv + 點數（每人都顯示） */}
@@ -2076,8 +2070,9 @@
                             {weekList.map((date) => {
                                 const key = formatDateKey(date);
                                 const data = dailyLogs[key] || {};
-                                const totalEx = (Number(data.exerciseTime) || 0) + (Number(data.stretchTime) || 0);
-                                const hasActivity = totalEx > 0 || data.practice > 0 || data.fiveMin > 0;
+                                const exerTime = Number(data.exerciseTime) || 0;
+                                const streTime = Number(data.stretchTime) || 0;
+                                const hasActivity = exerTime > 0 || streTime > 0 || data.practice > 0 || data.fiveMin > 0;
                                 const isToday = key === formatDateKey(new Date());
                                 const dayActivities = activities.filter(a => a.date === key);
                                 const isWeekend = date.getDay() === 0 || date.getDay() === 6;
@@ -2095,7 +2090,8 @@
                                         <div className="flex gap-1.5 items-center flex-wrap justify-end" style={{maxWidth:'70%'}}>
                                             {data.practice > 0 && <span className="pk-yellow px-2 py-0.5 r-badge text-[9px] sans-font" style={{color:'var(--c-accent-text)'}}>練功 {data.practice}</span>}
                                             {data.fiveMin > 0 && <span className="pk-blue px-2 py-0.5 r-badge text-[9px] sans-font" style={{color:'var(--c-primary-text)'}}>五分鐘 {data.fiveMin}</span>}
-                                            {totalEx > 0 && <span className="pk-pink px-2 py-0.5 r-badge text-[9px] sans-font" style={{color:'var(--c-danger-text)'}}>運動 {totalEx}m</span>}
+                                            {exerTime > 0 && <span className="pk-pink px-2 py-0.5 r-badge text-[9px] sans-font" style={{color:'var(--c-danger-text)'}}>運動 {exerTime}m</span>}
+                                            {streTime > 0 && <span className="px-2 py-0.5 r-badge text-[9px] sans-font" style={{background:'#d1fae5', color:'#065f46'}}>拉筋 {streTime}m</span>}
                                             {dayActivities.map((ev, ei) => (
                                                 <span key={ei} className="px-2 py-0.5 r-badge text-[9px] sans-font"
                                                     style={{background:'var(--c-primary-bg)', color:'var(--c-primary-text)', border:'1px solid var(--c-primary)', display:'inline-flex', alignItems:'center', whiteSpace:'nowrap'}}>
