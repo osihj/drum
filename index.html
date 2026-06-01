@@ -601,16 +601,10 @@
                 return () => unsubTeams();
             }, []);
 
-            const teamAccentColors = ['#ffd43b','#74c0fc','#ff8787','#8ce99a','#b197fc','#ff922b'];
-            // Header strip background — solid light tones, pairs with border color
-            const teamBgColors = [
-                '#fef3c7', // warm yellow
-                '#e0f2fe', // sky blue
-                '#ffe4e4', // blush rose
-                '#d1fae5', // mint green
-                '#ede9fe', // lavender
-                '#fff0e0', // peach
-            ];
+            // 練功黃、五分鐘藍、運動橙、拉筋綠 — 對應修煉室色系
+            const teamAccentColors = ['#ffd43b','#38bdf8','#ff922b','#34d399'];
+            const teamBgColors     = ['#fef9c3','#e0f7fe','#fff3e0','#d1fae5'];
+            const teamRankColors   = ['#ca8a04','#0284c7','#c2410c','#059669'];
 
 
 
@@ -646,14 +640,13 @@
                             {leaderboard.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有陣營資料</div>}
                             {leaderboard.map((team, i) => {
                                 const isMyTeam = team.id === userTeamId;
-                                const accentColor = isMyTeam ? '#74d99f' : teamAccentColors[i % teamAccentColors.length];
-                                const headerBg = isMyTeam ? '#d1fae5' : teamBgColors[i % teamBgColors.length];
+                                const accentColor = teamAccentColors[i % teamAccentColors.length];
+                                const headerBg = teamBgColors[i % teamBgColors.length];
                                 const visibleMembers = team.members
                                     .sort((a,b) => b.score - a.score || b.lv - a.lv);
                                 const rank = i + 1;
-                                // 名次圓顏色：同色系深色
-                                const rankBgColors = ['#059669','#2563eb','#dc2626','#16a34a','#7c3aed','#ea580c'];
-                                const rankBg = isMyTeam ? '#059669' : rankBgColors[i % rankBgColors.length];
+                                // 名次圓：同色系深色，對應 teamRankColors
+                                const rankBg = teamRankColors[i % teamRankColors.length];
                                 // 第一名以外顯示追趕文字
                                 const firstTotal = leaderboard[0]?.total || 0;
                                 const gap = firstTotal - team.total;
