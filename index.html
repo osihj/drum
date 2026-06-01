@@ -2100,7 +2100,7 @@
                                         {/* 隱形兩欄：左欄（日期＋笑臉＋行程badge）、右欄（四個打卡badge等寬兩行） */}
                                         <div className="flex items-center gap-2">
                                             {/* 左欄：固定寬，放日期＋笑臉＋行程 */}
-                                            <div className="flex-shrink-0" style={{width:'130px'}}>
+                                            <div className="flex-shrink-0" style={{width:'127px'}}>
                                                 <div className="flex items-center gap-1.5">
                                                     <div className="flex flex-col flex-shrink-0" style={{minWidth:'32px'}}>
                                                         <span className="sans-font text-xs" style={{color:'var(--c-text)', fontWeight:'600'}}>{date.getMonth() + 1}/{date.getDate()}</span>
@@ -2126,7 +2126,7 @@
                                             {/* 右欄：四個badge等寬，固定兩行 */}
                                             {hasActivity && (
                                                 <div className="flex flex-col gap-1" style={{flex:1}}>
-                                                    <div className="flex gap-1">
+                                                    <div className="flex" style={{gap:"3px"}}>
                                                         <span className="py-0.5 r-badge text-[9px] sans-font" style={{flex:1, textAlign:'center', background: data.practice > 0 ? '#ffd43b' : 'transparent', color: data.practice > 0 ? '#6b4f00' : 'transparent'}}>
                                                             {data.practice > 0 ? `練功 ${data.practice}次` : '\u00a0'}
                                                         </span>
@@ -2134,7 +2134,7 @@
                                                             {data.fiveMin > 0 ? `五分鐘 ${data.fiveMin}次` : '\u00a0'}
                                                         </span>
                                                     </div>
-                                                    <div className="flex gap-1">
+                                                    <div className="flex" style={{gap:"3px"}}>
                                                         <span className="py-0.5 r-badge text-[9px] sans-font" style={{flex:1, textAlign:'center', background: exerTime > 0 ? '#fed7aa' : 'transparent', color: exerTime > 0 ? '#7c2d12' : 'transparent'}}>
                                                             {exerTime > 0 ? `運動 ${exerTime}m` : '\u00a0'}
                                                         </span>
