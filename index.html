@@ -577,7 +577,7 @@
                                                 name: userData.displayName || userData.email,
                                                 teamId: userData.teamId,
                                                 teamName: teams[userData.teamId]?.name || '',
-                                                score, lv, activeDays
+                                                score, lv, activeDays, logs
                                             };
                                             teams[userData.teamId].members.push(member);
                                             membersFlat.push(member);
@@ -595,7 +595,7 @@
                         }).sort((a, b) => b.total - a.total);
 
                         setLeaderboard(result);
-                        setAllMembers(membersFlat.sort((a, b) => b.score - a.score || b.lv - a.lv));
+                        setAllMembers(membersFlat.sort((a, b) => b.lv - a.lv || b.score - a.score));
                         setLoading(false);
                     });
                 return () => unsubTeams();
@@ -700,26 +700,51 @@
                         <div className="space-y-2">
                             {allMembers.length === 0 && <div className="text-center py-12 opacity-30 sans-font text-sm">還沒有成員資料</div>}
                             {(() => {
-                                // 將成員依 (lv, score) 分組，相同的放在同一區塊
+                                // 週視圖：計算本週日期範圍
+                                const nowLb = new Date();
+                                const sundayLb = new Date(nowLb);
+                                sundayLb.setDate(nowLb.getDate() - nowLb.getDay());
+                                sundayLb.setHours(0,0,0,0);
+                                const weekDatesLb = Array.from({length:7}, (_,i) => {
+                                    const d = new Date(sundayLb);
+                                    d.setDate(sundayLb.getDate() + i);
+                                    return d;
+                                });
+                                // 強度計算（同修煉足跡邏輯）
+                                const getWeekIntensity = (logs) => {
+                                    return weekDatesLb.map(d => {
+                                        const key = formatDateKey(d);
+                                        const v = logs[key] || {};
+                                        const prac = v.practice||0, five = v.fiveMin||0;
+                                        const exer = v.exerciseTime||0, stre = v.stretchTime||0;
+                                        const bothTwo = prac >= 2 && five >= 2;
+                                        const hasAnyMove = exer > 0 || stre > 0;
+                                        const hasBothMove = exer > 0 && stre > 0;
+                                        const hasAny = prac > 0 || five > 0 || exer > 0 || stre > 0;
+                                        if (bothTwo && hasBothMove) return 3;
+                                        if (bothTwo && hasAnyMove) return 3;
+                                        if (bothTwo) return 2;
+                                        if ((prac >= 2 || five >= 2) && hasAnyMove) return 2;
+                                        if (hasAny) return 1;
+                                        return 0;
+                                    });
+                                };
+                                const heatBg   = ['#f3f4f6','#dcfce7','#bbf7d0','#4ade80'];
+                                const heatText = ['#d1d5db','#166534','#166534','#ffffff'];
+
+                                // 依等級分組，同等級放同一區塊，組內再依點數排序
                                 const groups = [];
-                                let rank = 1;
                                 allMembers.forEach((m, i) => {
-                                    if (i === 0 || allMembers[i-1].score !== m.score) {
-                                        // 新的一組，排名 = 前一組排名 + 1（密集排名，並列不佔名次）
-                                        rank = groups.length + 1;
-                                        groups.push({ rank, members: [m] });
+                                    if (i === 0 || allMembers[i-1].lv !== m.lv) {
+                                        groups.push({ rank: groups.length + 1, lv: m.lv, members: [m] });
                                     } else {
-                                        // 同分同級，加入前一組
                                         groups[groups.length - 1].members.push(m);
                                     }
                                 });
-                                return groups.map(({ rank, members }) => {
-                                    const isTied = members.length > 1;
-                                    const sampleMember = members[0];
-                                    const teamIdx = leaderboard.findIndex(t => t.id === sampleMember.teamId);
-                                    const sampleAccent = teamAccentColors[teamIdx >= 0 ? teamIdx % teamAccentColors.length : 0];
+
+                                return groups.map(({ rank, lv, members }) => {
                                     const hasMe = members.some(m => m.uid === currentUser?.uid);
-                                return (
+                                    return (
                                         <div key={`rank-${rank}`}
                                             style={{
                                                 background: '#fff',
@@ -734,59 +759,76 @@
                                                 const isMe = m.uid === currentUser?.uid;
                                                 const mTeamIdx = leaderboard.findIndex(t => t.id === m.teamId);
                                                 const accentColor = teamAccentColors[mTeamIdx >= 0 ? mTeamIdx % teamAccentColors.length : 0];
-                                                // 固定顏色：1紅 2黃 3藍，4名以後統一深灰
                                                 const rankCircleStyle = rank === 1
-                                                    ? { bg: '#ff8787', color: 'white', shadow: 'none' }
+                                                    ? { bg: '#ff8787', color: 'white' }
                                                     : rank === 2
-                                                    ? { bg: '#ffd43b', color: 'white', shadow: 'none' }
+                                                    ? { bg: '#ffd43b', color: 'white' }
                                                     : rank === 3
-                                                    ? { bg: '#74c0fc', color: 'white', shadow: 'none' }
-                                                    : { bg: '#e5e7eb', color: '#6b7280', shadow: 'none' };
+                                                    ? { bg: '#74c0fc', color: 'white' }
+                                                    : { bg: '#e5e7eb', color: '#6b7280' };
+                                                const weekIntensity = getWeekIntensity(m.logs || {});
                                                 return (
                                                     <div key={m.uid}
                                                         style={{
-                                                            display:'flex', alignItems:'center', gap:'12px',
-                                                            padding:'12px 16px',
+                                                            display:'flex', alignItems:'center', gap:'10px',
+                                                            padding:'10px 14px',
                                                             borderTop: mi > 0 ? '1px solid #f3f4f6' : 'none',
                                                             background: isMe ? 'rgba(116,192,252,0.10)' : 'transparent',
                                                         }}>
-                                                        {/* 排名數字 — 只有每組第一行顯示，其餘顯示空白佔位 */}
+                                                        {/* 排名圓圈 — 每組第一行顯示，其餘空白佔位 */}
                                                         <div style={{display:'flex', alignItems:'center', justifyContent:'center',
-                                                            width:'32px', height:'32px',
+                                                            width:'30px', height:'30px', flexShrink:0,
                                                             background: mi === 0 ? rankCircleStyle.bg : 'transparent',
-                                                            boxShadow: mi === 0 ? rankCircleStyle.shadow : 'none',
-                                                            borderRadius:'50%', flexShrink:0}}>
+                                                            borderRadius:'50%'}}>
                                                             {mi === 0 && (
-                                                                <span className="sans-font" style={{fontSize:'15px', fontWeight:'700', color: rankCircleStyle.color}}>{rank}</span>
+                                                                <span className="sans-font" style={{fontSize:'14px', fontWeight:'700', color: rankCircleStyle.color}}>{rank}</span>
                                                             )}
                                                         </div>
-                                                        {/* Name + team badge */}
+                                                        {/* 左側：名字 + 陣營 + 週格子 */}
                                                         <div style={{flex:1, minWidth:0}}>
-                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                            <div style={{display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap', marginBottom:'5px'}}>
                                                                 <span className="sans-font text-sm" style={{color: isMe ? 'var(--c-primary-text)' : '#1f2937', fontWeight: isMe ? '700' : '400'}}>{m.name}</span>
                                                                 {isMe && (
-                                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#f6c442" stroke="#d49a00" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>                                                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="#f6c442" stroke="#d49a00" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+                                                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
                                                                     </svg>
                                                                 )}
-                                                                <span className="sans-font" style={{fontSize:'9px', padding:'1px 7px', borderRadius:'99px', background:`${accentColor}28`, color: accentColor === '#ffd43b' ? '#6b4f00' : '#374151', border:`1px solid ${accentColor}60`}}>
+                                                                <span className="sans-font" style={{fontSize:'9px', padding:'1px 6px', borderRadius:'99px', background:`${accentColor}28`, color: accentColor === '#ffd43b' ? '#6b4f00' : '#374151', border:`1px solid ${accentColor}60`}}>
                                                                     {m.teamName}
                                                                 </span>
                                                             </div>
-                                                            <div style={{marginTop:'5px', display:'flex', alignItems:'center', gap:'6px'}}>
-                                                                <div style={{flex:1, height:'4px', background:'#f3f4f6', borderRadius:'2px', overflow:'hidden'}}>
-                                                                    <div style={{height:'100%', width:`${Math.min(100, Math.round(m.activeDays/30*100))}%`, background: accentColor, borderRadius:'2px'}}></div>
+                                                            {/* 週打卡格子 */}
+                                                            <div style={{display:'flex', gap:'2px', alignItems:'center'}}>
+                                                                {weekDatesLb.map((d, di) => {
+                                                                    const isFuture = d > nowLb;
+                                                                    const isToday = d.toDateString() === nowLb.toDateString();
+                                                                    const lvCell = isFuture ? -1 : weekIntensity[di];
+                                                                    const bg = lvCell === -1 ? '#f9fafb' : heatBg[lvCell];
+                                                                    const tc = lvCell === -1 ? '#e5e7eb' : heatText[lvCell];
+                                                                    return (
+                                                                        <div key={di} style={{
+                                                                            width:'22px', height:'20px', borderRadius:'4px',
+                                                                            background: bg, color: tc,
+                                                                            display:'flex', alignItems:'center', justifyContent:'center',
+                                                                            fontSize:'10px', fontWeight:'700',
+                                                                            fontFamily:"'Noto Sans TC',sans-serif",
+                                                                            outline: isToday ? '2px solid #16a34a' : 'none',
+                                                                            outlineOffset:'-1px', flexShrink:0,
+                                                                        }}>{d.getDate()}</div>
+                                                                    );
+                                                                })}
+                                                                {/* 圖例色塊 */}
+                                                                <div style={{display:'flex', gap:'2px', marginLeft:'4px'}}>
+                                                                    {['#f3f4f6','#dcfce7','#bbf7d0','#4ade80'].map((c,ci) => (
+                                                                        <div key={ci} style={{width:'6px', height:'6px', borderRadius:'2px', background:c, border: ci===0 ? '0.5px solid #e5e7eb' : 'none'}}></div>
+                                                                    ))}
                                                                 </div>
-                                                                <span className="sans-font" style={{fontSize:'9px', color:'#9ca3af', flexShrink:0}}>活躍 {m.activeDays} 天</span>
                                                             </div>
                                                         </div>
-                                                        {/* 等級分數 — 只有每組第一行顯示 */}
-                                                        <div style={{flexShrink:0, textAlign:'right', minWidth:'48px'}}>
-                                                            {mi === 0 && (
-                                                                <>
-                                                                    <div className="sans-font" style={{fontSize:'15px', fontWeight:'500', color:'#1f2937'}}>Lv.{m.lv}</div>
-                                                                    <div className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>{m.score} 點</div>
-                                                                </>
-                                                            )}
+                                                        {/* 右側：Lv + 點數（每人都顯示） */}
+                                                        <div style={{flexShrink:0, textAlign:'right', minWidth:'46px'}}>
+                                                            <div className="sans-font" style={{fontSize:'14px', fontWeight:'500', color:'#1f2937'}}>Lv.{m.lv}</div>
+                                                            <div className="sans-font" style={{fontSize:'10px', color:'#9ca3af'}}>{m.score} 點</div>
                                                         </div>
                                                     </div>
                                                 );
