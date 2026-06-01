@@ -2123,22 +2123,22 @@
                                                     ))}
                                                 </div>
                                             </div>
-                                            {/* 右欄：四個badge等寬，固定兩行 */}
+                                            {/* 右欄：四個badge固定寬度，兩行排列，不撐滿 */}
                                             {hasActivity && (
-                                                <div className="flex flex-col gap-1" style={{flex:1}}>
+                                                <div className="flex flex-col gap-1">
                                                     <div className="flex" style={{gap:"3px"}}>
-                                                        <span className="py-0.5 r-badge text-[9px] sans-font" style={{flex:1, textAlign:'center', background: data.practice > 0 ? '#ffd43b' : 'transparent', color: data.practice > 0 ? '#6b4f00' : 'transparent'}}>
+                                                        <span className="py-0.5 r-badge text-[9px] sans-font" style={{width:'56px', textAlign:'center', background: data.practice > 0 ? '#ffd43b' : 'transparent', color: data.practice > 0 ? '#6b4f00' : 'transparent'}}>
                                                             {data.practice > 0 ? `練功 ${data.practice}次` : '\u00a0'}
                                                         </span>
-                                                        <span className="py-0.5 r-badge text-[9px] sans-font" style={{flex:1, textAlign:'center', background: data.fiveMin > 0 ? '#bae6fd' : 'transparent', color: data.fiveMin > 0 ? '#0c4a6e' : 'transparent'}}>
+                                                        <span className="py-0.5 r-badge text-[9px] sans-font" style={{width:'56px', textAlign:'center', background: data.fiveMin > 0 ? '#bae6fd' : 'transparent', color: data.fiveMin > 0 ? '#0c4a6e' : 'transparent'}}>
                                                             {data.fiveMin > 0 ? `五分鐘 ${data.fiveMin}次` : '\u00a0'}
                                                         </span>
                                                     </div>
                                                     <div className="flex" style={{gap:"3px"}}>
-                                                        <span className="py-0.5 r-badge text-[9px] sans-font" style={{flex:1, textAlign:'center', background: exerTime > 0 ? '#fed7aa' : 'transparent', color: exerTime > 0 ? '#7c2d12' : 'transparent'}}>
+                                                        <span className="py-0.5 r-badge text-[9px] sans-font" style={{width:'56px', textAlign:'center', background: exerTime > 0 ? '#fed7aa' : 'transparent', color: exerTime > 0 ? '#7c2d12' : 'transparent'}}>
                                                             {exerTime > 0 ? `運動 ${exerTime}m` : '\u00a0'}
                                                         </span>
-                                                        <span className="py-0.5 r-badge text-[9px] sans-font" style={{flex:1, textAlign:'center', background: streTime > 0 ? '#a7f3d0' : 'transparent', color: streTime > 0 ? '#064e3b' : 'transparent'}}>
+                                                        <span className="py-0.5 r-badge text-[9px] sans-font" style={{width:'56px', textAlign:'center', background: streTime > 0 ? '#a7f3d0' : 'transparent', color: streTime > 0 ? '#064e3b' : 'transparent'}}>
                                                             {streTime > 0 ? `拉筋 ${streTime}m` : '\u00a0'}
                                                         </span>
                                                     </div>
