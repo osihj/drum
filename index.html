@@ -650,6 +650,13 @@
                                 const headerBg = isMyTeam ? '#d1fae5' : teamBgColors[i % teamBgColors.length];
                                 const visibleMembers = team.members
                                     .sort((a,b) => b.score - a.score || b.lv - a.lv);
+                                const rank = i + 1;
+                                // 名次圓顏色：同色系深色
+                                const rankBgColors = ['#059669','#2563eb','#dc2626','#16a34a','#7c3aed','#ea580c'];
+                                const rankBg = isMyTeam ? '#059669' : rankBgColors[i % rankBgColors.length];
+                                // 第一名以外顯示追趕文字
+                                const firstTotal = leaderboard[0]?.total || 0;
+                                const gap = firstTotal - team.total;
                                 return (
                                     <div key={team.id} className="rounded-[1.5rem] overflow-hidden"
                                         style={{border:`1.5px solid ${accentColor}`, background:'#ffffff'}}>
@@ -657,6 +664,13 @@
                                         <div className="flex items-center justify-between"
                                             style={{background: headerBg, padding:'12px 16px'}}>
                                             <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                {/* 名次圓圈 */}
+                                                <div className="sans-font flex-shrink-0" style={{
+                                                    width:'26px', height:'26px', borderRadius:'50%',
+                                                    background: rankBg, color:'#ffffff',
+                                                    display:'flex', alignItems:'center', justifyContent:'center',
+                                                    fontSize:'13px', fontWeight:'700'
+                                                }}>{rank}</div>
                                                 <p className="sans-font text-base truncate" style={{color:'#374151'}}>{team.name}</p>
                                                 {isMyTeam && <span className="text-[10px] px-2 py-0.5 rounded-full sans-font flex-shrink-0" style={{background:'#74d99f', color:'#0a4a2a'}}>我的陣營</span>}
                                             </div>
@@ -671,14 +685,19 @@
                                                     <div className="sans-font text-lg" style={{lineHeight:'1.2', color:'#374151'}}>{team.avg}</div>
                                                     <div className="sans-font" style={{fontSize:'9px', color:'#9ca3af'}}>均值</div>
                                                 </div>
-
                                             </div>
                                         </div>
                                         {/* White body — members list */}
                                         {visibleMembers.length > 0 && (
                                             <div style={{padding:'8px 16px 12px'}}>
+                                                {/* 追趕文字（非第一名才顯示） */}
+                                                {rank > 1 && gap > 0 && (
+                                                    <div className="sans-font" style={{fontSize:'11px', color:'#9ca3af', marginBottom:'8px'}}>
+                                                        再拿 <span style={{color:'#374151', fontWeight:'700'}}>{gap} 點</span>就突破
+                                                    </div>
+                                                )}
                                                 {visibleMembers.map((m, mi) => (
-                                                    <div key={m.uid} className="flex items-center justify-between" style={{padding:'5px 0'}}>
+                                                    <div key={m.uid} className="flex items-center justify-between" style={{padding:'5px 0', borderTop: mi > 0 ? '1px solid #f9fafb' : 'none'}}>
                                                         <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
                                                             <span className="sans-font" style={{fontSize:'11px', color:'#d1d5db', width:'14px'}}>{mi+1}</span>
                                                             <span className="sans-font text-sm" style={{color:'#374151'}}>{m.name}</span>
