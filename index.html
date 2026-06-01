@@ -604,7 +604,8 @@
             // 練功黃、五分鐘藍、運動橙、拉筋綠 — 對應修煉室色系
             const teamAccentColors = ['#ffd43b','#38bdf8','#ff922b','#34d399'];
             const teamBgColors     = ['#fef9c3','#e0f7fe','#fff3e0','#d1fae5'];
-            const teamRankColors   = ['#ca8a04','#0284c7','#c2410c','#059669'];
+            const teamRankColors   = ['#ffd43b','#38bdf8','#ff922b','#34d399'];
+            const teamRankTextColors = ['#6b4f00','#0c4a6e','#7c2d12','#064e3b'];
 
 
 
@@ -647,6 +648,7 @@
                                 const rank = i + 1;
                                 // 名次圓：同色系深色，對應 teamRankColors
                                 const rankBg = teamRankColors[i % teamRankColors.length];
+                                const rankText = teamRankTextColors[i % teamRankTextColors.length];
                                 // 第一名以外顯示追趕文字
                                 const firstTotal = leaderboard[0]?.total || 0;
                                 const gap = firstTotal - team.total;
@@ -660,7 +662,7 @@
                                                 {/* 名次圓圈 */}
                                                 <div className="sans-font flex-shrink-0" style={{
                                                     width:'26px', height:'26px', borderRadius:'50%',
-                                                    background: rankBg, color:'#ffffff',
+                                                    background: rankBg, color: rankText,
                                                     display:'flex', alignItems:'center', justifyContent:'center',
                                                     fontSize:'13px', fontWeight:'700'
                                                 }}>{rank}</div>
