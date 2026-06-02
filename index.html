@@ -3600,97 +3600,142 @@
 
                                         {/* 打卡明細展開區 */}
                                         {isOpen && (
-                                            <div style={{borderTop:'1px solid var(--c-border)', background:'#f8fafc', padding:'12px 16px'}}>
-                                                {/* 標頭：天數 + 累積分數 */}
-                                                <div className="flex items-center justify-between mb-3">
-                                                    {auditLoading ? (
-                                                        <p className="sans-font text-xs" style={{color:'var(--c-muted)'}}>載入中...</p>
-                                                    ) : (
-                                                        <p className="sans-font text-xs" style={{color:'var(--c-muted)'}}>
-                                                            共 <span style={{color:'var(--c-text)', fontWeight:'700'}}>{auditLogs.length}</span> 天打卡紀錄
-                                                        </p>
-                                                    )}
-                                                    {!auditLoading && auditLogs.length > 0 && (() => {
-                                                        let activeDays = 0, exMins = 0, stretchMins = 0, pracCount = 0;
-                                                        auditLogs.forEach(log => {
-                                                            const p = log.practice||0, e = log.exerciseTime||0, s = log.stretchTime||0, f = log.fiveMin||0;
-                                                            if ((p+e+s+f) > 0) activeDays++;
-                                                            exMins += e; stretchMins += s; pracCount += p;
-                                                        });
-                                                        const totalScore = Math.round((activeDays*10) + (exMins+stretchMins)/60 + (pracCount*5));
-                                                        const lv = (() => {
-                                                            const thresholds = [{score:0,base:1},{score:50,base:10},{score:300,base:20},{score:1500,base:30},{score:5000,base:50},{score:15000,base:70},{score:40000,base:90}];
-                                                            if (!totalScore || totalScore <= 0) return 1;
-                                                            let tier = thresholds[0];
-                                                            for (const t of thresholds) { if (totalScore >= t.score) tier = t; else break; }
-                                                            const idx = thresholds.indexOf(tier);
-                                                            const next = thresholds[idx+1];
-                                                            if (!next) return Math.min(99, 90 + Math.floor((totalScore - 40000) / 500));
-                                                            return tier.base + Math.floor(((totalScore - tier.score) / (next.score - tier.score)) * (next.base - tier.base));
-                                                        })();
-                                                        return (
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="sans-font text-[10px] px-2 py-0.5 r-badge"
-                                                                    style={{background:'#e0f2fe', color:'var(--c-primary-text)', border:'1px solid #74c0fc'}}>
-                                                                    累積 {totalScore} 分
-                                                                </span>
-                                                                <span className="sans-font text-[10px] px-2 py-0.5 r-badge"
-                                                                    style={{background:'#dcfce7', color:'#166534', border:'1px solid #86efac'}}>
-                                                                    Lv.{lv}
-                                                                </span>
-                                                            </div>
-                                                        );
-                                                    })()}
-                                                </div>
-
-                                                {/* 無紀錄 */}
-                                                {!auditLoading && auditLogs.length === 0 && (
-                                                    <p className="sans-font text-xs text-center py-4" style={{color:'var(--c-muted)'}}>此成員尚無任何打卡紀錄</p>
+                                            <div style={{borderTop:'1px solid var(--c-border)', background:'#f8fafc', padding:'16px'}}>
+                                                {auditLoading && (
+                                                    <p className="sans-font text-xs text-center py-4" style={{color:'var(--c-muted)'}}>載入中...</p>
                                                 )}
 
-                                                {/* 每日紀錄列表 */}
-                                                {!auditLoading && auditLogs.map((log, li) => {
-                                                    const contrib = ((log.practice||0)*5) + ((log.exerciseTime||0)+(log.stretchTime||0))/60;
-                                                    const isDel = deletingDate === log.date;
+                                                {!auditLoading && (() => {
+                                                    let activeDays = 0, exMins = 0, stretchMins = 0, pracCount = 0;
+                                                    auditLogs.forEach(log => {
+                                                        const p = log.practice||0, e = log.exerciseTime||0, s = log.stretchTime||0, f = log.fiveMin||0;
+                                                        if ((p+e+s+f) > 0) activeDays++;
+                                                        exMins += e; stretchMins += s; pracCount += p;
+                                                    });
+                                                    const totalScore = Math.round((activeDays*10) + (exMins+stretchMins)/60 + (pracCount*5));
+                                                    const totalHours = ((exMins+stretchMins)/60);
+                                                    const lv = (() => {
+                                                        const thresholds = [{score:0,base:1},{score:50,base:10},{score:300,base:20},{score:1500,base:30},{score:5000,base:50},{score:15000,base:70},{score:40000,base:90}];
+                                                        if (!totalScore || totalScore <= 0) return 1;
+                                                        let tier = thresholds[0];
+                                                        for (const t of thresholds) { if (totalScore >= t.score) tier = t; else break; }
+                                                        const idx = thresholds.indexOf(tier);
+                                                        const next = thresholds[idx+1];
+                                                        if (!next) return Math.min(99, 90 + Math.floor((totalScore - 40000) / 500));
+                                                        return tier.base + Math.floor(((totalScore - tier.score) / (next.score - tier.score)) * (next.base - tier.base));
+                                                    })();
                                                     return (
-                                                        <div key={log.date}
-                                                            className="flex items-center gap-2 py-2"
-                                                            style={{
-                                                                borderTop: li > 0 ? '1px solid var(--c-border)' : 'none',
-                                                                opacity: isDel ? 0.35 : 1,
-                                                                transition: 'opacity 0.2s'
-                                                            }}>
-                                                            {/* 日期 */}
-                                                            <span className="sans-font text-xs" style={{color:'var(--c-text)', minWidth:'84px', flexShrink:0, fontWeight:'700'}}>
-                                                                {log.date}
-                                                            </span>
-                                                            {/* 數值 */}
-                                                            <span className="sans-font text-[10px]" style={{color:'var(--c-text-sub)', flex:1, lineHeight:'1.6'}}>
-                                                                練習 <b style={{color:'var(--c-text)'}}>{log.practice||0}</b> ·{' '}
-                                                                運動 <b style={{color:'var(--c-text)'}}>{log.exerciseTime||0}</b>分 ·{' '}
-                                                                伸展 <b style={{color:'var(--c-text)'}}>{log.stretchTime||0}</b>分 ·{' '}
-                                                                五分鐘 <b style={{color:'var(--c-text)'}}>{log.fiveMin||0}</b>
-                                                            </span>
-                                                            {/* 貢獻分 */}
-                                                            <span className="sans-font text-[10px]" style={{color:'#d97706', fontWeight:'700', minWidth:'42px', textAlign:'right', flexShrink:0}}>
-                                                                +{contrib.toFixed(1)}分
-                                                            </span>
-                                                            {/* 刪除按鈕 */}
-                                                            <button
-                                                                onClick={() => deleteOneLog(u.uid, log.date)}
-                                                                disabled={isDel}
-                                                                className="px-2 py-0.5 r-badge sans-font text-[10px] active-press flex-shrink-0"
-                                                                style={{
-                                                                    background:'var(--c-danger-bg)',
-                                                                    border:'1px solid var(--c-danger)',
-                                                                    color:'var(--c-danger-text)',
-                                                                    minWidth:'44px', textAlign:'center'
-                                                                }}>
-                                                                {isDel ? '刪除中' : '刪除'}
-                                                            </button>
-                                                        </div>
+                                                        <>
+                                                            {/* 標題列 */}
+                                                            <div className="flex items-center justify-between mb-3">
+                                                                <p className="sans-font text-xs" style={{color:'var(--c-text)', fontWeight:'700'}}>分數來源稽核</p>
+                                                                <p className="sans-font text-[10px]" style={{color:'var(--c-muted)'}}>全時間累積</p>
+                                                            </div>
+
+                                                            {/* 分數 chips */}
+                                                            {auditLogs.length > 0 && (
+                                                                <div className="flex flex-wrap gap-2 mb-4">
+                                                                    <span className="sans-font text-[10px] px-2 py-1 r-badge"
+                                                                        style={{background:'#e0f2fe', color:'var(--c-primary-text)', border:'1px solid #74c0fc'}}>
+                                                                        活躍天 {activeDays} × 10 = <b>{activeDays*10} 分</b>
+                                                                    </span>
+                                                                    <span className="sans-font text-[10px] px-2 py-1 r-badge"
+                                                                        style={{background:'#f0fdf4', color:'#166534', border:'1px solid #86efac'}}>
+                                                                        運動時數 {totalHours.toFixed(1)}h = <b>{totalHours.toFixed(1)} 分</b>
+                                                                    </span>
+                                                                    <span className="sans-font text-[10px] px-2 py-1 r-badge"
+                                                                        style={{background:'#fef9c3', color:'#92400e', border:'1px solid #fde68a'}}>
+                                                                        練功 {pracCount} 次 × 5 = <b>{pracCount*5} 分</b>
+                                                                    </span>
+                                                                    <span className="sans-font text-[10px] px-2 py-1 r-badge"
+                                                                        style={{background:'#dcfce7', color:'#166534', border:'1px solid #86efac', fontWeight:'700'}}>
+                                                                        總計 {totalScore} 分 → Lv.{lv} ✓
+                                                                    </span>
+                                                                </div>
+                                                            )}
+
+                                                            {/* 無紀錄 */}
+                                                            {auditLogs.length === 0 && (
+                                                                <p className="sans-font text-xs text-center py-4" style={{color:'var(--c-muted)'}}>此成員尚無任何打卡紀錄</p>
+                                                            )}
+
+                                                            {/* 表格欄頭 */}
+                                                            {auditLogs.length > 0 && (
+                                                                <div className="flex items-center gap-2 pb-1 mb-1"
+                                                                    style={{borderBottom:'1.5px solid var(--c-border-strong)'}}>
+                                                                    <span className="sans-font text-[10px]" style={{color:'var(--c-muted)', minWidth:'84px', flexShrink:0}}>日期</span>
+                                                                    <span className="sans-font text-[10px]" style={{color:'var(--c-muted)', flex:1}}>練功</span>
+                                                                    <span className="sans-font text-[10px]" style={{color:'var(--c-muted)', flex:1}}>運動(分)</span>
+                                                                    <span className="sans-font text-[10px]" style={{color:'var(--c-muted)', flex:1}}>伸展(分)</span>
+                                                                    <span className="sans-font text-[10px]" style={{color:'var(--c-muted)', flex:1}}>五分鐘</span>
+                                                                    <span className="sans-font text-[10px]" style={{color:'var(--c-muted)', minWidth:'42px', textAlign:'right', flexShrink:0}}>得分</span>
+                                                                    <span style={{minWidth:'44px'}}></span>
+                                                                </div>
+                                                            )}
+
+                                                            {/* 每日紀錄列 */}
+                                                            {auditLogs.map((log, li) => {
+                                                                const contrib = ((log.practice||0)*5) + ((log.exerciseTime||0)+(log.stretchTime||0))/60;
+                                                                const isDel = deletingDate === log.date;
+                                                                const isHighlight = (log.practice||0) >= 3 || (log.exerciseTime||0) >= 30 || (log.stretchTime||0) >= 30;
+                                                                return (
+                                                                    <div key={log.date}
+                                                                        className="flex items-center gap-2 py-2"
+                                                                        style={{
+                                                                            borderBottom: li < auditLogs.length-1 ? '1px solid var(--c-border)' : 'none',
+                                                                            background: isHighlight ? '#fffbeb' : 'transparent',
+                                                                            borderRadius:'6px',
+                                                                            opacity: isDel ? 0.3 : 1,
+                                                                            transition: 'opacity 0.2s',
+                                                                            padding: isHighlight ? '8px 6px' : '8px 0',
+                                                                        }}>
+                                                                        <span className="sans-font text-xs" style={{color:'var(--c-text)', minWidth:'84px', flexShrink:0, fontWeight:'700'}}>
+                                                                            {log.date.slice(5).replace('-','/')}
+                                                                        </span>
+                                                                        <span className="sans-font text-xs" style={{flex:1, color: isHighlight ? '#d97706' : 'var(--c-text)', fontWeight: isHighlight ? '700' : '400'}}>
+                                                                            {log.practice||0}
+                                                                        </span>
+                                                                        <span className="sans-font text-xs" style={{flex:1, color: isHighlight ? '#d97706' : 'var(--c-text)', fontWeight: isHighlight ? '700' : '400'}}>
+                                                                            {log.exerciseTime||0}
+                                                                        </span>
+                                                                        <span className="sans-font text-xs" style={{flex:1, color: isHighlight ? '#d97706' : 'var(--c-text)', fontWeight: isHighlight ? '700' : '400'}}>
+                                                                            {log.stretchTime||0}
+                                                                        </span>
+                                                                        <span className="sans-font text-xs" style={{flex:1, color:'var(--c-text)'}}>
+                                                                            {log.fiveMin||0}
+                                                                        </span>
+                                                                        <span className="sans-font text-[10px]" style={{color:'#d97706', fontWeight:'700', minWidth:'42px', textAlign:'right', flexShrink:0}}>
+                                                                            +{contrib.toFixed(1)}
+                                                                        </span>
+                                                                        <button
+                                                                            onClick={() => deleteOneLog(u.uid, log.date)}
+                                                                            disabled={isDel}
+                                                                            className="px-2 py-0.5 r-badge sans-font text-[10px] active-press flex-shrink-0"
+                                                                            style={{
+                                                                                background:'var(--c-danger-bg)',
+                                                                                border:'1px solid var(--c-danger)',
+                                                                                color:'var(--c-danger-text)',
+                                                                                minWidth:'44px', textAlign:'center'
+                                                                            }}>
+                                                                            {isDel ? '刪除中' : '刪除'}
+                                                                        </button>
+                                                                    </div>
+                                                                );
+                                                            })}
+
+                                                            {/* 說明框 */}
+                                                            {auditLogs.length > 0 && (
+                                                                <div className="mt-4 p-3 r-btn flex items-start gap-2"
+                                                                    style={{background:'#fffbeb', border:'1px solid #fde68a'}}>
+                                                                    <span style={{color:'#d97706', fontSize:'13px', flexShrink:0}}>ⓘ</span>
+                                                                    <p className="sans-font text-[10px]" style={{color:'#92400e', lineHeight:'1.6'}}>
+                                                                        等級計算正常，分數來源可追溯。若懷疑資料不實，可由管理員刪除特定日期的紀錄，等級將自動重算。
+                                                                    </p>
+                                                                </div>
+                                                            )}
+                                                        </>
                                                     );
-                                                })}
+                                                })()}
                                             </div>
                                         )}
                                     </div>
