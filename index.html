@@ -3661,15 +3661,15 @@
 
                                                             {/* 表格欄頭 */}
                                                             {auditLogs.length > 0 && (
-                                                                <div className="flex items-center gap-2 pb-1 mb-1"
+                                                                <div className="flex items-center pb-2 mb-1"
                                                                     style={{borderBottom:'1.5px solid var(--c-border-strong)'}}>
-                                                                    <span className="sans-font text-[10px]" style={{color:'var(--c-muted)', minWidth:'84px', flexShrink:0}}>日期</span>
-                                                                    <span className="sans-font text-[10px]" style={{color:'var(--c-muted)', flex:1}}>練功</span>
-                                                                    <span className="sans-font text-[10px]" style={{color:'var(--c-muted)', flex:1}}>運動(分)</span>
-                                                                    <span className="sans-font text-[10px]" style={{color:'var(--c-muted)', flex:1}}>伸展(分)</span>
-                                                                    <span className="sans-font text-[10px]" style={{color:'var(--c-muted)', flex:1}}>五分鐘</span>
-                                                                    <span className="sans-font text-[10px]" style={{color:'var(--c-muted)', minWidth:'42px', textAlign:'right', flexShrink:0}}>得分</span>
-                                                                    <span style={{minWidth:'44px'}}></span>
+                                                                    <span className="sans-font text-[10px]" style={{color:'var(--c-muted)', width:'60px', flexShrink:0}}>日期</span>
+                                                                    <span className="sans-font text-[10px]" style={{color:'var(--c-muted)', flex:1, textAlign:'center'}}>練功<br/>/次</span>
+                                                                    <span className="sans-font text-[10px]" style={{color:'var(--c-muted)', flex:1, textAlign:'center'}}>五分鐘<br/>/次</span>
+                                                                    <span className="sans-font text-[10px]" style={{color:'var(--c-muted)', flex:1, textAlign:'center'}}>運動<br/>/m</span>
+                                                                    <span className="sans-font text-[10px]" style={{color:'var(--c-muted)', flex:1, textAlign:'center'}}>拉筋<br/>/m</span>
+                                                                    <span className="sans-font text-[10px]" style={{color:'var(--c-muted)', width:'42px', textAlign:'center', flexShrink:0}}>得分</span>
+                                                                    <span style={{width:'50px', flexShrink:0}}></span>
                                                                 </div>
                                                             )}
 
@@ -3677,34 +3677,30 @@
                                                             {auditLogs.map((log, li) => {
                                                                 const contrib = ((log.practice||0)*5) + ((log.exerciseTime||0)+(log.stretchTime||0))/60;
                                                                 const isDel = deletingDate === log.date;
-                                                                const isHighlight = (log.practice||0) >= 3 || (log.exerciseTime||0) >= 30 || (log.stretchTime||0) >= 30;
                                                                 return (
                                                                     <div key={log.date}
-                                                                        className="flex items-center gap-2 py-2"
+                                                                        className="flex items-center py-2"
                                                                         style={{
                                                                             borderBottom: li < auditLogs.length-1 ? '1px solid var(--c-border)' : 'none',
-                                                                            background: isHighlight ? '#fffbeb' : 'transparent',
-                                                                            borderRadius:'6px',
                                                                             opacity: isDel ? 0.3 : 1,
                                                                             transition: 'opacity 0.2s',
-                                                                            padding: isHighlight ? '8px 6px' : '8px 0',
                                                                         }}>
-                                                                        <span className="sans-font text-xs" style={{color:'var(--c-text)', minWidth:'84px', flexShrink:0, fontWeight:'700'}}>
+                                                                        <span className="sans-font text-xs" style={{color:'var(--c-text)', width:'60px', flexShrink:0, fontWeight:'700'}}>
                                                                             {log.date.slice(5).replace('-','/')}
                                                                         </span>
-                                                                        <span className="sans-font text-xs" style={{flex:1, color: isHighlight ? '#d97706' : 'var(--c-text)', fontWeight: isHighlight ? '700' : '400'}}>
+                                                                        <span className="sans-font text-xs" style={{flex:1, color:'var(--c-text)', textAlign:'center'}}>
                                                                             {log.practice||0}
                                                                         </span>
-                                                                        <span className="sans-font text-xs" style={{flex:1, color: isHighlight ? '#d97706' : 'var(--c-text)', fontWeight: isHighlight ? '700' : '400'}}>
-                                                                            {log.exerciseTime||0}
-                                                                        </span>
-                                                                        <span className="sans-font text-xs" style={{flex:1, color: isHighlight ? '#d97706' : 'var(--c-text)', fontWeight: isHighlight ? '700' : '400'}}>
-                                                                            {log.stretchTime||0}
-                                                                        </span>
-                                                                        <span className="sans-font text-xs" style={{flex:1, color:'var(--c-text)'}}>
+                                                                        <span className="sans-font text-xs" style={{flex:1, color:'var(--c-text)', textAlign:'center'}}>
                                                                             {log.fiveMin||0}
                                                                         </span>
-                                                                        <span className="sans-font text-[10px]" style={{color:'#d97706', fontWeight:'700', minWidth:'42px', textAlign:'right', flexShrink:0}}>
+                                                                        <span className="sans-font text-xs" style={{flex:1, color:'var(--c-text)', textAlign:'center'}}>
+                                                                            {log.exerciseTime||0}
+                                                                        </span>
+                                                                        <span className="sans-font text-xs" style={{flex:1, color:'var(--c-text)', textAlign:'center'}}>
+                                                                            {log.stretchTime||0}
+                                                                        </span>
+                                                                        <span className="sans-font text-[10px]" style={{color:'#d97706', fontWeight:'700', width:'42px', textAlign:'center', flexShrink:0}}>
                                                                             +{contrib.toFixed(1)}
                                                                         </span>
                                                                         <button
@@ -3715,7 +3711,7 @@
                                                                                 background:'var(--c-danger-bg)',
                                                                                 border:'1px solid var(--c-danger)',
                                                                                 color:'var(--c-danger-text)',
-                                                                                minWidth:'44px', textAlign:'center'
+                                                                                width:'50px', textAlign:'center'
                                                                             }}>
                                                                             {isDel ? '刪除中' : '刪除'}
                                                                         </button>
