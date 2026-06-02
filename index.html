@@ -3332,7 +3332,7 @@
                         <button onClick={() => { setTab('pizza'); setPizzaLogsLoading(true); db.collection('pizzaLogs').orderBy('createdAt','desc').limit(30).get().then(snap => { const logs = []; snap.forEach(d => logs.push({id:d.id,...d.data()})); setPizzaLogs(logs); setPizzaLogsLoading(false); }); }} className={`flex-1 sans-font text-xs r-btn transition-all ${tab === 'pizza' ? 'pk-yellow' : ''}`}
                             style={{color: tab === 'pizza' ? 'var(--c-accent-text)' : 'var(--c-muted)', padding:'6px 0'}}>🍕 Pizza</button>
                         <button onClick={() => { setTab('audit'); setAuditUser(null); setAuditLogs([]); }} className={`flex-1 sans-font text-xs r-btn transition-all ${tab === 'audit' ? 'pk-green' : ''}`}
-                            style={{color: tab === 'audit' ? '#166534' : 'var(--c-muted)', padding:'6px 0'}}>🔍 稽核</button>
+                            style={{color: tab === 'audit' ? '#166534' : 'var(--c-muted)', padding:'6px 0'}}>打卡稽核</button>
                     </div>
 
                     {/* ── Teams tab ── */}
