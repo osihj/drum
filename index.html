@@ -3331,6 +3331,8 @@
                             style={{color: tab === 'users' ? 'var(--c-primary-text)' : 'var(--c-muted)', padding:'6px 0'}}>成員管理</button>
                         <button onClick={() => { setTab('pizza'); setPizzaLogsLoading(true); db.collection('pizzaLogs').orderBy('createdAt','desc').limit(30).get().then(snap => { const logs = []; snap.forEach(d => logs.push({id:d.id,...d.data()})); setPizzaLogs(logs); setPizzaLogsLoading(false); }); }} className={`flex-1 sans-font text-xs r-btn transition-all ${tab === 'pizza' ? 'pk-yellow' : ''}`}
                             style={{color: tab === 'pizza' ? 'var(--c-accent-text)' : 'var(--c-muted)', padding:'6px 0'}}>🍕 Pizza</button>
+                        <button onClick={() => { setTab('audit'); setAuditUser(null); setAuditLogs([]); }} className={`flex-1 sans-font text-xs r-btn transition-all ${tab === 'audit' ? 'pk-green' : ''}`}
+                            style={{color: tab === 'audit' ? '#166534' : 'var(--c-muted)', padding:'6px 0'}}>🔍 稽核</button>
                     </div>
 
                     {/* ── Teams tab ── */}
@@ -3538,13 +3540,6 @@
                                                 </button>
                                             )}
 
-                                            {/* 查看打卡紀錄 */}
-                                            <button onClick={() => openAudit(u)}
-                                                className="px-3 py-1.5 r-btn text-[10px] sans-font active-press"
-                                                style={{background:'#e0f2fe', border:'1px solid #74c0fc', color:'var(--c-primary-text)'}}>
-                                                {auditUser?.uid === u.uid ? '收起紀錄' : '查看打卡'}
-                                            </button>
-
                                             {/* 啟用/停用 */}
                                             <button onClick={() => toggleActive(u.uid, u.active)}
                                                 className="px-3 py-1.5 r-btn text-[10px] sans-font active-press ml-auto"
@@ -3557,14 +3552,65 @@
                                             </button>
                                         </div>
 
-                                        {/* ── 打卡稽核展開區塊 ── */}
-                                        {auditUser?.uid === u.uid && (
-                                            <div className="mt-3 p-3 r-btn" style={{background:'#f8fafc', border:'1px solid var(--c-border)'}}>
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <p className="sans-font text-xs" style={{color:'var(--c-muted)'}}>
-                                                        打卡紀錄明細（共 {auditLogs.length} 天）
-                                                    </p>
-                                                    {auditLogs.length > 0 && (() => {
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* ── 打卡稽核 tab ── */}
+                    {tab === 'audit' && (
+                        <div className="space-y-3">
+                            <div className="bg-white p-4 r-card card-shadow">
+                                <p className="sans-font text-xs tracking-widest mb-1" style={{color:'var(--c-muted)'}}>選擇成員查看打卡紀錄</p>
+                                <p className="sans-font text-[10px]" style={{color:'var(--c-text-sub)'}}>點選成員可展開每日打卡明細，管理員可刪除指定日期的紀錄，等級將自動重算。</p>
+                            </div>
+
+                            {users.length === 0 && <p className="text-center text-xs sans-font py-4" style={{color:'var(--c-muted)'}}>尚無成員資料</p>}
+
+                            {users.map(u => {
+                                const teamName = teams.find(t => t.id === u.teamId)?.name;
+                                const isOpen = auditUser?.uid === u.uid;
+                                return (
+                                    <div key={u.uid} className="bg-white r-card card-shadow overflow-hidden">
+                                        {/* 成員列 */}
+                                        <div className="flex items-center gap-3 p-4">
+                                            <div className="flex flex-col flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="sans-font text-sm" style={{color:'var(--c-text)'}}>{u.displayName || '（未設定）'}</span>
+                                                    {teamName && (
+                                                        <span className="text-[9px] px-1.5 py-0.5 r-badge sans-font" style={{background:'#e0f2fe', color:'var(--c-primary-text)', border:'1px solid #74c0fc'}}>
+                                                            {teamName}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <span className="sans-font text-[10px] mt-0.5" style={{color:'var(--c-muted)'}}>{u.email || ''}</span>
+                                            </div>
+                                            <button
+                                                onClick={() => openAudit(u)}
+                                                className="px-3 py-1.5 r-btn text-[10px] sans-font active-press flex-shrink-0"
+                                                style={{
+                                                    background: isOpen ? '#dcfce7' : '#f8fafc',
+                                                    border: isOpen ? '1px solid #86efac' : '1px solid var(--c-border)',
+                                                    color: isOpen ? '#166534' : 'var(--c-text-sub)'
+                                                }}>
+                                                {isOpen ? '▲ 收起' : '▼ 查看打卡'}
+                                            </button>
+                                        </div>
+
+                                        {/* 打卡明細展開區 */}
+                                        {isOpen && (
+                                            <div style={{borderTop:'1px solid var(--c-border)', background:'#f8fafc', padding:'12px 16px'}}>
+                                                {/* 標頭：天數 + 累積分數 */}
+                                                <div className="flex items-center justify-between mb-3">
+                                                    {auditLoading ? (
+                                                        <p className="sans-font text-xs" style={{color:'var(--c-muted)'}}>載入中...</p>
+                                                    ) : (
+                                                        <p className="sans-font text-xs" style={{color:'var(--c-muted)'}}>
+                                                            共 <span style={{color:'var(--c-text)', fontWeight:'700'}}>{auditLogs.length}</span> 天打卡紀錄
+                                                        </p>
+                                                    )}
+                                                    {!auditLoading && auditLogs.length > 0 && (() => {
                                                         let activeDays = 0, exMins = 0, stretchMins = 0, pracCount = 0;
                                                         auditLogs.forEach(log => {
                                                             const p = log.practice||0, e = log.exerciseTime||0, s = log.stretchTime||0, f = log.fiveMin||0;
@@ -3572,42 +3618,75 @@
                                                             exMins += e; stretchMins += s; pracCount += p;
                                                         });
                                                         const totalScore = Math.round((activeDays*10) + (exMins+stretchMins)/60 + (pracCount*5));
+                                                        const lv = (() => {
+                                                            const thresholds = [{score:0,base:1},{score:50,base:10},{score:300,base:20},{score:1500,base:30},{score:5000,base:50},{score:15000,base:70},{score:40000,base:90}];
+                                                            if (!totalScore || totalScore <= 0) return 1;
+                                                            let tier = thresholds[0];
+                                                            for (const t of thresholds) { if (totalScore >= t.score) tier = t; else break; }
+                                                            const idx = thresholds.indexOf(tier);
+                                                            const next = thresholds[idx+1];
+                                                            if (!next) return Math.min(99, 90 + Math.floor((totalScore - 40000) / 500));
+                                                            return tier.base + Math.floor(((totalScore - tier.score) / (next.score - tier.score)) * (next.base - tier.base));
+                                                        })();
                                                         return (
-                                                            <span className="sans-font text-[10px] px-2 py-0.5 r-badge"
-                                                                style={{background:'#dcfce7', color:'#166534', border:'1px solid #86efac'}}>
-                                                                累積 {totalScore} 分
-                                                            </span>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="sans-font text-[10px] px-2 py-0.5 r-badge"
+                                                                    style={{background:'#e0f2fe', color:'var(--c-primary-text)', border:'1px solid #74c0fc'}}>
+                                                                    累積 {totalScore} 分
+                                                                </span>
+                                                                <span className="sans-font text-[10px] px-2 py-0.5 r-badge"
+                                                                    style={{background:'#dcfce7', color:'#166534', border:'1px solid #86efac'}}>
+                                                                    Lv.{lv}
+                                                                </span>
+                                                            </div>
                                                         );
                                                     })()}
                                                 </div>
-                                                {auditLoading && (
-                                                    <p className="sans-font text-xs text-center py-3" style={{color:'var(--c-muted)'}}>載入中...</p>
-                                                )}
+
+                                                {/* 無紀錄 */}
                                                 {!auditLoading && auditLogs.length === 0 && (
-                                                    <p className="sans-font text-xs text-center py-3" style={{color:'var(--c-muted)'}}>無任何打卡紀錄</p>
+                                                    <p className="sans-font text-xs text-center py-4" style={{color:'var(--c-muted)'}}>此成員尚無任何打卡紀錄</p>
                                                 )}
-                                                {!auditLoading && auditLogs.map(log => {
+
+                                                {/* 每日紀錄列表 */}
+                                                {!auditLoading && auditLogs.map((log, li) => {
                                                     const contrib = ((log.practice||0)*5) + ((log.exerciseTime||0)+(log.stretchTime||0))/60;
                                                     const isDel = deletingDate === log.date;
                                                     return (
                                                         <div key={log.date}
-                                                            className="flex items-center gap-2 py-1.5"
-                                                            style={{borderBottom:'1px solid var(--c-border)', opacity: isDel ? 0.4 : 1}}>
-                                                            <span className="sans-font text-xs" style={{color:'var(--c-text)', minWidth:'82px', flexShrink:0}}>
+                                                            className="flex items-center gap-2 py-2"
+                                                            style={{
+                                                                borderTop: li > 0 ? '1px solid var(--c-border)' : 'none',
+                                                                opacity: isDel ? 0.35 : 1,
+                                                                transition: 'opacity 0.2s'
+                                                            }}>
+                                                            {/* 日期 */}
+                                                            <span className="sans-font text-xs" style={{color:'var(--c-text)', minWidth:'84px', flexShrink:0, fontWeight:'700'}}>
                                                                 {log.date}
                                                             </span>
-                                                            <span className="sans-font text-[10px]" style={{color:'var(--c-text-sub)', flex:1}}>
-                                                                練習 {log.practice||0} · 運動 {log.exerciseTime||0}分 · 伸展 {log.stretchTime||0}分 · 五分鐘 {log.fiveMin||0}
+                                                            {/* 數值 */}
+                                                            <span className="sans-font text-[10px]" style={{color:'var(--c-text-sub)', flex:1, lineHeight:'1.6'}}>
+                                                                練習 <b style={{color:'var(--c-text)'}}>{log.practice||0}</b> ·{' '}
+                                                                運動 <b style={{color:'var(--c-text)'}}>{log.exerciseTime||0}</b>分 ·{' '}
+                                                                伸展 <b style={{color:'var(--c-text)'}}>{log.stretchTime||0}</b>分 ·{' '}
+                                                                五分鐘 <b style={{color:'var(--c-text)'}}>{log.fiveMin||0}</b>
                                                             </span>
-                                                            <span className="sans-font text-[10px]" style={{color:'#d97706', minWidth:'38px', textAlign:'right', flexShrink:0}}>
+                                                            {/* 貢獻分 */}
+                                                            <span className="sans-font text-[10px]" style={{color:'#d97706', fontWeight:'700', minWidth:'42px', textAlign:'right', flexShrink:0}}>
                                                                 +{contrib.toFixed(1)}分
                                                             </span>
+                                                            {/* 刪除按鈕 */}
                                                             <button
                                                                 onClick={() => deleteOneLog(u.uid, log.date)}
                                                                 disabled={isDel}
                                                                 className="px-2 py-0.5 r-badge sans-font text-[10px] active-press flex-shrink-0"
-                                                                style={{background:'var(--c-danger-bg)', border:'1px solid var(--c-danger)', color:'var(--c-danger-text)'}}>
-                                                                {isDel ? '刪除中...' : '刪除'}
+                                                                style={{
+                                                                    background:'var(--c-danger-bg)',
+                                                                    border:'1px solid var(--c-danger)',
+                                                                    color:'var(--c-danger-text)',
+                                                                    minWidth:'44px', textAlign:'center'
+                                                                }}>
+                                                                {isDel ? '刪除中' : '刪除'}
                                                             </button>
                                                         </div>
                                                     );
