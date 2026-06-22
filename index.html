@@ -860,18 +860,24 @@
                 console.log('📋 [UpcomingEventsBanner] 篩選本週活動，收到', activities.length, '個活動');
                 
                 const now = new Date();
-                const sunday = new Date(now);
-                sunday.setDate(now.getDate() - now.getDay());
-                sunday.setHours(0,0,0,0);
-                const saturday = new Date(sunday);
-                saturday.setDate(sunday.getDate() + 6);
+                // 本週改為「週一～週日」，且只顯示今天以後（含今天）的活動，
+                // 已過去的日子（即使仍在本週範圍內）不再顯示
+                const today = new Date(now);
+                today.setHours(0,0,0,0);
+                const dayOfWeek = today.getDay(); // 0=日 1=一 ... 6=六
+                const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+                const monday = new Date(today);
+                monday.setDate(today.getDate() + mondayOffset);
+                const sunday = new Date(monday);
+                sunday.setDate(monday.getDate() + 6);
+                sunday.setHours(23,59,59,999);
 
                 const events = activities
                     .filter(data => {
                         const dateStr = data.date;
                         if (!dateStr) return false;
                         const d = new Date(dateStr + 'T00:00:00');
-                        return d >= sunday && d <= saturday;
+                        return d >= today && d <= sunday;
                     })
                     .map(data => ({
                         id: data.id,
