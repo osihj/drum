@@ -1263,6 +1263,14 @@
                 setPendingTaps(prev => { const n = {...prev}; delete n[field]; return n; });
             };
 
+            // 補打：選了本週（週日~週六）且不晚於今天的日期就寫入該日，否則寫入今天
+            const commitKey = (() => {
+                if (selectedDateKey && selectedDateKey <= todayKey &&
+                    currentWeekDays.some(d => formatDateKey(d) === selectedDateKey)) return selectedDateKey;
+                return todayKey;
+            })();
+            const isBackfill = commitKey !== todayKey;
+
             const handleCommit = async () => {
                 if (!user || Object.keys(pendingTaps).length === 0) {
                     setIsModalOpen(false);
@@ -1278,7 +1286,7 @@
                     updates[field] = firebase.firestore.FieldValue.increment(val);
                 });
                 await db.collection('users').doc(user.uid)
-                    .collection('dailyLogs').doc(todayKey).set(updates, { merge: true });
+                    .collection('dailyLogs').doc(commitKey).set(updates, { merge: true });
 
                 // 3. 重新計算新等級（從 Firestore 最新資料）
                 const newLogsSnap = await db.collection('users').doc(user.uid)
@@ -1328,9 +1336,9 @@
 
             const handleClearToday = async () => {
                 if (!user) return;
-                if (window.confirm("確定要清除今日的所有紀錄嗎？")) {
+                if (window.confirm(isBackfill ? `確定要清除 ${commitKey} 的所有紀錄嗎？` : "確定要清除今日的所有紀錄嗎？")) {
                     await db.collection('users').doc(user.uid)
-                        .collection('dailyLogs').doc(todayKey).delete();
+                        .collection('dailyLogs').doc(commitKey).delete();
                 }
             };
 
@@ -1532,8 +1540,8 @@
                                                                 // 各 segment 的實際 px 高度，等比縮放到 barH
                                                                 const segPx = segs.map(v => total > 0 ? Math.round(v / total * barH) : 0);
                                                                 return (
-                                                                    <div key={i} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:'5px', cursor: total > 0 ? 'pointer' : 'default'}} 
-                                                                        onClick={() => total > 0 && setSelectedDateKey(selectedDateKey === dateStr ? null : dateStr)}>
+                                                                    <div key={i} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:'5px', cursor: (dateStr <= todayKey) ? 'pointer' : 'default'}} 
+                                                                        onClick={() => dateStr <= todayKey && setSelectedDateKey(selectedDateKey === dateStr ? null : dateStr)}>
                                                                         <div style={{width:'100%', height:`${STACK_MAX_H}px`, display:'flex', flexDirection:'column', justifyContent:'flex-end'}}>
                                                                             {isEmpty ? (
                                                                                 <div style={{width:'100%', height:'3px', background:'var(--c-border)', borderRadius:'2px'}}></div>
@@ -1570,7 +1578,7 @@
                                 })()}
 
                                 {/* CTA */}
-                                <button onClick={() => { setSelectedDateKey(null); setIsModalOpen(true); }} className="w-full pk-pink p-5 r-card neo-border neo-shadow active-press flex items-center justify-center gap-3 group">
+                                <button onClick={() => { setIsModalOpen(true); }} className="w-full pk-pink p-5 r-card neo-border neo-shadow active-press flex items-center justify-center gap-3 group">
                                     <span className="sans-font text-white text-xl tracking-tighter">立即突破</span>
                                 </button>
                                 
@@ -1591,7 +1599,7 @@
                                 <button onClick={() => { setIsModalOpen(false); setPendingTaps({}); }} className="absolute -top-3 -right-3 w-8 h-8 bg-white neo-border rounded-full flex items-center justify-center active-press">
                                     <Icon name="X" size={16} />
                                 </button>
-                                <h3 className="sans-font text-xl mb-6 italic text-center" style={{color:'var(--c-text)'}}>捕捉今日造化</h3>
+                                <h3 className="sans-font text-xl mb-6 italic text-center" style={{color:'var(--c-text)'}}>{isBackfill ? `補打 ${Number(commitKey.split('-')[1])}/${Number(commitKey.split('-')[2])} 造化` : '捕捉今日造化'}</h3>
                                 <div className="grid grid-cols-2 gap-4">
                                     <MiniActionCard label="練功" onClick={() => handleTap('simple', 'practice')} bgColor="#ffd43b" tapped={(pendingTaps['practice'] || 0) > 0} />
                                     <MiniActionCard label="五分鐘" onClick={() => handleTap('simple', 'fiveMin')} bgColor="#74c0fc" tapped={(pendingTaps['fiveMin'] || 0) > 0} />
@@ -1612,7 +1620,7 @@
                                 </div>
                                 <div className="mt-6 flex flex-col gap-2">
                                     <button onClick={handleCommit} className="w-full py-4 r-btn sans-font text-lg tracking-widest active-press text-white neo-border neo-shadow-sm" style={{background:'#b197fc', borderColor:'#9775fa'}}>修煉圓滿</button>
-                                    <button onClick={handleClearToday} className="w-full py-2 sans-font text-xs hover:text-red-400 transition-colors" style={{color:'var(--c-muted)'}}>清除今日紀錄</button>
+                                    <button onClick={handleClearToday} className="w-full py-2 sans-font text-xs hover:text-red-400 transition-colors" style={{color:'var(--c-muted)'}}>{isBackfill ? '清除該日紀錄' : '清除今日紀錄'}</button>
                                 </div>
                             </div>
                         </div>
