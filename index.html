@@ -1235,8 +1235,7 @@
                 const startOfWeek = currentWeekDays[0];
                 let wEx = 0, wPrac = 0, wFive = 0, wActive = 0;
                 Object.entries(dailyLogs).forEach(([dateStr, data]) => {
-                    const date = new Date(dateStr);
-                    if (date >= startOfWeek) {
+                    if (dateStr >= formatDateKey(startOfWeek)) {
                         const p = Number(data.practice) || 0;
                         const f = Number(data.fiveMin) || 0;
                         const e = Number(data.exerciseTime) || 0;
