@@ -148,6 +148,52 @@
     <div id="root"></div>
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
+
+        // ── 診斷用：把未捕捉的錯誤直接顯示在畫面上（iOS 主畫面模式沒有 Console 可看）──
+        // 出現紅色錯誤列時，請截圖給開發者；確認問題解決後可整段移除。
+        const showDebugBanner = (label, detail) => {
+            try {
+                let el = document.getElementById('debug-banner');
+                if (!el) {
+                    el = document.createElement('div');
+                    el.id = 'debug-banner';
+                    el.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;background:#fee2e2;color:#7f1d1d;font-size:12px;line-height:1.5;padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 8px;border-bottom:2px solid #ef4444;word-break:break-all;max-height:45vh;overflow:auto;white-space:pre-wrap;';
+                    el.onclick = () => el.remove();
+                    document.body.appendChild(el);
+                }
+                el.textContent += (el.textContent ? '\n\n' : '') + '[' + label + '] ' + detail + '\n（點一下可關閉）';
+            } catch (_) {}
+        };
+        window.addEventListener('error', e => {
+            showDebugBanner('錯誤', (e.message || '') + ' @ ' + (e.filename || '').split('/').pop() + ':' + (e.lineno || '?'));
+        });
+        window.addEventListener('unhandledrejection', e => {
+            const r = e.reason;
+            showDebugBanner('未處理的 Promise', (r && (r.code ? r.code + ' - ' : '') + (r.message || r)) || '未知');
+        });
+
+        class ErrorBoundary extends React.Component {
+            constructor(props) { super(props); this.state = { err: null }; }
+            static getDerivedStateFromError(err) { return { err }; }
+            componentDidCatch(err, info) {
+                console.error('[ErrorBoundary]', err, info);
+                showDebugBanner('畫面錯誤', (err && err.message) || String(err));
+            }
+            render() {
+                if (this.state.err) {
+                    return (
+                        <div style={{padding:'80px 24px 24px', textAlign:'center', fontFamily:"'Noto Sans TC', sans-serif"}}>
+                            <p style={{fontSize:'16px', fontWeight:700, marginBottom:'8px'}}>畫面發生錯誤</p>
+                            <p style={{fontSize:'12px', color:'#6b7280', marginBottom:'16px', wordBreak:'break-all'}}>{String(this.state.err && this.state.err.message || this.state.err)}</p>
+                            <button onClick={() => location.reload()}
+                                style={{padding:'10px 24px', background:'#74c0fc', border:'2px solid #374151', borderRadius:'10px', fontWeight:700}}>重新載入</button>
+                        </div>
+                    );
+                }
+                return this.props.children;
+            }
+        }
+
         const firebaseConfig = {
             apiKey: "AIzaSyAdCP5BvvIhcjYt2_Re80JKKDKqfbgjtvk",
             authDomain: "drum-8d969.firebaseapp.com",
@@ -1076,6 +1122,7 @@
                             // doc 不存在的新用戶：等 joinTeam 建立
                         } catch (e) {
                             console.warn('[Auth] 讀取失敗:', e.message);
+                            showDebugBanner('登入後讀取使用者資料失敗', (e.code ? e.code + ' - ' : '') + e.message);
                         }
                     }
                     setUser(u);
@@ -3324,7 +3371,7 @@
             </button>
         );
 
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+        ReactDOM.createRoot(document.getElementById('root')).render(<ErrorBoundary><App /></ErrorBoundary>);
     </script>
 </body>
 </html>
