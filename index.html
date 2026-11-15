@@ -1185,12 +1185,17 @@
                                 
                                 // 如果瀏覽器支援，直接顯示通知
                                 if ('Notification' in window && Notification.permission === 'granted') {
-                                    new Notification('自律動起來', {
-                                        body: message,
-                                        icon: '/drum/icon-96x96.png',
-                                        badge: '/drum/icon-96x96.png',
-                                        tag: 'instant-notif'
-                                    });
+                                    try {
+                                        new Notification('自律動起來', {
+                                            body: message,
+                                            icon: '/drum/icon-96x96.png',
+                                            badge: '/drum/icon-96x96.png',
+                                            tag: 'instant-notif'
+                                        });
+                                    } catch (notifErr) {
+                                        // iOS 不允許直接 new Notification（會丟 Illegal constructor），略過即可
+                                        console.warn('[通知] 顯示失敗:', notifErr.message);
+                                    }
                                 }
                             }
                         },
