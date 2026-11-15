@@ -172,6 +172,30 @@
             showDebugBanner('未處理的 Promise', (r && (r.code ? r.code + ' - ' : '') + (r.message || r)) || '未知');
         });
 
+        // ── 診斷用：步驟記錄。每個關鍵步驟先同步寫入 localStorage，
+        // 即使 iOS 直接把頁面關掉，下次開啟時仍能看到「最後走到哪一步」。
+        const crumb = (s) => {
+            try {
+                const a = JSON.parse(localStorage.getItem('__crumbs') || '[]');
+                a.push(new Date().toISOString().slice(11, 19) + ' ' + s);
+                localStorage.setItem('__crumbs', JSON.stringify(a.slice(-40)));
+            } catch (_) {}
+        };
+        (() => {
+            try {
+                const prev = JSON.parse(localStorage.getItem('__crumbs') || '[]');
+                const stable = localStorage.getItem('__stable') === '1';
+                if (prev.length && !stable) {
+                    showDebugBanner('上次異常結束，最後步驟（若上次並未閃退可忽略）', prev.slice(-15).join('\n'));
+                }
+                localStorage.setItem('__crumbs', '[]');
+                localStorage.setItem('__stable', '0');
+                crumb('頁面啟動 ' + navigator.userAgent.slice(0, 90) + ' standalone=' + window.navigator.standalone);
+                // 撐過 15 秒視為正常，不再提示
+                setTimeout(() => { try { localStorage.setItem('__stable', '1'); } catch (_) {} }, 15000);
+            } catch (_) {}
+        })();
+
         class ErrorBoundary extends React.Component {
             constructor(props) { super(props); this.state = { err: null }; }
             static getDerivedStateFromError(err) { return { err }; }
@@ -358,7 +382,9 @@
                 if (!em || !password) { setError('請填寫 Email 與密碼'); return; }
                 setLoading(true); setError(''); setMsg('');
                 try {
+                    crumb('Email 登入送出');
                     await auth.signInWithEmailAndPassword(em, password);
+                    crumb('Email 驗證成功');
                 } catch (err) {
                     const msgs = {
                         'auth/user-not-found': '查無此帳號',
@@ -1075,6 +1101,9 @@
             
             const todayKey = useMemo(() => formatDateKey(new Date()), []);
             const currentWeekDays = useMemo(() => getWeekDays(new Date()), []);
+            useEffect(() => {
+                crumb('App 渲染 tab=' + activeTab + ' user=' + !!user + ' team=' + !!(userProfile && userProfile.teamId));
+            }, [activeTab, user, userProfile]);
 
             // Auth state
             // redirect 登入回來後取得結果（必須在 App 層執行）
@@ -1125,6 +1154,7 @@
                             showDebugBanner('登入後讀取使用者資料失敗', (e.code ? e.code + ' - ' : '') + e.message);
                         }
                     }
+                    crumb('onAuthStateChanged 完成 user=' + !!u);
                     setUser(u);
                     setAuthReady(true);
                 });
@@ -1170,6 +1200,7 @@
                                 setCalendarHasNew(true);
                             }
                             
+                            crumb('收到活動資料 ' + processed.length + ' 筆');
                             setGlobalActivities(processed);
                             setActivitiesLoaded(true);
                         },
@@ -1255,6 +1286,7 @@
             useEffect(() => {
                 if (!user) return;
                 const registerPushSubscription = async () => {
+                    crumb('推播註冊開始 permission=' + (typeof Notification !== 'undefined' ? Notification.permission : '不支援'));
                     try {
                         if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
                             console.warn('⚠️ 此裝置不支援 Web Push');
@@ -1293,6 +1325,7 @@
                             updatedAt: Date.now()
                         });
                         console.log('✅ Web Push 訂閱已儲存');
+                        crumb('推播訂閱已儲存');
                     } catch (err) {
                         console.warn('⚠️ Web Push 訂閱失敗:', err.message);
                     }
@@ -1305,6 +1338,7 @@
                 if (!user) return;
                 const unsub = db.collection('users').doc(user.uid)
                     .onSnapshot(snap => {
+                        crumb('收到使用者資料 exists=' + snap.exists);
                         if (snap.exists) setUserProfile(snap.data());
                         else setUserProfile(null);
                     });
@@ -1318,6 +1352,7 @@
                     .collection('dailyLogs').onSnapshot(snap => {
                         const logs = {};
                         snap.forEach(doc => logs[doc.id] = doc.data());
+                        crumb('收到打卡紀錄 ' + Object.keys(logs).length + ' 天');
                         setDailyLogs(logs);
                     });
                 return () => unsub();
