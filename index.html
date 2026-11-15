@@ -371,6 +371,7 @@
             const handleGoogleLogin = async () => {
                 setLoading(true);
                 setError('');
+                crumb('按下 Google 登入（開始 popup）');
                 const provider = new firebase.auth.GoogleAuthProvider();
                 provider.addScope('email');
                 provider.addScope('profile');
@@ -378,10 +379,12 @@
                 try {
                     // popup 優先（桌面 Chrome 最穩定）
                     const result = await auth.signInWithPopup(provider);
+                    crumb('popup 登入成功');
                     const resolvedEmail = result.user?.email || result.user?.providerData?.[0]?.email;
                     console.log('[Popup 登入成功]', { uid: result.user?.uid, email: resolvedEmail });
                 } catch (popupError) {
                     console.warn('[Popup 失敗]', popupError.code);
+                    crumb('popup 失敗 ' + popupError.code);
                     if (
                         popupError.code === 'auth/popup-blocked' ||
                         popupError.code === 'auth/popup-closed-by-user' ||
@@ -389,6 +392,7 @@
                     ) {
                         // popup 被封鎖才改用 redirect（行動裝置 Safari）
                         try {
+                            crumb('改用 redirect 登入');
                             await auth.signInWithRedirect(provider);
                         } catch (e) {
                             setError('登入失敗，請再試一次');
@@ -1031,7 +1035,9 @@
             // Auth state
             // redirect 登入回來後取得結果（必須在 App 層執行）
             useEffect(() => {
+                crumb('檢查 redirect 結果');
                 auth.getRedirectResult().then(result => {
+                    crumb('redirect 結果 user=' + !!(result && result.user));
                     if (result?.user) {
                         console.log('[Redirect 登入成功]', {
                             uid: result.user.uid,
@@ -1040,6 +1046,7 @@
                     }
                 }).catch(e => {
                     console.error('[Redirect 登入失敗]', e.message);
+                    crumb('redirect 失敗 ' + (e.code || e.message));
                 });
             }, []);
 
