@@ -148,76 +148,6 @@
     <div id="root"></div>
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
-
-        // ── 診斷用：把未捕捉的錯誤直接顯示在畫面上（iOS 主畫面模式沒有 Console 可看）──
-        // 出現紅色錯誤列時，請截圖給開發者；確認問題解決後可整段移除。
-        const showDebugBanner = (label, detail) => {
-            try {
-                let el = document.getElementById('debug-banner');
-                if (!el) {
-                    el = document.createElement('div');
-                    el.id = 'debug-banner';
-                    el.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;background:#fee2e2;color:#7f1d1d;font-size:12px;line-height:1.5;padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 8px;border-bottom:2px solid #ef4444;word-break:break-all;max-height:45vh;overflow:auto;white-space:pre-wrap;';
-                    el.onclick = () => el.remove();
-                    document.body.appendChild(el);
-                }
-                el.textContent += (el.textContent ? '\n\n' : '') + '[' + label + '] ' + detail + '\n（點一下可關閉）';
-            } catch (_) {}
-        };
-        window.addEventListener('error', e => {
-            showDebugBanner('錯誤', (e.message || '') + ' @ ' + (e.filename || '').split('/').pop() + ':' + (e.lineno || '?'));
-        });
-        window.addEventListener('unhandledrejection', e => {
-            const r = e.reason;
-            showDebugBanner('未處理的 Promise', (r && (r.code ? r.code + ' - ' : '') + (r.message || r)) || '未知');
-        });
-
-        // ── 診斷用：步驟記錄。每個關鍵步驟先同步寫入 localStorage，
-        // 即使 iOS 直接把頁面關掉，下次開啟時仍能看到「最後走到哪一步」。
-        const crumb = (s) => {
-            try {
-                const a = JSON.parse(localStorage.getItem('__crumbs') || '[]');
-                a.push(new Date().toISOString().slice(11, 19) + ' ' + s);
-                localStorage.setItem('__crumbs', JSON.stringify(a.slice(-40)));
-            } catch (_) {}
-        };
-        (() => {
-            try {
-                const prev = JSON.parse(localStorage.getItem('__crumbs') || '[]');
-                const stable = localStorage.getItem('__stable') === '1';
-                if (prev.length && !stable) {
-                    showDebugBanner('上次異常結束，最後步驟（若上次並未閃退可忽略）', prev.slice(-15).join('\n'));
-                }
-                localStorage.setItem('__crumbs', '[]');
-                localStorage.setItem('__stable', '0');
-                crumb('頁面啟動 ' + navigator.userAgent.slice(0, 90) + ' standalone=' + window.navigator.standalone);
-                // 撐過 15 秒視為正常，不再提示
-                setTimeout(() => { try { localStorage.setItem('__stable', '1'); } catch (_) {} }, 15000);
-            } catch (_) {}
-        })();
-
-        class ErrorBoundary extends React.Component {
-            constructor(props) { super(props); this.state = { err: null }; }
-            static getDerivedStateFromError(err) { return { err }; }
-            componentDidCatch(err, info) {
-                console.error('[ErrorBoundary]', err, info);
-                showDebugBanner('畫面錯誤', (err && err.message) || String(err));
-            }
-            render() {
-                if (this.state.err) {
-                    return (
-                        <div style={{padding:'80px 24px 24px', textAlign:'center', fontFamily:"'Noto Sans TC', sans-serif"}}>
-                            <p style={{fontSize:'16px', fontWeight:700, marginBottom:'8px'}}>畫面發生錯誤</p>
-                            <p style={{fontSize:'12px', color:'#6b7280', marginBottom:'16px', wordBreak:'break-all'}}>{String(this.state.err && this.state.err.message || this.state.err)}</p>
-                            <button onClick={() => location.reload()}
-                                style={{padding:'10px 24px', background:'#74c0fc', border:'2px solid #374151', borderRadius:'10px', fontWeight:700}}>重新載入</button>
-                        </div>
-                    );
-                }
-                return this.props.children;
-            }
-        }
-
         const firebaseConfig = {
             apiKey: "AIzaSyAdCP5BvvIhcjYt2_Re80JKKDKqfbgjtvk",
             authDomain: "drum-8d969.firebaseapp.com",
@@ -371,7 +301,6 @@
             const handleGoogleLogin = async () => {
                 setLoading(true);
                 setError('');
-                crumb('按下 Google 登入（開始 popup）');
                 const provider = new firebase.auth.GoogleAuthProvider();
                 provider.addScope('email');
                 provider.addScope('profile');
@@ -379,12 +308,10 @@
                 try {
                     // popup 優先（桌面 Chrome 最穩定）
                     const result = await auth.signInWithPopup(provider);
-                    crumb('popup 登入成功');
                     const resolvedEmail = result.user?.email || result.user?.providerData?.[0]?.email;
                     console.log('[Popup 登入成功]', { uid: result.user?.uid, email: resolvedEmail });
                 } catch (popupError) {
                     console.warn('[Popup 失敗]', popupError.code);
-                    crumb('popup 失敗 ' + popupError.code);
                     if (
                         popupError.code === 'auth/popup-blocked' ||
                         popupError.code === 'auth/popup-closed-by-user' ||
@@ -392,7 +319,6 @@
                     ) {
                         // popup 被封鎖才改用 redirect（行動裝置 Safari）
                         try {
-                            crumb('改用 redirect 登入');
                             await auth.signInWithRedirect(provider);
                         } catch (e) {
                             setError('登入失敗，請再試一次');
@@ -1028,16 +954,11 @@
             
             const todayKey = useMemo(() => formatDateKey(new Date()), []);
             const currentWeekDays = useMemo(() => getWeekDays(new Date()), []);
-            useEffect(() => {
-                crumb('App 渲染 tab=' + activeTab + ' user=' + !!user + ' team=' + !!(userProfile && userProfile.teamId));
-            }, [activeTab, user, userProfile]);
 
             // Auth state
             // redirect 登入回來後取得結果（必須在 App 層執行）
             useEffect(() => {
-                crumb('檢查 redirect 結果');
                 auth.getRedirectResult().then(result => {
-                    crumb('redirect 結果 user=' + !!(result && result.user));
                     if (result?.user) {
                         console.log('[Redirect 登入成功]', {
                             uid: result.user.uid,
@@ -1046,7 +967,6 @@
                     }
                 }).catch(e => {
                     console.error('[Redirect 登入失敗]', e.message);
-                    crumb('redirect 失敗 ' + (e.code || e.message));
                 });
             }, []);
 
@@ -1081,10 +1001,8 @@
                             // doc 不存在的新用戶：等 joinTeam 建立
                         } catch (e) {
                             console.warn('[Auth] 讀取失敗:', e.message);
-                            showDebugBanner('登入後讀取使用者資料失敗', (e.code ? e.code + ' - ' : '') + e.message);
                         }
                     }
-                    crumb('onAuthStateChanged 完成 user=' + !!u);
                     setUser(u);
                     setAuthReady(true);
                 });
@@ -1130,7 +1048,6 @@
                                 setCalendarHasNew(true);
                             }
                             
-                            crumb('收到活動資料 ' + processed.length + ' 筆');
                             setGlobalActivities(processed);
                             setActivitiesLoaded(true);
                         },
@@ -1192,17 +1109,12 @@
                                 
                                 // 如果瀏覽器支援，直接顯示通知
                                 if ('Notification' in window && Notification.permission === 'granted') {
-                                    try {
-                                        new Notification('自律動起來', {
-                                            body: message,
-                                            icon: '/drum/icon-96x96.png',
-                                            badge: '/drum/icon-96x96.png',
-                                            tag: 'instant-notif'
-                                        });
-                                    } catch (notifErr) {
-                                        // iOS 不允許直接 new Notification（會丟 Illegal constructor），略過即可
-                                        console.warn('[通知] 顯示失敗:', notifErr.message);
-                                    }
+                                    new Notification('自律動起來', {
+                                        body: message,
+                                        icon: '/drum/icon-96x96.png',
+                                        badge: '/drum/icon-96x96.png',
+                                        tag: 'instant-notif'
+                                    });
                                 }
                             }
                         },
@@ -1221,7 +1133,6 @@
             useEffect(() => {
                 if (!user) return;
                 const registerPushSubscription = async () => {
-                    crumb('推播註冊開始 permission=' + (typeof Notification !== 'undefined' ? Notification.permission : '不支援'));
                     try {
                         if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
                             console.warn('⚠️ 此裝置不支援 Web Push');
@@ -1260,7 +1171,6 @@
                             updatedAt: Date.now()
                         });
                         console.log('✅ Web Push 訂閱已儲存');
-                        crumb('推播訂閱已儲存');
                     } catch (err) {
                         console.warn('⚠️ Web Push 訂閱失敗:', err.message);
                     }
@@ -1273,7 +1183,6 @@
                 if (!user) return;
                 const unsub = db.collection('users').doc(user.uid)
                     .onSnapshot(snap => {
-                        crumb('收到使用者資料 exists=' + snap.exists);
                         if (snap.exists) setUserProfile(snap.data());
                         else setUserProfile(null);
                     });
@@ -1287,7 +1196,6 @@
                     .collection('dailyLogs').onSnapshot(snap => {
                         const logs = {};
                         snap.forEach(doc => logs[doc.id] = doc.data());
-                        crumb('收到打卡紀錄 ' + Object.keys(logs).length + ' 天');
                         setDailyLogs(logs);
                     });
                 return () => unsub();
@@ -3341,7 +3249,7 @@
             </button>
         );
 
-        ReactDOM.createRoot(document.getElementById('root')).render(<ErrorBoundary><App /></ErrorBoundary>);
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
 </html>
