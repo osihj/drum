@@ -374,7 +374,8 @@
             // iOS「加入主畫面」(standalone) 模式：Safari 會隔離儲存空間，
             // Google 彈窗／重新導向登入回來後拿不到結果，畫面會一直回到登入頁。
             // 這是 iOS 的限制，因此該模式下改用 Email／密碼登入。
-            const isIosPwa = /iphone|ipad|ipod/i.test(navigator.userAgent) && window.navigator.standalone === true;
+            const isIosDevice = /iphone|ipad|ipod/i.test(navigator.userAgent) || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+            const isIosPwa = isIosDevice && window.navigator.standalone === true;
 
             const handleEmailLogin = async (e) => {
                 if (e) e.preventDefault();
